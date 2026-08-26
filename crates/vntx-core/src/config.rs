@@ -103,18 +103,19 @@ impl VntxConfig {
     ///
     /// Returns [`VntxError::ConfigError`] if the file cannot be read or contains invalid TOML.
     pub fn load_from_path<P: AsRef<Path>>(path: P) -> Result<Self, VntxError> {
-        let content = fs::read_to_string(path.as_ref()).map_err(|e| {
+        let path_ref = path.as_ref();
+        let content = fs::read_to_string(path_ref).map_err(|e| {
             VntxError::ConfigError(format!(
-                "Failed to read config from {:?}: {}",
-                path.as_ref(),
+                "Failed to read config from {}: {}",
+                path_ref.display(),
                 e
             ))
         })?;
 
         toml::from_str(&content).map_err(|e| {
             VntxError::ConfigError(format!(
-                "Failed to parse TOML config from {:?}: {}",
-                path.as_ref(),
+                "Failed to parse TOML config from {}: {}",
+                path_ref.display(),
                 e
             ))
         })
@@ -137,21 +138,24 @@ impl VntxConfig {
     ///
     /// Returns [`VntxError::ConfigError`] if serialization or writing fails.
     pub fn save_to_path<P: AsRef<Path>>(&self, path: P) -> Result<(), VntxError> {
+        let path_ref = path.as_ref();
         let toml_str = toml::to_string_pretty(self).map_err(|e| {
             VntxError::ConfigError(format!("Failed to serialize configuration to TOML: {e}"))
         })?;
 
-        if let Some(parent) = path.as_ref().parent() {
+        if let Some(parent) = path_ref.parent() {
             fs::create_dir_all(parent).map_err(|e| {
-                VntxError::ConfigError(format!("Failed to create directory {:?}: {}", parent, e))
+                VntxError::ConfigError(format!(
+                    "Failed to create directory {}: {e}",
+                    parent.display()
+                ))
             })?;
         }
 
-        fs::write(path.as_ref(), toml_str).map_err(|e| {
+        fs::write(path_ref, toml_str).map_err(|e| {
             VntxError::ConfigError(format!(
-                "Failed to write config to {:?}: {}",
-                path.as_ref(),
-                e
+                "Failed to write config to {}: {e}",
+                path_ref.display()
             ))
         })
     }

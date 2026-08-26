@@ -5,7 +5,7 @@ use vntx_core::{VntxConfig, VntxError};
 /// Arguments for `vntx fetch`.
 #[derive(Debug, clap::Args)]
 pub struct FetchArgs {
-    /// Game name or Steam AppID to fetch pre-trained neural textures for.
+    /// Game name or Steam `AppID` to fetch pre-trained neural textures for.
     #[arg(short = 'g', long = "game", required = true)]
     pub game: String,
 
@@ -15,6 +15,7 @@ pub struct FetchArgs {
 }
 
 /// Executes the `vntx fetch` command.
+#[allow(clippy::unnecessary_wraps)]
 pub fn execute(args: &FetchArgs, _config: &VntxConfig) -> Result<(), VntxError> {
     let repo_url = args
         .repo
@@ -25,7 +26,7 @@ pub fn execute(args: &FetchArgs, _config: &VntxConfig) -> Result<(), VntxError> 
         "\nFetching pre-trained NTC textures for game: {}",
         args.game
     );
-    println!("Repository: {}", repo_url);
+    println!("Repository: {repo_url}");
     println!("Contacting community repository... [All texture models up to date]");
 
     Ok(())

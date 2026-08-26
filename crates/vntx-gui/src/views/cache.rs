@@ -16,7 +16,7 @@ pub fn render(app: &mut VntxGuiApp, ui: &mut Ui) {
             {
                 if let Ok(count) = app.cache_mgr.clean_cache(None, true) {
                     app.refresh_cache();
-                    app.set_toast(format!("Purged all cache ({} files deleted).", count));
+                    app.set_toast(format!("Purged all cache ({count} files deleted)."));
                 }
             }
 
@@ -51,14 +51,15 @@ pub fn render(app: &mut VntxGuiApp, ui: &mut Ui) {
             ui.add_space(6.0);
 
             for file in &app.cached_files {
+                #[allow(clippy::cast_precision_loss)]
+                let kb = file.size_bytes as f64 / 1024.0;
                 ui.horizontal(|ui| {
                     ui.label(RichText::new(&file.file_name).strong());
                     ui.label(format!(
-                        "AppID: {} | Res: {}x{} | NTC: {:.1} KB",
+                        "AppID: {} | Res: {}x{} | NTC: {kb:.1} KB",
                         file.app_id,
                         file.header.get_original_width(),
-                        file.header.get_original_height(),
-                        file.size_bytes as f64 / 1024.0
+                        file.header.get_original_height()
                     ));
                 });
                 ui.separator();

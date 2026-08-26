@@ -9,7 +9,7 @@ use vntx_trainer::TrainingOrchestrator;
 /// Arguments for `vntx compress`.
 #[derive(Debug, clap::Args)]
 pub struct CompressArgs {
-    /// Game name or Steam AppID to compress.
+    /// Game name or Steam `AppID` to compress.
     #[arg(short = 'g', long = "game", required = true)]
     pub game: String,
 
@@ -48,10 +48,12 @@ pub fn execute(args: &CompressArgs, config: &VntxConfig) -> Result<(), VntxError
         return Ok(());
     }
 
+    #[allow(clippy::cast_precision_loss)]
+    let uncompressed_mb = scan_res.total_uncompressed_bytes as f64 / (1024.0 * 1024.0);
     println!(
         "Found {} candidate textures ({:.2} MB uncompressed)",
         scan_res.textures.len(),
-        scan_res.total_uncompressed_bytes as f64 / (1024.0 * 1024.0)
+        uncompressed_mb
     );
 
     let cache_dir = args
@@ -62,23 +64,19 @@ pub fn execute(args: &CompressArgs, config: &VntxConfig) -> Result<(), VntxError
     let jobs = args.jobs.unwrap_or(config.training.max_parallel_jobs);
     let orchestrator = TrainingOrchestrator::new(config.clone(), cache_dir.clone());
 
-    println!(
-        "Starting parallel compression using {} worker threads...",
-        jobs
-    );
+    println!("Starting parallel compression using {jobs} worker threads...");
     let summary = orchestrator.compress_textures(game.app_id, &scan_res.textures, jobs)?;
+
+    #[allow(clippy::cast_precision_loss)]
+    let in_mb = summary.total_input_bytes as f64 / (1024.0 * 1024.0);
+    #[allow(clippy::cast_precision_loss)]
+    let out_mb = summary.total_output_bytes as f64 / (1024.0 * 1024.0);
 
     println!("\nCompression Complete!");
     println!("  Processed: {} textures", summary.processed_count);
     println!("  Failed:    {} textures", summary.failed_count);
-    println!(
-        "  Input Size:  {:.2} MB",
-        summary.total_input_bytes as f64 / (1024.0 * 1024.0)
-    );
-    println!(
-        "  Output Size: {:.2} MB",
-        summary.total_output_bytes as f64 / (1024.0 * 1024.0)
-    );
+    println!("  Input Size:  {in_mb:.2} MB");
+    println!("  Output Size: {out_mb:.2} MB");
     println!(
         "  Cache Directory: {}",
         cache_dir.join(game.app_id.to_string()).display()

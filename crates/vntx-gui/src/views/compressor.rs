@@ -6,6 +6,7 @@ use vntx_core::scan_game_textures;
 use vntx_trainer::TrainingOrchestrator;
 
 /// Renders the compression panel.
+#[allow(clippy::too_many_lines)]
 pub fn render(app: &mut VntxGuiApp, ui: &mut Ui) {
     ui.add_space(10.0);
 
@@ -38,8 +39,7 @@ pub fn render(app: &mut VntxGuiApp, ui: &mut Ui) {
             game_names
                 .iter()
                 .find(|(id, _)| *id == selected_id)
-                .map(|(_, name)| name.as_str())
-                .unwrap_or("Select a game...")
+                .map_or("Select a game...", |(_, name)| name.as_str())
         } else {
             "Select a game..."
         };
@@ -138,6 +138,7 @@ pub fn render(app: &mut VntxGuiApp, ui: &mut Ui) {
                                 app.worker_jobs,
                             ) {
                                 Ok(summary) => {
+                                    #[allow(clippy::cast_precision_loss)]
                                     let saved_mb = (summary
                                         .total_input_bytes
                                         .saturating_sub(summary.total_output_bytes))
@@ -188,6 +189,7 @@ pub fn render(app: &mut VntxGuiApp, ui: &mut Ui) {
                 ui.add(ProgressBar::new(0.0).animate(true));
             }
             CompressionStatus::Compressing { processed, total } => {
+                #[allow(clippy::cast_precision_loss)]
                 let fraction = if *total > 0 {
                     *processed as f32 / *total as f32
                 } else {
@@ -195,8 +197,7 @@ pub fn render(app: &mut VntxGuiApp, ui: &mut Ui) {
                 };
                 ui.label(
                     RichText::new(format!(
-                        "⚡ Compressing textures ({}/{})...",
-                        processed, total
+                        "⚡ Compressing textures ({processed}/{total})..."
                     ))
                     .color(Color32::from_rgb(255, 152, 0)),
                 );
@@ -209,8 +210,7 @@ pub fn render(app: &mut VntxGuiApp, ui: &mut Ui) {
             } => {
                 ui.label(
                     RichText::new(format!(
-                        "✓ Finished! Compressed {} of {} textures. Saved {:.2} MB VRAM.",
-                        processed, total, saved_mb
+                        "✓ Finished! Compressed {processed} of {total} textures. Saved {saved_mb:.2} MB VRAM."
                     ))
                     .color(Color32::from_rgb(76, 175, 80))
                     .strong(),
@@ -219,7 +219,7 @@ pub fn render(app: &mut VntxGuiApp, ui: &mut Ui) {
             }
             CompressionStatus::Failed(reason) => {
                 ui.label(
-                    RichText::new(format!("✗ Compression failed: {}", reason))
+                    RichText::new(format!("✗ Compression failed: {reason}"))
                         .color(Color32::from_rgb(244, 67, 54))
                         .strong(),
                 );

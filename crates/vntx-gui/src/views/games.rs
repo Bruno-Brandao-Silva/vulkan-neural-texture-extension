@@ -62,15 +62,16 @@ pub fn render(app: &mut VntxGuiApp, ui: &mut Ui) {
 
     egui::ScrollArea::vertical().show(ui, |ui| {
         for game in filtered_games {
+            #[allow(clippy::cast_precision_loss)]
+            let disk_gb = game.size_on_disk as f64 / (1024.0 * 1024.0 * 1024.0);
             ui.group(|ui| {
                 ui.horizontal(|ui| {
                     ui.vertical(|ui| {
                         ui.label(RichText::new(&game.name).size(16.0).strong());
                         ui.label(
                             RichText::new(format!(
-                                "AppID: {} | Size on Disk: {:.1} GB",
-                                game.app_id,
-                                game.size_on_disk as f64 / (1024.0 * 1024.0 * 1024.0)
+                                "AppID: {} | Size on Disk: {disk_gb:.1} GB",
+                                game.app_id
                             ))
                             .color(Color32::from_gray(160)),
                         );
@@ -94,7 +95,7 @@ pub fn render(app: &mut VntxGuiApp, ui: &mut Ui) {
                             .clicked()
                         {
                             ui.output_mut(|o| {
-                                o.copied_text = "ENABLE_VNTX=1 %command%".to_string()
+                                o.copied_text = "ENABLE_VNTX=1 %command%".to_string();
                             });
                             app.set_toast("Copied 'ENABLE_VNTX=1 %command%' to clipboard!");
                         }

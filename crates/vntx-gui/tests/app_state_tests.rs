@@ -1,3 +1,5 @@
+#![allow(clippy::all, clippy::pedantic)]
+
 use vntx_gui::{CompressionStatus, Tab, VntxGuiApp};
 
 #[test]

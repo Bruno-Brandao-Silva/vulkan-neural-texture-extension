@@ -23,7 +23,7 @@ pub enum VntxError {
         supported: u32,
     },
 
-    /// The provided byte buffer is too small for a 64-byte NtcHeader.
+    /// The provided byte buffer is too small for a 64-byte `NtcHeader`.
     #[error("Invalid header size: expected {expected} bytes, found {size} bytes")]
     InvalidHeaderSize {
         /// Expected size in bytes.

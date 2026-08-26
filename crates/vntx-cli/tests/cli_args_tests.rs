@@ -1,3 +1,5 @@
+#![allow(clippy::all, clippy::pedantic)]
+
 use assert_cmd::Command;
 use predicates::prelude::*;
 

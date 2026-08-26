@@ -20,6 +20,11 @@ pub fn render(app: &mut VntxGuiApp, ui: &mut Ui) {
     let layer_path = expand_home_path("~/.local/share/vulkan/implicit_layer.d/vntx_layer.json");
     let is_layer_installed = layer_path.exists();
 
+    #[allow(clippy::cast_precision_loss)]
+    let saved_mb = app.cache_stats.estimated_saved_bytes as f64 / (1024.0 * 1024.0);
+    #[allow(clippy::cast_precision_loss)]
+    let size_mb = app.cache_stats.total_size_bytes as f64 / (1024.0 * 1024.0);
+
     // 4 Key Metrics Cards Layout
     ui.horizontal(|ui| {
         let card_width = 180.0;
@@ -30,10 +35,7 @@ pub fn render(app: &mut VntxGuiApp, ui: &mut Ui) {
             card_width,
             card_height,
             "Estimated VRAM Saved",
-            &format!(
-                "{:.1} MB",
-                app.cache_stats.estimated_saved_bytes as f64 / (1024.0 * 1024.0)
-            ),
+            &format!("{saved_mb:.1} MB"),
             Color32::from_rgb(76, 175, 80),
         );
 
@@ -51,10 +53,7 @@ pub fn render(app: &mut VntxGuiApp, ui: &mut Ui) {
             card_width,
             card_height,
             "Disk Cache Footprint",
-            &format!(
-                "{:.2} MB",
-                app.cache_stats.total_size_bytes as f64 / (1024.0 * 1024.0)
-            ),
+            &format!("{size_mb:.2} MB"),
             Color32::from_rgb(255, 152, 0),
         );
 

@@ -9,7 +9,7 @@ pub struct CleanArgs {
     #[arg(long = "all")]
     pub all: bool,
 
-    /// Purge cache only for a specific game name or Steam AppID.
+    /// Purge cache only for a specific game name or Steam `AppID`.
     #[arg(short = 'g', long = "game")]
     pub game: Option<String>,
 }
@@ -21,7 +21,7 @@ pub fn execute(args: &CleanArgs, config: &VntxConfig) -> Result<(), VntxError> {
 
     if args.all {
         let count = cache_mgr.clean_cache(None, true)?;
-        println!("Purged all cached NTC files ({} assets removed).", count);
+        println!("Purged all cached NTC files ({count} assets removed).");
         return Ok(());
     }
 
@@ -38,10 +38,7 @@ pub fn execute(args: &CleanArgs, config: &VntxConfig) -> Result<(), VntxError> {
         };
 
         let count = cache_mgr.clean_cache(Some(app_id), false)?;
-        println!(
-            "Purged cache for AppID {} ({} assets removed).",
-            app_id, count
-        );
+        println!("Purged cache for AppID {app_id} ({count} assets removed).");
         return Ok(());
     }
 

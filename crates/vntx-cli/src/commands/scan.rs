@@ -8,7 +8,7 @@ use vntx_core::{
 /// Arguments for `vntx scan`.
 #[derive(Debug, clap::Args)]
 pub struct ScanArgs {
-    /// Game name or Steam AppID to scan specifically.
+    /// Game name or Steam `AppID` to scan specifically.
     #[arg(short = 'g', long = "game")]
     pub game: Option<String>,
 
@@ -56,6 +56,7 @@ fn list_discovered_games(games: &[InstalledGame]) {
     println!("{:-<60}", "");
 
     for game in games {
+        #[allow(clippy::cast_precision_loss)]
         let size_mb = game.size_on_disk as f64 / (1024.0 * 1024.0);
         println!(
             "{:<10} {:<35} {:<10.1} MB",
@@ -78,16 +79,15 @@ fn scan_single_game(game: &InstalledGame, _min_size: u32) -> Result<(), VntxErro
     let min_bytes = 1024 * 1024;
     let result = scan_game_textures(game, min_bytes)?;
 
+    #[allow(clippy::cast_precision_loss)]
+    let raw_mb = result.total_uncompressed_bytes as f64 / (1024.0 * 1024.0);
+    #[allow(clippy::cast_precision_loss)]
+    let ntc_mb = result.total_estimated_ntc_bytes as f64 / (1024.0 * 1024.0);
+
     println!("\nScan Results:");
     println!("  Total Candidate Textures: {}", result.textures.len());
-    println!(
-        "  Original Uncompressed Size: {:.2} MB",
-        result.total_uncompressed_bytes as f64 / (1024.0 * 1024.0)
-    );
-    println!(
-        "  Estimated NTC Size:         {:.2} MB",
-        result.total_estimated_ntc_bytes as f64 / (1024.0 * 1024.0)
-    );
+    println!("  Original Uncompressed Size: {raw_mb:.2} MB");
+    println!("  Estimated NTC Size:         {ntc_mb:.2} MB");
     println!(
         "  Estimated VRAM Reduction:   {:.1}%",
         result.estimated_savings_percentage
@@ -96,11 +96,13 @@ fn scan_single_game(game: &InstalledGame, _min_size: u32) -> Result<(), VntxErro
     if !result.textures.is_empty() {
         println!("\nTop Candidate Textures:");
         for tex in result.textures.iter().take(5) {
+            #[allow(clippy::cast_precision_loss)]
+            let uncomp_mb = tex.file_size_bytes as f64 / (1024.0 * 1024.0);
+            #[allow(clippy::cast_precision_loss)]
+            let compressed_kb = tex.estimated_ntc_size_bytes as f64 / 1024.0;
             println!(
-                "  - {} ({:.2} MB -> {:.2} KB)",
-                tex.relative_path,
-                tex.file_size_bytes as f64 / (1024.0 * 1024.0),
-                tex.estimated_ntc_size_bytes as f64 / 1024.0
+                "  - {} ({uncomp_mb:.2} MB -> {compressed_kb:.2} KB)",
+                tex.relative_path
             );
         }
         if result.textures.len() > 5 {
@@ -113,7 +115,7 @@ fn scan_single_game(game: &InstalledGame, _min_size: u32) -> Result<(), VntxErro
 
 fn truncate_str(s: &str, max_chars: usize) -> String {
     if s.chars().count() > max_chars {
-        let truncated: String = s.chars().take(max_chars - 3).collect();
+        let truncated: String = s.chars().take(max_chars.saturating_sub(3)).collect();
         format!("{truncated}...")
     } else {
         s.to_string()

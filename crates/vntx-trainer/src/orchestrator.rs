@@ -81,7 +81,7 @@ impl TrainingOrchestrator {
                 }
                 Err(err) => {
                     summary.failed_count += 1;
-                    tracing::warn!("Failed to train texture {:?}: {}", tex.path, err);
+                    tracing::warn!("Failed to train texture {}: {}", tex.path.display(), err);
                 }
             }
         }
@@ -115,15 +115,17 @@ impl TrainingOrchestrator {
         )
         .map_err(|e| e.to_string())?;
 
-        let expected_size = header
+        let raw_expected = header
             .calculate_expected_weights_size()
-            .map_err(|e| e.to_string())? as usize;
+            .map_err(|e| e.to_string())?;
+        let expected_size = usize::try_from(raw_expected).map_err(|e| e.to_string())?;
         let mut dummy_weights = vec![0u8; expected_size];
 
         // Seed weights deterministically from texture hash
         let hash_bytes = texture_hash.to_le_bytes();
         for (i, byte) in dummy_weights.iter_mut().enumerate() {
-            *byte = hash_bytes[i % 8] ^ ((i % 255) as u8);
+            let mod_byte = u8::try_from(i % 255).unwrap_or(0);
+            *byte = hash_bytes[i % 8] ^ mod_byte;
         }
 
         self.cache_manager

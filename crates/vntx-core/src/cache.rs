@@ -18,13 +18,13 @@ pub struct CachedFile {
     /// Decoded 64-bit texture checksum.
     pub texture_hash: u64,
 
-    /// Associated Steam AppID or game ID.
+    /// Associated Steam `AppID` or game ID.
     pub app_id: u32,
 
     /// Total file size on disk in bytes.
     pub size_bytes: u64,
 
-    /// Parsed and validated NtcHeader.
+    /// Parsed and validated `NtcHeader`.
     pub header: NtcHeader,
 }
 
@@ -65,13 +65,13 @@ impl CacheManager {
         &self.root_dir
     }
 
-    /// Returns the directory path for a specific game AppID: `<root>/<app_id>/`.
+    /// Returns the directory path for a specific game `AppID`: `<root>/<app_id>/`.
     #[must_use]
     pub fn get_app_dir(&self, app_id: u32) -> PathBuf {
         self.root_dir.join(app_id.to_string())
     }
 
-    /// Lists all valid `.ntc` files, optionally filtered by game AppID.
+    /// Lists all valid `.ntc` files, optionally filtered by game `AppID`.
     ///
     /// # Errors
     ///
@@ -85,7 +85,7 @@ impl CacheManager {
         if let Some(target_app_id) = app_id {
             let app_dir = self.get_app_dir(target_app_id);
             if app_dir.exists() {
-                self.collect_app_files(target_app_id, &app_dir, &mut cached_files)?;
+                Self::collect_app_files(target_app_id, &app_dir, &mut cached_files);
             }
         } else if let Ok(entries) = fs::read_dir(&self.root_dir) {
             for entry in entries.flatten() {
@@ -93,7 +93,7 @@ impl CacheManager {
                 if path.is_dir() {
                     if let Some(name) = path.file_name().and_then(|n| n.to_str()) {
                         if let Ok(parsed_app_id) = name.parse::<u32>() {
-                            let _ = self.collect_app_files(parsed_app_id, &path, &mut cached_files);
+                            Self::collect_app_files(parsed_app_id, &path, &mut cached_files);
                         }
                     }
                 }
@@ -152,8 +152,9 @@ impl CacheManager {
             if self.root_dir.exists() {
                 fs::remove_dir_all(&self.root_dir).map_err(|e| {
                     VntxError::CacheError(format!(
-                        "Failed to wipe root cache directory {:?}: {}",
-                        self.root_dir, e
+                        "Failed to wipe root cache directory {}: {}",
+                        self.root_dir.display(),
+                        e
                     ))
                 })?;
             }
@@ -164,8 +165,9 @@ impl CacheManager {
                 deleted_count = files.len();
                 fs::remove_dir_all(&app_dir).map_err(|e| {
                     VntxError::CacheError(format!(
-                        "Failed to purge game cache directory {:?}: {}",
-                        app_dir, e
+                        "Failed to purge game cache directory {}: {}",
+                        app_dir.display(),
+                        e
                     ))
                 })?;
             }
@@ -190,8 +192,9 @@ impl CacheManager {
         let app_dir = self.get_app_dir(app_id);
         fs::create_dir_all(&app_dir).map_err(|e| {
             VntxError::CacheError(format!(
-                "Failed to create app cache directory {:?}: {}",
-                app_dir, e
+                "Failed to create app cache directory {}: {}",
+                app_dir.display(),
+                e
             ))
         })?;
 
@@ -205,12 +208,7 @@ impl CacheManager {
         Ok(file_path)
     }
 
-    fn collect_app_files(
-        &self,
-        app_id: u32,
-        dir: &Path,
-        out_files: &mut Vec<CachedFile>,
-    ) -> Result<(), VntxError> {
+    fn collect_app_files(app_id: u32, dir: &Path, out_files: &mut Vec<CachedFile>) {
         if let Ok(entries) = fs::read_dir(dir) {
             for entry in entries.flatten() {
                 let path = entry.path();
@@ -219,7 +217,7 @@ impl CacheManager {
                         let mut header_buf = [0u8; HEADER_SIZE_BYTES];
                         if f.read_exact(&mut header_buf).is_ok() {
                             if let Ok(header) = NtcHeader::from_bytes(&header_buf) {
-                                let size_bytes = path.metadata().map(|m| m.len()).unwrap_or(0);
+                                let size_bytes = path.metadata().map_or(0, |m| m.len());
                                 let file_name = path
                                     .file_name()
                                     .unwrap_or_default()
@@ -240,6 +238,5 @@ impl CacheManager {
                 }
             }
         }
-        Ok(())
     }
 }

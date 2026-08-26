@@ -96,7 +96,7 @@ pub fn render(app: &mut VntxGuiApp, ui: &mut Ui) {
                     app.refresh_all();
                 }
                 Err(err) => {
-                    app.set_toast(format!("Failed to save config: {}", err));
+                    app.set_toast(format!("Failed to save config: {err}"));
                 }
             }
         }

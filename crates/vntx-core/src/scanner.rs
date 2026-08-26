@@ -10,7 +10,7 @@ const DEFAULT_NTC_WEIGHTS_SIZE: u64 = 9288;
 /// Represents a discovered Steam game installation.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct InstalledGame {
-    /// Steam AppID (e.g. `1091500` for Cyberpunk 2077).
+    /// Steam `AppID` (e.g. `1091500` for Cyberpunk 2077).
     pub app_id: u32,
 
     /// Human-readable game name.
@@ -158,7 +158,7 @@ pub fn parse_acf_manifest(content: &str, steamapps_dir: &Path) -> Result<Install
         .cloned()
         .unwrap_or_else(|| format!("Steam App {app_id}"));
 
-    let installdir = kvs
+    let rel_install_dir = kvs
         .get("installdir")
         .cloned()
         .unwrap_or_else(|| app_id.to_string());
@@ -169,7 +169,7 @@ pub fn parse_acf_manifest(content: &str, steamapps_dir: &Path) -> Result<Install
         .unwrap_or(0);
 
     let common_dir = steamapps_dir.join("common");
-    let install_dir = common_dir.join(installdir);
+    let install_dir = common_dir.join(rel_install_dir);
 
     Ok(InstalledGame {
         app_id,
@@ -211,7 +211,11 @@ pub fn discover_steam_games(library_roots: &[PathBuf]) -> Vec<InstalledGame> {
             for entry in entries.flatten() {
                 let path = entry.path();
                 if let Some(file_name) = path.file_name().and_then(|n| n.to_str()) {
-                    if file_name.starts_with("appmanifest_") && file_name.ends_with(".acf") {
+                    if file_name.starts_with("appmanifest_")
+                        && Path::new(file_name)
+                            .extension()
+                            .is_some_and(|ext| ext.eq_ignore_ascii_case("acf"))
+                    {
                         if let Ok(content) = fs::read_to_string(&path) {
                             if let Ok(game) = parse_acf_manifest(&content, steamapps_dir) {
                                 if !games
@@ -232,7 +236,7 @@ pub fn discover_steam_games(library_roots: &[PathBuf]) -> Vec<InstalledGame> {
     games
 }
 
-/// Finds a game by AppID or case-insensitive query substring.
+/// Finds a game by `AppID` or case-insensitive query substring.
 #[must_use]
 pub fn find_game_by_query(games: &[InstalledGame], query: &str) -> Option<InstalledGame> {
     if let Ok(app_id) = query.parse::<u32>() {
@@ -290,8 +294,12 @@ pub fn scan_game_textures(
     }
 
     let estimated_savings_percentage = if total_uncompressed_bytes > 0 {
-        let saved = total_uncompressed_bytes.saturating_sub(total_estimated_ntc_bytes) as f32;
-        (saved / (total_uncompressed_bytes as f32)) * 100.0
+        let saved = total_uncompressed_bytes.saturating_sub(total_estimated_ntc_bytes);
+        #[allow(clippy::cast_precision_loss)]
+        let pct = (saved as f64 / total_uncompressed_bytes as f64) * 100.0;
+        #[allow(clippy::cast_possible_truncation)]
+        let res = pct as f32;
+        res
     } else {
         0.0
     };

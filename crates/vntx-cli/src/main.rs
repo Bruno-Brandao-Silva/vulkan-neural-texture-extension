@@ -62,7 +62,7 @@ fn main() -> ExitCode {
         match VntxConfig::load_from_path(path) {
             Ok(cfg) => cfg,
             Err(err) => {
-                eprintln!("Error loading config from {}: {}", path.display(), err);
+                eprintln!("Error loading config from {}: {err}", path.display());
                 return ExitCode::FAILURE;
             }
         }
@@ -81,12 +81,12 @@ fn main() -> ExitCode {
     match result {
         Ok(()) => ExitCode::SUCCESS,
         Err(VntxError::GameNotFound(name)) => {
-            eprintln!("Error: Game '{}' was not found in Steam libraries.", name);
+            eprintln!("Error: Game '{name}' was not found in Steam libraries.");
             eprintln!("Run 'vntx scan' to see all discovered games.");
             ExitCode::FAILURE
         }
         Err(err) => {
-            eprintln!("Error: {}", err);
+            eprintln!("Error: {err}");
             ExitCode::FAILURE
         }
     }
