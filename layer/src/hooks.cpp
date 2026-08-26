@@ -30,40 +30,53 @@ VKAPI_ATTR VkResult VKAPI_CALL vntx_CreateImage(
         return VK_ERROR_INITIALIZATION_FAILED;
     }
 
-    auto* const device_data = vntx::LayerContext::get().get_device_data(device);
-    if (!device_data || !device_data->next_create_image) {
-        VNTX_LOG_ERROR("CreateImage failed: missing device dispatch data");
+    try {
+        auto* const device_data = vntx::LayerContext::get().get_device_data(device);
+        if (!device_data || !device_data->next_create_image) {
+            return VK_ERROR_INITIALIZATION_FAILED;
+        }
+
+        if (vntx::LayerContext::get().is_disabled()) {
+            return device_data->next_create_image(device, pCreateInfo, pAllocator, pImage);
+        }
+
+        const bool is_candidate = vntx::is_candidate_texture(*pCreateInfo);
+
+        if (is_candidate) {
+            VNTX_LOG_INFO(
+                "Candidate texture detected: {}x{} format={} mipLevels={}",
+                pCreateInfo->extent.width,
+                pCreateInfo->extent.height,
+                static_cast<int>(pCreateInfo->format),
+                pCreateInfo->mipLevels
+            );
+        } else {
+            VNTX_LOG_DEBUG(
+                "Image passed through: {}",
+                vntx::get_filter_rejection_reason(*pCreateInfo)
+            );
+        }
+
+        const VkResult result = device_data->next_create_image(
+            device, pCreateInfo, pAllocator, pImage
+        );
+
+        if (result == VK_SUCCESS && is_candidate && *pImage != VK_NULL_HANDLE) {
+            std::unique_lock<std::shared_mutex> lock(device_data->image_mutex);
+            device_data->candidate_images.insert(*pImage);
+            VNTX_LOG_DEBUG("Tracked candidate image handle: {}", static_cast<void*>(*pImage));
+        }
+
+        return result;
+    } catch (...) {
+        VNTX_LOG_ERROR("Exception in vntx_CreateImage, deactivating layer");
+        vntx::LayerContext::get().disable();
+        auto* const device_data = vntx::LayerContext::get().get_device_data(device);
+        if (device_data && device_data->next_create_image) {
+            return device_data->next_create_image(device, pCreateInfo, pAllocator, pImage);
+        }
         return VK_ERROR_INITIALIZATION_FAILED;
     }
-
-    const bool is_candidate = vntx::is_candidate_texture(*pCreateInfo);
-
-    if (is_candidate) {
-        VNTX_LOG_INFO(
-            "Candidate texture detected: {}x{} format={} mipLevels={}",
-            pCreateInfo->extent.width,
-            pCreateInfo->extent.height,
-            static_cast<int>(pCreateInfo->format),
-            pCreateInfo->mipLevels
-        );
-    } else {
-        VNTX_LOG_DEBUG(
-            "Image passed through: {}",
-            vntx::get_filter_rejection_reason(*pCreateInfo)
-        );
-    }
-
-    const VkResult result = device_data->next_create_image(
-        device, pCreateInfo, pAllocator, pImage
-    );
-
-    if (result == VK_SUCCESS && is_candidate && *pImage != VK_NULL_HANDLE) {
-        std::unique_lock<std::shared_mutex> lock(device_data->image_mutex);
-        device_data->candidate_images.insert(*pImage);
-        VNTX_LOG_DEBUG("Tracked candidate image handle: {}", static_cast<void*>(*pImage));
-    }
-
-    return result;
 }
 
 VKAPI_ATTR void VKAPI_CALL vntx_DestroyImage(
@@ -75,17 +88,21 @@ VKAPI_ATTR void VKAPI_CALL vntx_DestroyImage(
         return;
     }
 
-    auto* const device_data = vntx::LayerContext::get().get_device_data(device);
-    if (!device_data || !device_data->next_destroy_image) {
-        return;
-    }
+    try {
+        auto* const device_data = vntx::LayerContext::get().get_device_data(device);
+        if (!device_data || !device_data->next_destroy_image) {
+            return;
+        }
 
-    if (image != VK_NULL_HANDLE) {
-        std::unique_lock<std::shared_mutex> lock(device_data->image_mutex);
-        device_data->candidate_images.erase(image);
-    }
+        if (image != VK_NULL_HANDLE && !vntx::LayerContext::get().is_disabled()) {
+            std::unique_lock<std::shared_mutex> lock(device_data->image_mutex);
+            device_data->candidate_images.erase(image);
+        }
 
-    device_data->next_destroy_image(device, image, pAllocator);
+        device_data->next_destroy_image(device, image, pAllocator);
+    } catch (...) {
+        // Prevent exception propagation from DestroyImage
+    }
 }
 
 VKAPI_ATTR void VKAPI_CALL vntx_GetImageMemoryRequirements(
@@ -97,33 +114,41 @@ VKAPI_ATTR void VKAPI_CALL vntx_GetImageMemoryRequirements(
         return;
     }
 
-    auto* const device_data = vntx::LayerContext::get().get_device_data(device);
-    if (!device_data || !device_data->next_get_image_memory_requirements) {
-        return;
-    }
+    try {
+        auto* const device_data = vntx::LayerContext::get().get_device_data(device);
+        if (!device_data || !device_data->next_get_image_memory_requirements) {
+            return;
+        }
 
-    device_data->next_get_image_memory_requirements(device, image, pMemoryRequirements);
+        device_data->next_get_image_memory_requirements(device, image, pMemoryRequirements);
 
-    bool is_candidate = false;
-    {
-        std::shared_lock<std::shared_mutex> lock(device_data->image_mutex);
-        is_candidate = device_data->candidate_images.contains(image);
-    }
+        if (vntx::LayerContext::get().is_disabled()) {
+            return;
+        }
 
-    if (is_candidate) {
-        const VkDeviceSize original_size = pMemoryRequirements->size;
-        const VkDeviceSize ntc_aligned_size = align_memory_size(
-            DEFAULT_NTC_WEIGHTS_SIZE,
-            pMemoryRequirements->alignment
-        );
-        pMemoryRequirements->size = ntc_aligned_size;
+        bool is_candidate = false;
+        {
+            std::shared_lock<std::shared_mutex> lock(device_data->image_mutex);
+            is_candidate = device_data->candidate_images.contains(image);
+        }
 
-        VNTX_LOG_INFO(
-            "Overriding candidate VRAM memory requirements: original={} bytes -> NTC={} bytes (alignment={})",
-            original_size,
-            ntc_aligned_size,
-            pMemoryRequirements->alignment
-        );
+        if (is_candidate) {
+            const VkDeviceSize original_size = pMemoryRequirements->size;
+            const VkDeviceSize ntc_aligned_size = align_memory_size(
+                DEFAULT_NTC_WEIGHTS_SIZE,
+                pMemoryRequirements->alignment
+            );
+            pMemoryRequirements->size = ntc_aligned_size;
+
+            VNTX_LOG_INFO(
+                "Overriding candidate VRAM memory requirements: original={} bytes -> NTC={} bytes (alignment={})",
+                original_size,
+                ntc_aligned_size,
+                pMemoryRequirements->alignment
+            );
+        }
+    } catch (...) {
+        // Safe pass-through
     }
 }
 
@@ -136,32 +161,40 @@ VKAPI_ATTR void VKAPI_CALL vntx_GetImageMemoryRequirements2(
         return;
     }
 
-    auto* const device_data = vntx::LayerContext::get().get_device_data(device);
-    if (!device_data || !device_data->next_get_image_memory_requirements2) {
-        return;
-    }
+    try {
+        auto* const device_data = vntx::LayerContext::get().get_device_data(device);
+        if (!device_data || !device_data->next_get_image_memory_requirements2) {
+            return;
+        }
 
-    device_data->next_get_image_memory_requirements2(device, pInfo, pMemoryRequirements);
+        device_data->next_get_image_memory_requirements2(device, pInfo, pMemoryRequirements);
 
-    bool is_candidate = false;
-    {
-        std::shared_lock<std::shared_mutex> lock(device_data->image_mutex);
-        is_candidate = device_data->candidate_images.contains(pInfo->image);
-    }
+        if (vntx::LayerContext::get().is_disabled()) {
+            return;
+        }
 
-    if (is_candidate) {
-        const VkDeviceSize original_size = pMemoryRequirements->memoryRequirements.size;
-        const VkDeviceSize ntc_aligned_size = align_memory_size(
-            DEFAULT_NTC_WEIGHTS_SIZE,
-            pMemoryRequirements->memoryRequirements.alignment
-        );
-        pMemoryRequirements->memoryRequirements.size = ntc_aligned_size;
+        bool is_candidate = false;
+        {
+            std::shared_lock<std::shared_mutex> lock(device_data->image_mutex);
+            is_candidate = device_data->candidate_images.contains(pInfo->image);
+        }
 
-        VNTX_LOG_INFO(
-            "Overriding candidate VRAM memory requirements (v2): original={} bytes -> NTC={} bytes",
-            original_size,
-            ntc_aligned_size
-        );
+        if (is_candidate) {
+            const VkDeviceSize original_size = pMemoryRequirements->memoryRequirements.size;
+            const VkDeviceSize ntc_aligned_size = align_memory_size(
+                DEFAULT_NTC_WEIGHTS_SIZE,
+                pMemoryRequirements->memoryRequirements.alignment
+            );
+            pMemoryRequirements->memoryRequirements.size = ntc_aligned_size;
+
+            VNTX_LOG_INFO(
+                "Overriding candidate VRAM memory requirements (v2): original={} bytes -> NTC={} bytes",
+                original_size,
+                ntc_aligned_size
+            );
+        }
+    } catch (...) {
+        // Safe pass-through
     }
 }
 
@@ -175,26 +208,38 @@ VKAPI_ATTR VkResult VKAPI_CALL vntx_BindImageMemory(
         return VK_ERROR_INITIALIZATION_FAILED;
     }
 
-    auto* const device_data = vntx::LayerContext::get().get_device_data(device);
-    if (!device_data || !device_data->next_bind_image_memory) {
+    try {
+        auto* const device_data = vntx::LayerContext::get().get_device_data(device);
+        if (!device_data || !device_data->next_bind_image_memory) {
+            return VK_ERROR_INITIALIZATION_FAILED;
+        }
+
+        if (vntx::LayerContext::get().is_disabled()) {
+            return device_data->next_bind_image_memory(device, image, memory, memoryOffset);
+        }
+
+        bool is_candidate = false;
+        {
+            std::shared_lock<std::shared_mutex> lock(device_data->image_mutex);
+            is_candidate = device_data->candidate_images.contains(image);
+        }
+
+        if (is_candidate) {
+            VNTX_LOG_INFO(
+                "Binding memory for candidate NTC image: handle={} offset={}",
+                static_cast<void*>(image),
+                memoryOffset
+            );
+        }
+
+        return device_data->next_bind_image_memory(device, image, memory, memoryOffset);
+    } catch (...) {
+        auto* const device_data = vntx::LayerContext::get().get_device_data(device);
+        if (device_data && device_data->next_bind_image_memory) {
+            return device_data->next_bind_image_memory(device, image, memory, memoryOffset);
+        }
         return VK_ERROR_INITIALIZATION_FAILED;
     }
-
-    bool is_candidate = false;
-    {
-        std::shared_lock<std::shared_mutex> lock(device_data->image_mutex);
-        is_candidate = device_data->candidate_images.contains(image);
-    }
-
-    if (is_candidate) {
-        VNTX_LOG_INFO(
-            "Binding memory for candidate NTC image: handle={} offset={}",
-            static_cast<void*>(image),
-            memoryOffset
-        );
-    }
-
-    return device_data->next_bind_image_memory(device, image, memory, memoryOffset);
 }
 
 VKAPI_ATTR VkResult VKAPI_CALL vntx_BindImageMemory2(
@@ -206,12 +251,20 @@ VKAPI_ATTR VkResult VKAPI_CALL vntx_BindImageMemory2(
         return VK_ERROR_INITIALIZATION_FAILED;
     }
 
-    auto* const device_data = vntx::LayerContext::get().get_device_data(device);
-    if (!device_data || !device_data->next_bind_image_memory2) {
+    try {
+        auto* const device_data = vntx::LayerContext::get().get_device_data(device);
+        if (!device_data || !device_data->next_bind_image_memory2) {
+            return VK_ERROR_INITIALIZATION_FAILED;
+        }
+
+        return device_data->next_bind_image_memory2(device, bindInfoCount, pBindInfos);
+    } catch (...) {
+        auto* const device_data = vntx::LayerContext::get().get_device_data(device);
+        if (device_data && device_data->next_bind_image_memory2) {
+            return device_data->next_bind_image_memory2(device, bindInfoCount, pBindInfos);
+        }
         return VK_ERROR_INITIALIZATION_FAILED;
     }
-
-    return device_data->next_bind_image_memory2(device, bindInfoCount, pBindInfos);
 }
 
 VKAPI_ATTR void VKAPI_CALL vntx_CmdCopyBufferToImage(
@@ -228,8 +281,11 @@ VKAPI_ATTR void VKAPI_CALL vntx_CmdCopyBufferToImage(
     (void)dstImageLayout;
     (void)regionCount;
     (void)pRegions;
-    // Suppresses uncompressed staging copy if target image is NTC-managed
-    VNTX_LOG_DEBUG("Intercepted CmdCopyBufferToImage for texture staging upload");
+    try {
+        VNTX_LOG_DEBUG("Intercepted CmdCopyBufferToImage for texture staging upload");
+    } catch (...) {
+        // Safe logging
+    }
 }
 
 VKAPI_ATTR VkResult VKAPI_CALL vntx_CreateShaderModule(
@@ -242,31 +298,45 @@ VKAPI_ATTR VkResult VKAPI_CALL vntx_CreateShaderModule(
         return VK_ERROR_INITIALIZATION_FAILED;
     }
 
-    auto* const device_data = vntx::LayerContext::get().get_device_data(device);
-    if (!device_data || !device_data->next_create_shader_module) {
+    try {
+        auto* const device_data = vntx::LayerContext::get().get_device_data(device);
+        if (!device_data || !device_data->next_create_shader_module) {
+            return VK_ERROR_INITIALIZATION_FAILED;
+        }
+
+        if (vntx::LayerContext::get().is_disabled()) {
+            return device_data->next_create_shader_module(device, pCreateInfo, pAllocator, pShaderModule);
+        }
+
+        const size_t size_in_words = pCreateInfo->codeSize / sizeof(uint32_t);
+        const auto rewrite_result = vntx::spv::rewrite_shader_bytecode(
+            pCreateInfo->pCode,
+            size_in_words
+        );
+
+        if (rewrite_result.modified && !rewrite_result.bytecode.empty()) {
+            VkShaderModuleCreateInfo modified_info = *pCreateInfo;
+            modified_info.pCode = rewrite_result.bytecode.data();
+            modified_info.codeSize = rewrite_result.bytecode.size() * sizeof(uint32_t);
+
+            VNTX_LOG_INFO(
+                "Deploying transformed SPIR-V shader module (original words={}, rewritten words={})",
+                size_in_words,
+                rewrite_result.bytecode.size()
+            );
+            return device_data->next_create_shader_module(device, &modified_info, pAllocator, pShaderModule);
+        }
+
+        return device_data->next_create_shader_module(device, pCreateInfo, pAllocator, pShaderModule);
+    } catch (...) {
+        VNTX_LOG_ERROR("Exception in vntx_CreateShaderModule, deactivating layer");
+        vntx::LayerContext::get().disable();
+        auto* const device_data = vntx::LayerContext::get().get_device_data(device);
+        if (device_data && device_data->next_create_shader_module) {
+            return device_data->next_create_shader_module(device, pCreateInfo, pAllocator, pShaderModule);
+        }
         return VK_ERROR_INITIALIZATION_FAILED;
     }
-
-    const size_t size_in_words = pCreateInfo->codeSize / sizeof(uint32_t);
-    const auto rewrite_result = vntx::spv::rewrite_shader_bytecode(
-        pCreateInfo->pCode,
-        size_in_words
-    );
-
-    if (rewrite_result.modified && !rewrite_result.bytecode.empty()) {
-        VkShaderModuleCreateInfo modified_info = *pCreateInfo;
-        modified_info.pCode = rewrite_result.bytecode.data();
-        modified_info.codeSize = rewrite_result.bytecode.size() * sizeof(uint32_t);
-
-        VNTX_LOG_INFO(
-            "Deploying transformed SPIR-V shader module (original words={}, rewritten words={})",
-            size_in_words,
-            rewrite_result.bytecode.size()
-        );
-        return device_data->next_create_shader_module(device, &modified_info, pAllocator, pShaderModule);
-    }
-
-    return device_data->next_create_shader_module(device, pCreateInfo, pAllocator, pShaderModule);
 }
 
 VKAPI_ATTR void VKAPI_CALL vntx_DestroyShaderModule(
@@ -278,12 +348,16 @@ VKAPI_ATTR void VKAPI_CALL vntx_DestroyShaderModule(
         return;
     }
 
-    auto* const device_data = vntx::LayerContext::get().get_device_data(device);
-    if (!device_data || !device_data->next_destroy_shader_module) {
-        return;
-    }
+    try {
+        auto* const device_data = vntx::LayerContext::get().get_device_data(device);
+        if (!device_data || !device_data->next_destroy_shader_module) {
+            return;
+        }
 
-    device_data->next_destroy_shader_module(device, shaderModule, pAllocator);
+        device_data->next_destroy_shader_module(device, shaderModule, pAllocator);
+    } catch (...) {
+        // Prevent exception propagation from DestroyShaderModule
+    }
 }
 
 } // extern "C"

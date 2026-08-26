@@ -14,8 +14,8 @@ __pycache__/
 build/
 outputs/
 *.so
-pkg/
-src/
+/pkg/
+/src/
 pkgbuild/pkg/
 pkgbuild/src/
 pkgbuild/*.pkg.tar.*

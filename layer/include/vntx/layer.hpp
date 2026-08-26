@@ -3,6 +3,7 @@
 #include <vulkan/vulkan.h>
 #include <vulkan/vk_layer.h>
 
+#include <atomic>
 #include <memory>
 #include <shared_mutex>
 #include <unordered_map>
@@ -38,10 +39,13 @@ struct DeviceData {
     std::unordered_set<VkImage> candidate_images;
 };
 
-/// @brief Registry for instance and device contexts.
+/// @brief Registry for instance and device contexts with graceful fallback state.
 class LayerContext {
 public:
     static LayerContext& get() noexcept;
+
+    [[nodiscard]] bool is_disabled() const noexcept;
+    void disable() noexcept;
 
     void register_instance(VkInstance instance, std::unique_ptr<InstanceData> data);
     void unregister_instance(VkInstance instance);
@@ -57,6 +61,8 @@ private:
     LayerContext(const LayerContext&) = delete;
     LayerContext& operator=(const LayerContext&) = delete;
 
+    std::atomic<bool> disabled_{false};
+
     mutable std::shared_mutex instance_map_mutex_;
     std::unordered_map<void*, std::unique_ptr<InstanceData>> instance_map_;
 
@@ -66,6 +72,7 @@ private:
 
 // Dispatch key helpers (Khronos Layer Dispatch Architecture)
 inline void* get_dispatch_key(const void* handle) noexcept {
+    if (!handle) return nullptr;
     return const_cast<void*>(*reinterpret_cast<void* const*>(handle));
 }
 
@@ -86,6 +93,17 @@ VKAPI_ATTR PFN_vkVoidFunction VKAPI_CALL vntx_GetDeviceProcAddr(
 
 VKAPI_ATTR VkResult VKAPI_CALL vntx_NegotiateLoaderLayerInterfaceVersion(
     VkNegotiateLayerInterface* pVersionStruct
+);
+
+VKAPI_ATTR VkResult VKAPI_CALL vntx_EnumerateInstanceLayerProperties(
+    uint32_t* pPropertyCount,
+    VkLayerProperties* pProperties
+);
+
+VKAPI_ATTR VkResult VKAPI_CALL vntx_EnumerateInstanceExtensionProperties(
+    const char* pLayerName,
+    uint32_t* pPropertyCount,
+    VkExtensionProperties* pProperties
 );
 
 // Core Vulkan function hooks
@@ -173,3 +191,4 @@ VKAPI_ATTR void VKAPI_CALL vntx_DestroyShaderModule(
 );
 
 } // extern "C"
+

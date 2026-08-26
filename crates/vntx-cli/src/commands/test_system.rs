@@ -17,7 +17,7 @@ pub fn execute(args: &TestSystemArgs, _config: &VntxConfig) -> Result<(), VntxEr
     println!("\x1b[1m==> Running VNTX Local System & Proton Integration Validation...\x1b[0m\n");
 
     let mut checks_passed = 0;
-    let total_checks = if args.skip_gpu_test { 2 } else { 3 };
+    let total_checks = if args.skip_gpu_test { 2 } else { 4 };
 
     // Check 1: Shared Library & ldd resolution
     let layer_lib_paths = [
@@ -100,7 +100,7 @@ pub fn execute(args: &TestSystemArgs, _config: &VntxConfig) -> Result<(), VntxEr
         }
     }
 
-    // Check 3: GPU Neural Inference & CTest SSIM Validation
+    // Check 3 & 4: Vulkan Layer Entrypoints & GPU Neural Inference Validation
     if !args.skip_gpu_test {
         let test_bin_paths = [
             PathBuf::from("build/tests/ntc_headless_test"),
@@ -111,11 +111,27 @@ pub fn execute(args: &TestSystemArgs, _config: &VntxConfig) -> Result<(), VntxEr
 
         match found_test_bin {
             Some(test_bin) => {
-                let test_output = Command::new(&test_bin)
+                // Check 3: Layer entrypoint & instance initialization responsiveness
+                let layer_test = Command::new(&test_bin)
+                    .arg("--gtest_filter=VulkanInterceptionTest.LayerEntrypointsExported")
+                    .output();
+
+                match layer_test {
+                    Ok(output) if output.status.success() => {
+                        print_ok("Vulkan instance & layer entrypoints verified (vkGetInstanceProcAddr & negotiation OK)");
+                        checks_passed += 1;
+                    }
+                    _ => {
+                        print_err("Vulkan layer entrypoints test failed");
+                    }
+                }
+
+                // Check 4: GPU Neural Inference & SSIM Quality
+                let quality_test = Command::new(&test_bin)
                     .arg("--gtest_filter=VisualQualityTest.*")
                     .output();
 
-                match test_output {
+                match quality_test {
                     Ok(output) if output.status.success() => {
                         let stdout = String::from_utf8_lossy(&output.stdout);
                         let ssim_score = parse_ssim_score(&stdout).unwrap_or(0.9984);
