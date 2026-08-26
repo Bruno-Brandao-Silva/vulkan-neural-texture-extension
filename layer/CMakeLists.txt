@@ -26,6 +26,11 @@ set_target_properties(vntx_layer PROPERTIES
 set(VNTX_LAYER_OUTPUT_PATH "$<TARGET_FILE:vntx_layer>")
 configure_file(
     ${CMAKE_CURRENT_SOURCE_DIR}/manifest/vntx_layer.json.in
+    ${CMAKE_BINARY_DIR}/vntx_layer.json
+    @ONLY
+)
+configure_file(
+    ${CMAKE_CURRENT_SOURCE_DIR}/manifest/vntx_layer.json.in
     ${CMAKE_BINARY_DIR}/manifest/vntx_layer.json
     @ONLY
 )

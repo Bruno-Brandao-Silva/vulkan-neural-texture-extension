@@ -67,7 +67,7 @@ jobs:
 
           # Copy layer shared library & manifest
           cp build/layer/libvntx_layer.so "${BUNDLE_DIR}/lib/"
-          cp build/layer/manifest/vntx_layer.json "${BUNDLE_DIR}/share/vulkan/implicit_layer.d/"
+          cp build/vntx_layer.json "${BUNDLE_DIR}/share/vulkan/implicit_layer.d/"
 
           # Copy desktop integration
           cp crates/vntx-gui/assets/vntx-gui.desktop "${BUNDLE_DIR}/share/applications/"

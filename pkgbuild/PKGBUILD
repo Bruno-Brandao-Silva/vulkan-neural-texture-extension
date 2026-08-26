@@ -70,7 +70,7 @@ package() {
     install -Dm755 build/layer/libvntx_layer.so "${pkgdir}/usr/lib/libvntx_layer.so"
 
     # Install Vulkan implicit layer manifest
-    install -Dm644 build/layer/manifest/vntx_layer.json \
+    install -Dm644 build/vntx_layer.json \
         "${pkgdir}/usr/share/vulkan/implicit_layer.d/vntx_layer.json"
 
     # Install Desktop launcher and scalable SVG icon
