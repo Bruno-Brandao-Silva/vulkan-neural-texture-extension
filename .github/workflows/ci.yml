@@ -1,0 +1,96 @@
+name: CI
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  rust-check:
+    name: Rust (Format, Clippy & Tests)
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install system dependencies for GUI & Vulkan
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            pkg-config \
+            libx11-dev \
+            libxcb1-dev \
+            libxcursor-dev \
+            libxi-dev \
+            libxrandr-dev \
+            libwayland-dev \
+            libxkbcommon-dev \
+            libvulkan-dev
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy, rustfmt
+
+      - name: Cache cargo registry & index
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-
+
+      - name: Verify Code Formatting
+        run: cargo fmt --check
+
+      - name: Run Clippy Linter
+        run: cargo clippy --workspace --all-targets -- -D warnings
+
+      - name: Run Rust Test Suite
+        run: cargo test --workspace --verbose
+
+  cpp-check:
+    name: C++20 Vulkan Layer & LavaPipe Tests
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install C++, Vulkan, and LavaPipe Dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            build-essential \
+            cmake \
+            ninja-build \
+            libvulkan-dev \
+            vulkan-tools \
+            mesa-vulkan-drivers \
+            glslang-tools \
+            python3 \
+            python3-pip \
+            python3-numpy \
+            python3-scipy
+
+      - name: Configure CMake with Sanitizers & Tests
+        run: |
+          cmake -B build -S . -G Ninja \
+            -DCMAKE_BUILD_TYPE=Debug \
+            -DVNTX_BUILD_TESTS=ON \
+            -DVNTX_ENABLE_SANITIZERS=ON
+
+      - name: Compile C++ Layer, Shaders, and Test Suite
+        run: cmake --build build --parallel
+
+      - name: Execute CTest Suite under Mesa LavaPipe
+        run: |
+          export VK_DRIVER_FILES=$(find /usr/share/vulkan/icd.d/ -name "lvp_icd*.json" | head -n 1)
+          echo "Using Vulkan ICD: $VK_DRIVER_FILES"
+          ctest --test-dir build --output-on-failure --verbose

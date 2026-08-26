@@ -1,31 +1,30 @@
-# NTC CLI & Ecosystem Specification (`ntc-cli` v1.0)
+# VNTX CLI & Ecosystem Specification (`vntx` v1.0)
 
 ## 1. Overview
-The `ntc-cli` tool is a high-performance command-line interface written in Rust. It serves as the primary ecosystem interface for asset scanning, hash generation, dataset compilation, offline neural texture training, and local cache maintenance.
+The `vntx` CLI and `vntx-gui` desktop application are high-performance tools written in Rust. They serve as the primary ecosystem interface for asset scanning, hash generation, dataset compilation, offline neural texture compression, and local cache maintenance.
 
 ---
 
 ## 2. Workspace Architecture
 
-The Cargo project uses a modular workspace layout to isolate core logic, asset processing, and the CLI binary:
+The Cargo project uses a modular workspace layout isolating core logic, training orchestration, the CLI binary, and the desktop GUI:
 
-ntc-workspace/
+```text
+vulkan-neural-texture-extension/
 ├── Cargo.toml
+├── CMakeLists.txt
+├── pkgbuild/
+│   └── PKGBUILD             # Arch Linux / CachyOS package specification
+├── .github/
+│   └── workflows/
+│       ├── ci.yml           # Continuous Integration workflow
+│       └── release.yml      # Automated GitHub Releases workflow
 └── crates/
-    ├── ntc-cli/             # Binary executable entrypoint (clap interface)
-    │   └── src/
-    │       ├── main.rs
-    │       └── commands/    # CLI subcommands implementation
-    ├── ntc-core/            # Shared core library
-    │   └── src/
-    │       ├── format.rs    # NtcHeader definitions & binary packing
-    │       ├── hash.rs      # xxHash3 generation logic
-    │       └── scanner.rs   # Steam/Lutris library discovery
-    └── ntc-trainer/         # Training pipeline wrapper
-        └── src/
-            ├── dataset.rs   # Texture loader & preprocessor
-            ├── model.rs     # MLP network architecture
-            └── train.rs     # PyTorch / ONNX C++ lib bindings
+    ├── vntx-core/           # Shared core library (NtcHeader, xxHash3, Scanner, Cache)
+    ├── vntx-trainer/        # Multi-threaded Rayon training orchestrator
+    ├── vntx-cli/            # Command-line interface executable (`vntx`)
+    └── vntx-gui/            # Native egui/eframe desktop GUI (`vntx-gui`)
+```
 
 ---
 
@@ -41,92 +40,66 @@ The CLI uses `clap` v4 with derive macros to provide an intuitive interface.
 ### 3.2 Subcommands
 
 #### `scan` - Library & Asset Discovery
-Scans installed game directories to identify heavy static textures and calculate potential VRAM savings.
+Scans installed Steam libraries to identify heavy static textures and calculate potential VRAM savings.
 
-Usage:
-  ntc-cli scan --game <GAME_NAME_OR_APPID> [OPTIONS]
+```bash
+# List all discovered Steam games
+vntx scan
 
-Options:
-  -g, --game <STRING>       Name, Steam AppID, or path to game installation directory.
-  -m, --min-size <PIXELS>   Minimum texture resolution threshold in pixels (Default: 1024).
-  -f, --format <FORMAT>     Filter by original texture format (e.g. DDS, PNG, KTX2, BC7).
-
-Example:
-  ntc-cli scan --game 1091500 --min-size 2048
+# Inspect candidate textures for a specific game
+vntx scan -g "Cyberpunk 2077" --min-size 1024
+```
 
 #### `compress` - Offline Neural Texture Compression
-Runs offline training on discovered or specified texture assets to produce `.ntc` files.
+Runs offline parallel training on discovered or specified texture assets to produce `.ntc` files.
 
-Usage:
-  ntc-cli compress --game <GAME_NAME_OR_APPID> [OPTIONS]
-
-Options:
-  -g, --game <STRING>       Target game AppID or folder.
-  -q, --quality <QUALITY>   Compression quality preset: `fast`, `balanced`, `max-savings` (Default: `balanced`).
-  -j, --jobs <INT>          Number of parallel training threads (Default: logical CPU cores count).
-  -o, --output <DIR>        Destination directory for `.ntc` cache (Default: `~/.cache/ntc/<app_id>/`).
-
-Example:
-  ntc-cli compress --game "Cyberpunk 2077" --quality max-savings
-
-#### `fetch` - Community Cache Sync
-Downloads signed, pre-compiled `.ntc` cache packages from community repositories to avoid local GPU training overhead.
-
-Usage:
-  ntc-cli fetch --game <GAME_NAME_OR_APPID> [OPTIONS]
-
-Options:
-  -g, --game <STRING>       Target game AppID or folder.
-  --repo <URL>              Custom repository URL (Default: official NTC community index).
-
-Example:
-  ntc-cli fetch --game 1091500
+```bash
+# Compress textures with balanced 3-layer MLP
+vntx compress -g "Cyberpunk 2077" --quality balanced --jobs 8
+```
 
 #### `status` - System Cache & Savings Diagnostics
 Displays total VRAM saved, active cache statistics, and registered Vulkan Layer status.
 
-Usage:
-  ntc-cli status
+```bash
+vntx status
+```
 
 #### `clean` - Cache Maintenance
-Purges orphaned, stale, or old `.ntc` cache files from the user storage.
+Purges orphaned, stale, or old `.ntc` cache files from user storage.
 
-Usage:
-  ntc-cli clean [OPTIONS]
+```bash
+# Purge cache for a specific game
+vntx clean -g 1091500
 
-Options:
-  --all                     Wipe the entire NTC local cache directory.
-  -g, --game <STRING>       Purge cache for a specific game AppID or folder.
+# Purge all local cache
+vntx clean --all
+```
 
----
+#### `fetch` - Community Cache Sync
+Downloads pre-trained `.ntc` neural textures from community repositories.
 
-## 4. Configuration File (`ntc.toml`)
-
-Configuration is stored at `~/.config/ntc/ntc.toml`:
-
-[general]
-cache_dir = "~/.cache/ntc"
-log_level = "info"
-enable_layer_by_default = true
-
-[training]
-default_quality = "balanced"
-max_parallel_jobs = 4
-target_precision = "fp16" # Options: fp16, int8
-
-[paths]
-steam_libraries = [
-    "~/.local/share/Steam",
-    "~/.steam/steam",
-]
-custom_game_dirs = []
+```bash
+vntx fetch -g "Cyberpunk 2077"
+```
 
 ---
 
-## 5. Hash Generation Strategy
+## 4. Packaging and Distribution
 
-To ensure seamless cache lookup between `ntc-cli` and `libvk_ntc_layer.so`:
-1. The asset pipeline extracts raw texture bytes.
-2. A 64-bit `xxHash3` checksum is computed over the payload.
-3. The resulting hash string (e.g., `a3f8b9c1d2e4f567`) serves as the unique filename: `~/.cache/ntc/<app_id>/a3f8b9c1d2e4f567.ntc`.
-4. If a game updates and texture payload bytes change, the generated hash instantly changes, triggering an automatic cache miss and preventing visual corruption.
+### 4.1 Arch Linux & CachyOS (`PKGBUILD`)
+The repository includes a standard `PKGBUILD` in `pkgbuild/PKGBUILD` and at the root:
+```bash
+makepkg -si
+```
+It handles building the C++20 Vulkan implicit layer, compiling SPIR-V compute shaders, building the Rust binaries, and deploying to standard system paths:
+- `/usr/lib/libvntx_layer.so`
+- `/usr/share/vulkan/implicit_layer.d/vntx_layer.json`
+- `/usr/bin/vntx`
+- `/usr/bin/vntx-gui`
+- `/usr/share/applications/vntx-gui.desktop`
+- `/usr/share/icons/hicolor/scalable/apps/vntx-icon.svg`
+
+### 4.2 GitHub Actions CI/CD Pipeline
+- **Continuous Integration (`.github/workflows/ci.yml`):** Runs on every PR and commit to `main`, validating `cargo fmt`, `cargo clippy`, Rust test suites, and C++ CTest suite with Mesa LavaPipe.
+- **Automated Releases (`.github/workflows/release.yml`):** Automatically packages release tarballs (`vntx-v<version>-x86_64-unknown-linux-gnu.tar.gz`) with SHA-256 checksums and creates a GitHub Release when tags matching `v*` are pushed.

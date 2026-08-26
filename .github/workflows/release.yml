@@ -1,0 +1,113 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+
+jobs:
+  build-release:
+    name: Build & Publish Release Tarball
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Extract Tag Version
+        id: get_version
+        run: echo "VERSION=${GITHUB_REF_NAME#v}" >> $GITHUB_OUTPUT
+
+      - name: Install Build Dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            build-essential \
+            cmake \
+            ninja-build \
+            libvulkan-dev \
+            glslang-tools \
+            pkg-config \
+            libx11-dev \
+            libxcb1-dev \
+            libxcursor-dev \
+            libxi-dev \
+            libxrandr-dev \
+            libwayland-dev \
+            libxkbcommon-dev
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Build Rust CLI & GUI in Release Mode
+        run: cargo build --release --workspace
+
+      - name: Build C++ Vulkan Layer in Release Mode
+        run: |
+          cmake -B build -S . -G Ninja \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DVNTX_BUILD_TESTS=OFF
+          cmake --build build --config Release
+
+      - name: Assemble Release Bundle
+        run: |
+          VERSION="${{ steps.get_version.outputs.VERSION }}"
+          BUNDLE_DIR="vntx-v${VERSION}-x86_64-unknown-linux-gnu"
+          mkdir -p "${BUNDLE_DIR}/bin"
+          mkdir -p "${BUNDLE_DIR}/lib"
+          mkdir -p "${BUNDLE_DIR}/share/vulkan/implicit_layer.d"
+          mkdir -p "${BUNDLE_DIR}/share/applications"
+          mkdir -p "${BUNDLE_DIR}/share/icons/hicolor/scalable/apps"
+
+          # Copy binaries
+          cp target/release/vntx "${BUNDLE_DIR}/bin/"
+          cp target/release/vntx-gui "${BUNDLE_DIR}/bin/"
+
+          # Copy layer shared library & manifest
+          cp build/layer/libvntx_layer.so "${BUNDLE_DIR}/lib/"
+          cp build/layer/manifest/vntx_layer.json "${BUNDLE_DIR}/share/vulkan/implicit_layer.d/"
+
+          # Copy desktop integration
+          cp crates/vntx-gui/assets/vntx-gui.desktop "${BUNDLE_DIR}/share/applications/"
+          cp crates/vntx-gui/assets/vntx-icon.svg "${BUNDLE_DIR}/share/icons/hicolor/scalable/apps/"
+
+          # Documentation & License
+          cp README.md "${BUNDLE_DIR}/"
+          [ -f LICENSE ] && cp LICENSE "${BUNDLE_DIR}/"
+
+          # Create installation helper script
+          cat << 'EOF' > "${BUNDLE_DIR}/install.sh"
+          #!/usr/bin/env bash
+          set -euo pipefail
+          PREFIX="${PREFIX:-/usr/local}"
+
+          echo "Installing VNTX to ${PREFIX}..."
+          install -d "${PREFIX}/bin" "${PREFIX}/lib" "${PREFIX}/share/vulkan/implicit_layer.d" "${PREFIX}/share/applications" "${PREFIX}/share/icons/hicolor/scalable/apps"
+
+          install -m 755 bin/vntx "${PREFIX}/bin/"
+          install -m 755 bin/vntx-gui "${PREFIX}/bin/"
+          install -m 755 lib/libvntx_layer.so "${PREFIX}/lib/"
+          install -m 644 share/vulkan/implicit_layer.d/vntx_layer.json "${PREFIX}/share/vulkan/implicit_layer.d/"
+          install -m 644 share/applications/vntx-gui.desktop "${PREFIX}/share/applications/"
+          install -m 644 share/icons/hicolor/scalable/apps/vntx-icon.svg "${PREFIX}/share/icons/hicolor/scalable/apps/"
+
+          echo "VNTX installed successfully!"
+          echo "Run 'vntx --help' or launch 'vntx-gui' to begin."
+          EOF
+          chmod +x "${BUNDLE_DIR}/install.sh"
+
+          # Create tarball and sha256 checksum
+          tar -czvf "${BUNDLE_DIR}.tar.gz" "${BUNDLE_DIR}"
+          sha256sum "${BUNDLE_DIR}.tar.gz" > "${BUNDLE_DIR}.tar.gz.sha256"
+
+      - name: Publish GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            vntx-v${{ steps.get_version.outputs.VERSION }}-x86_64-unknown-linux-gnu.tar.gz
+            vntx-v${{ steps.get_version.outputs.VERSION }}-x86_64-unknown-linux-gnu.tar.gz.sha256
+          draft: false
+          prerelease: false
+          generate_release_notes: true

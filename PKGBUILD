@@ -1,0 +1,85 @@
+# Maintainer: Bruno Brandão Silva <bruno.brandao@cmsw.com>
+pkgname=vntx-git
+_pkgname=vntx
+pkgver=0.1.0
+pkgrel=1
+pkgdesc="Vulkan Neural Texture Compression Extension - Layer, CLI & Native GUI"
+arch=('x86_64')
+url="https://github.com/Bruno-Brandao-Silva/vulkan-neural-texture-extension"
+license=('MIT' 'Apache-2.0')
+depends=(
+    'vulkan-icd-loader'
+    'hicolor-icon-theme'
+    'gcc-libs'
+    'glibc'
+)
+makedepends=(
+    'git'
+    'rust'
+    'cargo'
+    'cmake'
+    'ninja'
+    'vulkan-headers'
+    'glslang'
+    'pkgconf'
+    'libx11'
+    'libxcb'
+    'libxcursor'
+    'libxi'
+    'libxrandr'
+    'wayland'
+    'libxkbcommon'
+)
+provides=('vntx' 'vntx-gui' 'vulkan-neural-texture-extension')
+conflicts=('vntx' 'vntx-gui')
+source=("git+https://github.com/Bruno-Brandao-Silva/vulkan-neural-texture-extension.git")
+sha256sums=('SKIP')
+
+pkgver() {
+    cd "${srcdir}/${_pkgname}" 2>/dev/null || cd "${srcdir}/vulkan-neural-texture-extension" 2>/dev/null || cd "${startdir}"
+    printf "0.1.0.r%s.%s" "$(git rev-list --count HEAD)" "$(git rev-parse --short HEAD)"
+}
+
+build() {
+    cd "${srcdir}/${_pkgname}" 2>/dev/null || cd "${srcdir}/vulkan-neural-texture-extension" 2>/dev/null || cd "${startdir}"
+
+    # Build C++20 Vulkan layer and compiled SPIR-V shaders
+    cmake -B build -S . -G Ninja \
+        -DCMAKE_BUILD_TYPE=Release \
+        -DCMAKE_INSTALL_PREFIX=/usr \
+        -DVNTX_BUILD_TESTS=OFF
+    cmake --build build
+
+    # Build Rust CLI and GUI binaries
+    cargo build --release --locked --workspace
+}
+
+check() {
+    cd "${srcdir}/${_pkgname}" 2>/dev/null || cd "${srcdir}/vulkan-neural-texture-extension" 2>/dev/null || cd "${startdir}"
+    cargo test --release --locked --workspace
+}
+
+package() {
+    cd "${srcdir}/${_pkgname}" 2>/dev/null || cd "${srcdir}/vulkan-neural-texture-extension" 2>/dev/null || cd "${startdir}"
+
+    # Install executables
+    install -Dm755 target/release/vntx "${pkgdir}/usr/bin/vntx"
+    install -Dm755 target/release/vntx-gui "${pkgdir}/usr/bin/vntx-gui"
+
+    # Install Vulkan layer library
+    install -Dm755 build/layer/libvntx_layer.so "${pkgdir}/usr/lib/libvntx_layer.so"
+
+    # Install Vulkan implicit layer manifest
+    install -Dm644 build/layer/manifest/vntx_layer.json \
+        "${pkgdir}/usr/share/vulkan/implicit_layer.d/vntx_layer.json"
+
+    # Install Desktop launcher and scalable SVG icon
+    install -Dm644 crates/vntx-gui/assets/vntx-gui.desktop \
+        "${pkgdir}/usr/share/applications/vntx-gui.desktop"
+    install -Dm644 crates/vntx-gui/assets/vntx-icon.svg \
+        "${pkgdir}/usr/share/icons/hicolor/scalable/apps/vntx-icon.svg"
+
+    # Install documentation and license
+    install -Dm644 README.md "${pkgdir}/usr/share/doc/${_pkgname}/README.md"
+    [ -f LICENSE ] && install -Dm644 LICENSE "${pkgdir}/usr/share/licenses/${pkgname}/LICENSE"
+}
