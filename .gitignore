@@ -14,3 +14,9 @@ __pycache__/
 build/
 outputs/
 *.so
+pkg/
+src/
+pkgbuild/pkg/
+pkgbuild/src/
+pkgbuild/*.pkg.tar.*
+pkgbuild/vulkan-neural-texture-extension/

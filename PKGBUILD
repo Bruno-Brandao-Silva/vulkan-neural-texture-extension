@@ -62,6 +62,13 @@ check() {
 package() {
     cd "${srcdir}/${_pkgname}" 2>/dev/null || cd "${srcdir}/vulkan-neural-texture-extension" 2>/dev/null || cd "${startdir}"
 
+    # Create destination directories
+    install -dm755 "${pkgdir}/usr/lib/"
+    install -dm755 "${pkgdir}/usr/bin/"
+    install -dm755 "${pkgdir}/usr/share/vulkan/implicit_layer.d/"
+    install -dm755 "${pkgdir}/usr/share/applications/"
+    install -dm755 "${pkgdir}/usr/share/icons/hicolor/scalable/apps/"
+
     # Install executables
     install -Dm755 target/release/vntx "${pkgdir}/usr/bin/vntx"
     install -Dm755 target/release/vntx-gui "${pkgdir}/usr/bin/vntx-gui"
@@ -81,5 +88,7 @@ package() {
 
     # Install documentation and license
     install -Dm644 README.md "${pkgdir}/usr/share/doc/${_pkgname}/README.md"
-    [ -f LICENSE ] && install -Dm644 LICENSE "${pkgdir}/usr/share/licenses/${pkgname}/LICENSE"
+    if [ -f LICENSE ]; then
+        install -Dm644 LICENSE "${pkgdir}/usr/share/licenses/${pkgname}/LICENSE"
+    fi
 }
