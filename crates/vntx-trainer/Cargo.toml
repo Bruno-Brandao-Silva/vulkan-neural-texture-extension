@@ -5,10 +5,14 @@ authors.workspace = true
 edition.workspace = true
 license.workspace = true
 repository.workspace = true
-description = "Texture training pipeline for VNTX"
+description = "Offline neural texture training pipeline and orchestrator for VNTX"
 
 [dependencies]
 vntx-core = { workspace = true }
-tracing = { workspace = true }
-anyhow = { workspace = true }
+rayon = { workspace = true }
 thiserror = { workspace = true }
+tracing = { workspace = true }
+indicatif = { workspace = true }
+
+[dev-dependencies]
+tempfile = "3.10"

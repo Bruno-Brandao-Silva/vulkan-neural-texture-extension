@@ -5,11 +5,23 @@ authors.workspace = true
 edition.workspace = true
 license.workspace = true
 repository.workspace = true
-description = "Command-line interface for VNTX"
+description = "Command-line interface for the Vulkan Neural Texture Extension (VNTX)"
+
+[[bin]]
+name = "vntx"
+path = "src/main.rs"
 
 [dependencies]
 vntx-core = { workspace = true }
+vntx-trainer = { workspace = true }
 clap = { workspace = true }
 tracing = { workspace = true }
 tracing-subscriber = { workspace = true }
-anyhow = { workspace = true }
+indicatif = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+
+[dev-dependencies]
+tempfile = "3.10"
+assert_cmd = "2.0"
+predicates = "3.1"

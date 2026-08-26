@@ -1,7 +1,11 @@
 //! # VNTX Trainer
-//! Texture preprocessing and offline neural network training pipeline.
+//!
+//! Offline neural texture training pipeline and orchestrator for the **VNTX** framework.
 
+#![deny(unsafe_code)]
 #![deny(missing_docs)]
 #![deny(warnings)]
-#![deny(unsafe_code)]
-#![deny(clippy::all)]
+
+pub mod orchestrator;
+
+pub use orchestrator::{BatchTrainingSummary, TrainingOrchestrator};

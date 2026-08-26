@@ -1,24 +1,21 @@
 [workspace]
 resolver = "2"
 members = [
-    "crates/vntx-cli",
     "crates/vntx-core",
+    "crates/vntx-cli",
     "crates/vntx-trainer",
 ]
 
 [workspace.package]
 version = "0.1.0"
-authors = ["VNTX Developers"]
 edition = "2021"
+authors = ["Bruno Brandão Silva <bruno.brandao@cmsw.com>"]
 license = "MIT OR Apache-2.0"
 repository = "https://github.com/Bruno-Brandao-Silva/vulkan-neural-texture-extension"
 
 [workspace.dependencies]
-# Internal crates
 vntx-core = { path = "crates/vntx-core" }
 vntx-trainer = { path = "crates/vntx-trainer" }
-
-# Shared external dependencies
 clap = { version = "4.4", features = ["derive", "env"] }
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
@@ -27,13 +24,7 @@ tokio = { version = "1.35", features = ["full"] }
 anyhow = "1.0"
 thiserror = "1.0"
 tracing = "0.1"
-tracing-subscriber = "0.3"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 xxhash-rust = { version = "0.8", features = ["xxh3"] }
 rayon = "1.8"
 indicatif = "0.17"
-
-[profile.release]
-opt-level = 3
-lto = true
-codegen-units = 1
-panic = "abort"

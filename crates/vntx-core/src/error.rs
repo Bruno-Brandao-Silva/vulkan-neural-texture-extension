@@ -89,6 +89,27 @@ pub enum VntxError {
         calculated: u64,
     },
 
+    /// Configuration parsing or serialization error.
+    #[error("Configuration error: {0}")]
+    ConfigError(String),
+
+    /// Steam library manifest parsing error.
+    #[error("Manifest parse error for '{path}': {reason}")]
+    ManifestParseError {
+        /// File path of the manifest.
+        path: String,
+        /// Reason for failure.
+        reason: String,
+    },
+
+    /// Specified game was not found in Steam libraries.
+    #[error("Game not found: {0}")]
+    GameNotFound(String),
+
+    /// Cache operation error.
+    #[error("Cache error: {0}")]
+    CacheError(String),
+
     /// Standard I/O error wrapper.
     #[error("I/O error: {0}")]
     Io(String),

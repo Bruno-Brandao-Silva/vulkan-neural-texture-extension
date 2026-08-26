@@ -5,13 +5,16 @@ authors.workspace = true
 edition.workspace = true
 license.workspace = true
 repository.workspace = true
-description = "Core data formats, binary packing, and hashing for VNTX"
+description = "Core data formats, binary packing, Steam discovery, and cache management for VNTX"
 
 [dependencies]
 xxhash-rust = { workspace = true }
 thiserror = { workspace = true }
 tracing = { workspace = true }
-serde = { workspace = true, optional = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+toml = { workspace = true }
+rayon = { workspace = true }
 
 [dev-dependencies]
 tempfile = "3.10"
