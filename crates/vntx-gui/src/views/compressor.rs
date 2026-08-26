@@ -8,16 +8,16 @@ use vntx_trainer::TrainingOrchestrator;
 /// Renders the compression panel.
 #[allow(clippy::too_many_lines)]
 pub fn render(app: &mut VntxGuiApp, ui: &mut Ui) {
-    ui.add_space(10.0);
+    ui.add_space(10.0_f32);
 
     ui.heading(
         RichText::new("Neural Texture Compressor")
-            .size(24.0)
+            .size(24.0_f32)
             .strong(),
     );
-    ui.add_space(6.0);
+    ui.add_space(6.0_f32);
     ui.label("Train and pack neural MLP models for eligible 2D textures using multi-threaded CPU/GPU acceleration.");
-    ui.add_space(16.0);
+    ui.add_space(16.0_f32);
 
     let game_names: Vec<(u32, String)> = app
         .discovered_games
@@ -56,7 +56,7 @@ pub fn render(app: &mut VntxGuiApp, ui: &mut Ui) {
             });
     });
 
-    ui.add_space(10.0);
+    ui.add_space(10.0_f32);
 
     // Quality & Performance Options
     ui.group(|ui| {
@@ -79,14 +79,14 @@ pub fn render(app: &mut VntxGuiApp, ui: &mut Ui) {
             );
         });
 
-        ui.add_space(10.0);
+        ui.add_space(10.0_f32);
         ui.horizontal(|ui| {
             ui.label("Parallel Worker Threads:");
             ui.add(egui::Slider::new(&mut app.worker_jobs, 1..=16));
         });
     });
 
-    ui.add_space(16.0);
+    ui.add_space(16.0_f32);
 
     let can_compress = app.selected_game_id.is_some()
         && !matches!(
@@ -99,7 +99,7 @@ pub fn render(app: &mut VntxGuiApp, ui: &mut Ui) {
             can_compress,
             egui::Button::new(
                 RichText::new("🚀 Start Neural Compression")
-                    .size(16.0)
+                    .size(16.0_f32)
                     .strong(),
             ),
         )
@@ -170,12 +170,12 @@ pub fn render(app: &mut VntxGuiApp, ui: &mut Ui) {
         }
     }
 
-    ui.add_space(20.0);
+    ui.add_space(20.0_f32);
 
     // Progress and Result Status Box
     ui.group(|ui| {
-        ui.heading(RichText::new("Task Status").size(16.0));
-        ui.add_space(6.0);
+        ui.heading(RichText::new("Task Status").size(16.0_f32));
+        ui.add_space(6.0_f32);
 
         match &app.compression_status {
             CompressionStatus::Idle => {
@@ -186,14 +186,14 @@ pub fn render(app: &mut VntxGuiApp, ui: &mut Ui) {
                     RichText::new("🔍 Scanning game directories for texture assets...")
                         .color(Color32::from_rgb(33, 150, 243)),
                 );
-                ui.add(ProgressBar::new(0.0).animate(true));
+                ui.add(ProgressBar::new(0.0_f32).animate(true));
             }
             CompressionStatus::Compressing { processed, total } => {
                 #[allow(clippy::cast_precision_loss)]
                 let fraction = if *total > 0 {
                     *processed as f32 / *total as f32
                 } else {
-                    0.0
+                    0.0_f32
                 };
                 ui.label(
                     RichText::new(format!(
@@ -215,7 +215,7 @@ pub fn render(app: &mut VntxGuiApp, ui: &mut Ui) {
                     .color(Color32::from_rgb(76, 175, 80))
                     .strong(),
                 );
-                ui.add(ProgressBar::new(1.0));
+                ui.add(ProgressBar::new(1.0_f32));
             }
             CompressionStatus::Failed(reason) => {
                 ui.label(

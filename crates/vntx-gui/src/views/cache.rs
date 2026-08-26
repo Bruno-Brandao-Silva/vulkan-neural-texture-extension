@@ -5,10 +5,10 @@ use eframe::egui::{self, Color32, RichText, Ui};
 
 /// Renders the cache manager view.
 pub fn render(app: &mut VntxGuiApp, ui: &mut Ui) {
-    ui.add_space(10.0);
+    ui.add_space(10.0_f32);
 
     ui.horizontal(|ui| {
-        ui.heading(RichText::new("NTC Cache Manager").size(24.0).strong());
+        ui.heading(RichText::new("NTC Cache Manager").size(24.0_f32).strong());
         ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
             if ui
                 .button(RichText::new("🗑️ Purge All Cache").color(Color32::from_rgb(244, 67, 54)))
@@ -27,12 +27,12 @@ pub fn render(app: &mut VntxGuiApp, ui: &mut Ui) {
         });
     });
 
-    ui.add_space(6.0);
+    ui.add_space(6.0_f32);
     ui.label(format!(
         "Cache Directory: {}",
         app.cache_mgr.root_dir().display()
     ));
-    ui.add_space(12.0);
+    ui.add_space(12.0_f32);
 
     if app.cached_files.is_empty() {
         ui.group(|ui| {
@@ -46,9 +46,9 @@ pub fn render(app: &mut VntxGuiApp, ui: &mut Ui) {
         ui.group(|ui| {
             ui.heading(
                 RichText::new(format!("Cached Assets ({} files):", app.cached_files.len()))
-                    .size(16.0),
+                    .size(16.0_f32),
             );
-            ui.add_space(6.0);
+            ui.add_space(6.0_f32);
 
             for file in &app.cached_files {
                 #[allow(clippy::cast_precision_loss)]

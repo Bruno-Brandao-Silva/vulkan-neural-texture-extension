@@ -5,10 +5,10 @@ use eframe::egui::{self, Color32, RichText, Ui};
 
 /// Renders the Steam games library view.
 pub fn render(app: &mut VntxGuiApp, ui: &mut Ui) {
-    ui.add_space(10.0);
+    ui.add_space(10.0_f32);
 
     ui.horizontal(|ui| {
-        ui.heading(RichText::new("Steam Games Library").size(24.0).strong());
+        ui.heading(RichText::new("Steam Games Library").size(24.0_f32).strong());
         ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
             if ui.button("🔄 Refresh Libraries").clicked() {
                 app.refresh_games();
@@ -17,9 +17,9 @@ pub fn render(app: &mut VntxGuiApp, ui: &mut Ui) {
         });
     });
 
-    ui.add_space(6.0);
+    ui.add_space(6.0_f32);
     ui.label("Manage and compress neural textures for games installed in your Steam libraries.");
-    ui.add_space(12.0);
+    ui.add_space(12.0_f32);
 
     // Search bar
     ui.horizontal(|ui| {
@@ -30,7 +30,7 @@ pub fn render(app: &mut VntxGuiApp, ui: &mut Ui) {
         }
     });
 
-    ui.add_space(12.0);
+    ui.add_space(12.0_f32);
 
     let filtered_games: Vec<_> = app
         .discovered_games
@@ -67,7 +67,7 @@ pub fn render(app: &mut VntxGuiApp, ui: &mut Ui) {
             ui.group(|ui| {
                 ui.horizontal(|ui| {
                     ui.vertical(|ui| {
-                        ui.label(RichText::new(&game.name).size(16.0).strong());
+                        ui.label(RichText::new(&game.name).size(16.0_f32).strong());
                         ui.label(
                             RichText::new(format!(
                                 "AppID: {} | Size on Disk: {disk_gb:.1} GB",
@@ -78,7 +78,7 @@ pub fn render(app: &mut VntxGuiApp, ui: &mut Ui) {
                         ui.label(
                             RichText::new(format!("Location: {}", game.install_dir.display()))
                                 .color(Color32::from_gray(130))
-                                .size(11.0),
+                                .size(11.0_f32),
                         );
                     });
 
@@ -114,7 +114,7 @@ pub fn render(app: &mut VntxGuiApp, ui: &mut Ui) {
                     });
                 });
             });
-            ui.add_space(4.0);
+            ui.add_space(4.0_f32);
         }
     });
 }

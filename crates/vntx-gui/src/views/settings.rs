@@ -6,25 +6,25 @@ use vntx_core::VntxConfig;
 
 /// Renders the settings view.
 pub fn render(app: &mut VntxGuiApp, ui: &mut Ui) {
-    ui.add_space(10.0);
+    ui.add_space(10.0_f32);
 
     ui.heading(
         RichText::new("Preferences & Configuration")
-            .size(24.0)
+            .size(24.0_f32)
             .strong(),
     );
-    ui.add_space(6.0);
+    ui.add_space(6.0_f32);
     ui.label(format!(
         "Configuration file path: {}",
         VntxConfig::default_config_path().display()
     ));
-    ui.add_space(16.0);
+    ui.add_space(16.0_f32);
 
     egui::ScrollArea::vertical().show(ui, |ui| {
         // General Section
         ui.group(|ui| {
-            ui.heading(RichText::new("General Settings").size(16.0));
-            ui.add_space(6.0);
+            ui.heading(RichText::new("General Settings").size(16.0_f32));
+            ui.add_space(6.0_f32);
 
             ui.horizontal(|ui| {
                 ui.label("Cache Directory:");
@@ -42,12 +42,12 @@ pub fn render(app: &mut VntxGuiApp, ui: &mut Ui) {
             );
         });
 
-        ui.add_space(12.0);
+        ui.add_space(12.0_f32);
 
         // Training Section
         ui.group(|ui| {
-            ui.heading(RichText::new("Training & Compression Defaults").size(16.0));
-            ui.add_space(6.0);
+            ui.heading(RichText::new("Training & Compression Defaults").size(16.0_f32));
+            ui.add_space(6.0_f32);
 
             ui.horizontal(|ui| {
                 ui.label("Default Quality:");
@@ -68,12 +68,12 @@ pub fn render(app: &mut VntxGuiApp, ui: &mut Ui) {
             });
         });
 
-        ui.add_space(12.0);
+        ui.add_space(12.0_f32);
 
         // Steam Libraries Section
         ui.group(|ui| {
-            ui.heading(RichText::new("Steam Library Search Paths").size(16.0));
-            ui.add_space(6.0);
+            ui.heading(RichText::new("Steam Library Search Paths").size(16.0_f32));
+            ui.add_space(6.0_f32);
 
             for (idx, path) in app.config.paths.steam_libraries.iter_mut().enumerate() {
                 ui.horizontal(|ui| {
@@ -83,10 +83,10 @@ pub fn render(app: &mut VntxGuiApp, ui: &mut Ui) {
             }
         });
 
-        ui.add_space(20.0);
+        ui.add_space(20.0_f32);
 
         if ui
-            .button(RichText::new("💾 Save Configuration").size(16.0).strong())
+            .button(RichText::new("💾 Save Configuration").size(16.0_f32).strong())
             .clicked()
         {
             let default_path = VntxConfig::default_config_path();

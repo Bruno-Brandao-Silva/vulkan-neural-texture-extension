@@ -154,21 +154,21 @@ impl eframe::App for VntxGuiApp {
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
         // Top Navigation Bar
         TopBottomPanel::top("top_header").show(ctx, |ui| {
-            ui.add_space(6.0);
+            ui.add_space(6.0_f32);
             ui.horizontal(|ui| {
                 ui.heading(
                     RichText::new("⚡ VNTX")
-                        .size(20.0)
+                        .size(20.0_f32)
                         .strong()
                         .color(Color32::from_rgb(129, 199, 132)),
                 );
                 ui.label(
                     RichText::new("Vulkan Neural Textures")
-                        .size(12.0)
+                        .size(12.0_f32)
                         .color(Color32::from_gray(160)),
                 );
 
-                ui.add_space(20.0);
+                ui.add_space(20.0_f32);
 
                 ui.selectable_value(&mut self.selected_tab, Tab::Dashboard, "📊 Dashboard");
                 ui.selectable_value(&mut self.selected_tab, Tab::Games, "🎮 Games");
@@ -176,7 +176,7 @@ impl eframe::App for VntxGuiApp {
                 ui.selectable_value(&mut self.selected_tab, Tab::Cache, "🗄️ Cache");
                 ui.selectable_value(&mut self.selected_tab, Tab::Settings, "⚙️ Settings");
             });
-            ui.add_space(6.0);
+            ui.add_space(6.0_f32);
         });
 
         // Bottom Toast Panel
