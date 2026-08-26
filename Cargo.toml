@@ -4,6 +4,7 @@ members = [
     "crates/vntx-core",
     "crates/vntx-cli",
     "crates/vntx-trainer",
+    "crates/vntx-gui",
 ]
 
 [workspace.package]
@@ -28,3 +29,4 @@ tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 xxhash-rust = { version = "0.8", features = ["xxh3"] }
 rayon = "1.8"
 indicatif = "0.17"
+eframe = { version = "0.27", default-features = true }
