@@ -51,6 +51,10 @@ enum Commands {
 
     /// Purge local texture caches to reclaim disk space.
     Clean(commands::clean::CleanArgs),
+
+    /// Validate system setup, Vulkan layer registration, and GPU inference sanities.
+    #[command(name = "test-system")]
+    TestSystem(commands::test_system::TestSystemArgs),
 }
 
 fn main() -> ExitCode {
@@ -76,6 +80,7 @@ fn main() -> ExitCode {
         Commands::Fetch(args) => commands::fetch::execute(&args, &config),
         Commands::Status(args) => commands::status::execute(&args, &config),
         Commands::Clean(args) => commands::clean::execute(&args, &config),
+        Commands::TestSystem(args) => commands::test_system::execute(&args, &config),
     };
 
     match result {

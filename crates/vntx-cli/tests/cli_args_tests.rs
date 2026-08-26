@@ -69,3 +69,12 @@ fn test_cli_fetch_command() {
             "Fetching pre-trained NTC textures",
         ));
 }
+
+#[test]
+fn test_cli_test_system_help() {
+    let mut cmd = Command::cargo_bin("vntx").expect("binary exists");
+    cmd.args(["test-system", "--help"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("--skip-gpu-test"));
+}

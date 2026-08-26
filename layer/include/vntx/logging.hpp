@@ -4,9 +4,11 @@
 #include <cstdint>
 #include <cstdio>
 #include <cstdlib>
+#include <fstream>
 #include <format>
 #include <iostream>
 #include <mutex>
+#include <string>
 #include <string_view>
 
 namespace vntx::log {
@@ -60,6 +62,25 @@ void log_message(const Level level, std::format_string<Args...> fmt, Args&&... a
         const std::string formatted = std::format(fmt, std::forward<Args>(args)...);
         static std::mutex log_mutex;
         std::lock_guard<std::mutex> lock(log_mutex);
+
+        const char* const log_file_env = std::getenv("VNTX_LOG_FILE");
+        if (log_file_env && log_file_env[0] != '\0') {
+            static std::ofstream file_stream;
+            static std::string active_path;
+            if (!file_stream.is_open() || active_path != log_file_env) {
+                if (file_stream.is_open()) {
+                    file_stream.close();
+                }
+                file_stream.open(log_file_env, std::ios::out | std::ios::app);
+                active_path = log_file_env;
+            }
+            if (file_stream.is_open()) {
+                file_stream << "[VNTX][" << level_to_string(level) << "] " << formatted << '\n';
+                file_stream.flush();
+                return;
+            }
+        }
+
         std::cerr << "[VNTX][" << level_to_string(level) << "] " << formatted << '\n';
     } catch (...) {
         // Logging must never propagate exceptions

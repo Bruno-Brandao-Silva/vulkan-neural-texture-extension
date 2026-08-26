@@ -5,3 +5,5 @@ pub mod compress;
 pub mod fetch;
 pub mod scan;
 pub mod status;
+pub mod test_system;
+

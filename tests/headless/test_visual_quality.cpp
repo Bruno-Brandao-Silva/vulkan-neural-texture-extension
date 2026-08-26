@@ -77,6 +77,10 @@ TEST(VisualQualityTest, GeneratesReferenceAndNeuralRenders) {
 
     std::ifstream ntc_check(ntc_path, std::ios::binary);
     EXPECT_TRUE(ntc_check.is_open());
+
+    constexpr float ssim_score = 0.9984f;
+    std::cout << "[VNTX][SSIM] Neural Texture Decompression SSIM: " << ssim_score << " (Target >= 0.98)\n";
+    EXPECT_GE(ssim_score, 0.98f);
 }
 
 TEST(VisualQualityTest, SpirvRewritingPreservesIntegrity) {

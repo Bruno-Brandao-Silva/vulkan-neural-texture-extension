@@ -110,6 +110,10 @@ pub enum VntxError {
     #[error("Cache error: {0}")]
     CacheError(String),
 
+    /// System validation or local test failure.
+    #[error("System validation error: {0}")]
+    SystemValidationError(String),
+
     /// Standard I/O error wrapper.
     #[error("I/O error: {0}")]
     Io(String),
