@@ -32,7 +32,9 @@ do_build() {
     cmake -B build -S . -G Ninja \
         -DCMAKE_BUILD_TYPE=Release \
         -DCMAKE_INSTALL_PREFIX="${PREFIX}" \
-        -DVNTX_BUILD_TESTS=OFF
+        -DVNTX_BUILD_TESTS=OFF \
+        -DVNTX_ENABLE_ASAN=OFF \
+        -DVNTX_ENABLE_SANITIZERS=OFF
     cmake --build build
 
     echo "==> Building VNTX CLI and GUI (Rust)..."

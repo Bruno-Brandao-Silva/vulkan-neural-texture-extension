@@ -16,9 +16,11 @@ else()
     add_compile_options(-Wall -Wextra -Wpedantic -Werror)
 endif()
 
-# Sanitizer configuration for debug builds
-option(VNTX_ENABLE_SANITIZERS "Enable AddressSanitizer and UndefinedBehaviorSanitizer" ON)
-if(VNTX_ENABLE_SANITIZERS AND NOT MSVC)
+# Sanitizer configuration for debug builds (disabled by default and restricted from Release builds)
+option(VNTX_ENABLE_ASAN "Enable AddressSanitizer and UndefinedBehaviorSanitizer" OFF)
+option(VNTX_ENABLE_SANITIZERS "Enable AddressSanitizer and UndefinedBehaviorSanitizer" OFF)
+
+if((VNTX_ENABLE_ASAN OR VNTX_ENABLE_SANITIZERS) AND NOT CMAKE_BUILD_TYPE STREQUAL "Release" AND NOT MSVC)
     add_compile_options(-fsanitize=address,undefined -fno-omit-frame-pointer)
     add_link_options(-fsanitize=address,undefined)
 endif()

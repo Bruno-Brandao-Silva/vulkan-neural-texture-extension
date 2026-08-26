@@ -1,7 +1,7 @@
 # Maintainer: Bruno Brandão Silva <bruno.brandao@cmsw.com>
 pkgname=vntx-git
 _pkgname=vntx
-pkgver=0.1.0.r21.91b7964
+pkgver=0.1.0.r22.16f3602
 pkgrel=1
 pkgdesc="Vulkan Neural Texture Compression Extension - Layer, CLI & Native GUI"
 arch=('x86_64')
@@ -47,7 +47,9 @@ build() {
     cmake -B build -S . -G Ninja \
         -DCMAKE_BUILD_TYPE=Release \
         -DCMAKE_INSTALL_PREFIX=/usr \
-        -DVNTX_BUILD_TESTS=OFF
+        -DVNTX_BUILD_TESTS=OFF \
+        -DVNTX_ENABLE_ASAN=OFF \
+        -DVNTX_ENABLE_SANITIZERS=OFF
     cmake --build build
 
     # Build Rust CLI and GUI binaries
