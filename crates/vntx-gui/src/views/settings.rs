@@ -86,7 +86,11 @@ pub fn render(app: &mut VntxGuiApp, ui: &mut Ui) {
         ui.add_space(20.0_f32);
 
         if ui
-            .button(RichText::new("💾 Save Configuration").size(16.0_f32).strong())
+            .button(
+                RichText::new("💾 Save Configuration")
+                    .size(16.0_f32)
+                    .strong(),
+            )
             .clicked()
         {
             let default_path = VntxConfig::default_config_path();
