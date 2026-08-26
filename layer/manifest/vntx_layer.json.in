@@ -1,0 +1,21 @@
+{
+    "file_format_version": "1.0.0",
+    "layer": {
+        "name": "VK_LAYER_VNTX_neural_texture",
+        "type": "GLOBAL",
+        "library_path": "@VNTX_LAYER_OUTPUT_PATH@",
+        "api_version": "1.3.260",
+        "implementation_version": "1",
+        "description": "VNTX - Vulkan Neural Texture Extension Implicit Layer",
+        "functions": {
+            "vkGetInstanceProcAddr": "vntx_GetInstanceProcAddr",
+            "vkGetDeviceProcAddr": "vntx_GetDeviceProcAddr"
+        },
+        "enable_environment": {
+            "ENABLE_VNTX": "1"
+        },
+        "disable_environment": {
+            "DISABLE_VNTX": "1"
+        }
+    }
+}
