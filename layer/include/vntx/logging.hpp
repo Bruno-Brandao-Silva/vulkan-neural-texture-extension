@@ -65,6 +65,11 @@ void log_message(const Level level, std::format_string<Args...> fmt, Args&&... a
 
         const char* const log_file_env = std::getenv("VNTX_LOG_FILE");
         if (log_file_env && log_file_env[0] != '\0') {
+            static bool log_file_failed = false;
+            if (log_file_failed) {
+                return; // Silent fallback when log file creation/writing failed
+            }
+
             try {
                 static std::ofstream file_stream;
                 static std::string active_path;
@@ -81,8 +86,11 @@ void log_message(const Level level, std::format_string<Args...> fmt, Args&&... a
                     file_stream.flush();
                     return;
                 }
+                log_file_failed = true;
+                return; // Silent fallback
             } catch (...) {
-                // I/O failure caught gracefully - fallback to std::cerr
+                log_file_failed = true;
+                return; // Silent fallback
             }
         }
 

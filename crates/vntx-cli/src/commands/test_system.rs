@@ -102,10 +102,22 @@ pub fn execute(args: &TestSystemArgs, _config: &VntxConfig) -> Result<(), VntxEr
 
     // Check 3 & 4: Vulkan Layer Entrypoints & GPU Neural Inference Validation
     if !args.skip_gpu_test {
-        let test_bin_paths = [
+        let mut test_bin_paths = vec![
             PathBuf::from("build/tests/ntc_headless_test"),
             PathBuf::from("build/tests/vntx_headless_tests"),
+            PathBuf::from("build/layer/tests/ntc_headless_test"),
+            PathBuf::from("/usr/bin/ntc_headless_test"),
+            PathBuf::from("/usr/local/bin/ntc_headless_test"),
         ];
+
+        if let Ok(path_env) = std::env::var("PATH") {
+            for dir in std::env::split_paths(&path_env) {
+                let candidate = dir.join("ntc_headless_test");
+                if candidate.exists() && !test_bin_paths.contains(&candidate) {
+                    test_bin_paths.push(candidate);
+                }
+            }
+        }
 
         let found_test_bin = test_bin_paths.into_iter().find(|p| p.exists());
 
