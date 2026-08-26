@@ -6,16 +6,16 @@ use vntx_core::expand_home_path;
 
 /// Renders the dashboard view.
 pub fn render(app: &mut VntxGuiApp, ui: &mut Ui) {
-    ui.add_space(10.0);
+    ui.add_space(10.0_f32);
 
     ui.heading(
         RichText::new("System & Optimization Overview")
-            .size(24.0)
+            .size(24.0_f32)
             .strong(),
     );
-    ui.add_space(6.0);
+    ui.add_space(6.0_f32);
     ui.label("Real-time telemetry on Vulkan Implicit Layer activity, VRAM reduction, and cache footprint.");
-    ui.add_space(16.0);
+    ui.add_space(16.0_f32);
 
     let layer_path = expand_home_path("~/.local/share/vulkan/implicit_layer.d/vntx_layer.json");
     let is_layer_installed = layer_path.exists();
@@ -27,8 +27,8 @@ pub fn render(app: &mut VntxGuiApp, ui: &mut Ui) {
 
     // 4 Key Metrics Cards Layout
     ui.horizontal(|ui| {
-        let card_width = 180.0;
-        let card_height = 90.0;
+        let card_width = 180.0_f32;
+        let card_height = 90.0_f32;
 
         render_metric_card(
             ui,
@@ -75,30 +75,30 @@ pub fn render(app: &mut VntxGuiApp, ui: &mut Ui) {
         );
     });
 
-    ui.add_space(24.0);
+    ui.add_space(24.0_f32);
     ui.separator();
-    ui.add_space(16.0);
+    ui.add_space(16.0_f32);
 
-    ui.heading(RichText::new("Quick Actions").size(18.0).strong());
-    ui.add_space(10.0);
+    ui.heading(RichText::new("Quick Actions").size(18.0_f32).strong());
+    ui.add_space(10.0_f32);
 
     ui.horizontal(|ui| {
         if ui
-            .button(RichText::new("🎮 Browse Steam Games").size(14.0))
+            .button(RichText::new("🎮 Browse Steam Games").size(14.0_f32))
             .clicked()
         {
             app.selected_tab = Tab::Games;
         }
 
         if ui
-            .button(RichText::new("⚡ Open Compressor").size(14.0))
+            .button(RichText::new("⚡ Open Compressor").size(14.0_f32))
             .clicked()
         {
             app.selected_tab = Tab::Compressor;
         }
 
         if ui
-            .button(RichText::new("🔄 Refresh Status").size(14.0))
+            .button(RichText::new("🔄 Refresh Status").size(14.0_f32))
             .clicked()
         {
             app.refresh_all();
@@ -106,7 +106,7 @@ pub fn render(app: &mut VntxGuiApp, ui: &mut Ui) {
         }
     });
 
-    ui.add_space(20.0);
+    ui.add_space(20.0_f32);
     ui.group(|ui| {
         ui.label(RichText::new("ℹ️ How VNTX Works").strong());
         ui.label("VNTX is an implicit Vulkan layer that dynamically intercepts high-resolution 2D sampled textures.");
@@ -124,17 +124,17 @@ fn render_metric_card(
     color: Color32,
 ) {
     egui::Frame::group(ui.style())
-        .stroke(Stroke::new(1.0, Color32::from_gray(60)))
+        .stroke(Stroke::new(1.0_f32, Color32::from_gray(60)))
         .fill(Color32::from_gray(30))
-        .inner_margin(12.0)
+        .inner_margin(12.0_f32)
         .show(ui, |ui| {
             ui.set_min_size(egui::vec2(width, height));
             ui.label(
                 RichText::new(title)
-                    .size(12.0)
+                    .size(12.0_f32)
                     .color(Color32::from_gray(180)),
             );
-            ui.add_space(4.0);
-            ui.label(RichText::new(value).size(20.0).strong().color(color));
+            ui.add_space(4.0_f32);
+            ui.label(RichText::new(value).size(20.0_f32).strong().color(color));
         });
 }
