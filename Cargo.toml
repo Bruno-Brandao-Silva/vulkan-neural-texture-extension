@@ -11,7 +11,7 @@ version = "0.1.0"
 authors = ["VNTX Developers"]
 edition = "2021"
 license = "MIT OR Apache-2.0"
-repository = "https://github.com/vntx/vulkan-neural-texture-extension"
+repository = "https://github.com/Bruno-Brandao-Silva/vulkan-neural-texture-extension"
 
 [workspace.dependencies]
 # Internal crates
