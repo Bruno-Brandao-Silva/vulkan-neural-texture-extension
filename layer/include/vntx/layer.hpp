@@ -37,6 +37,7 @@ struct DeviceData {
 
     std::shared_mutex image_mutex;
     std::unordered_set<VkImage> candidate_images;
+    std::unordered_set<VkImage> active_ntc_images;
 };
 
 /// @brief Registry for instance and device contexts with graceful fallback state.

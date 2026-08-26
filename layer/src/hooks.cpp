@@ -16,6 +16,15 @@ constexpr VkDeviceSize DEFAULT_NTC_WEIGHTS_SIZE = 9288; // 64-byte header + 9224
     return (size + alignment - 1) & ~(alignment - 1);
 }
 
+[[nodiscard]] bool should_override_memory_size(const vntx::DeviceData& device_data, const VkImage image) noexcept {
+    const char* const force_env = std::getenv("VNTX_FORCE_NTC");
+    if (force_env && (std::string_view(force_env) == "1" || std::string_view(force_env) == "true")) {
+        return true;
+    }
+    std::shared_lock<std::shared_mutex> lock(const_cast<vntx::DeviceData&>(device_data).image_mutex);
+    return device_data.active_ntc_images.contains(image);
+}
+
 } // namespace
 
 extern "C" {
@@ -97,6 +106,7 @@ VKAPI_ATTR void VKAPI_CALL vntx_DestroyImage(
         if (image != VK_NULL_HANDLE && !vntx::LayerContext::get().is_disabled()) {
             std::unique_lock<std::shared_mutex> lock(device_data->image_mutex);
             device_data->candidate_images.erase(image);
+            device_data->active_ntc_images.erase(image);
         }
 
         device_data->next_destroy_image(device, image, pAllocator);
@@ -134,18 +144,33 @@ VKAPI_ATTR void VKAPI_CALL vntx_GetImageMemoryRequirements(
 
         if (is_candidate) {
             const VkDeviceSize original_size = pMemoryRequirements->size;
+            const VkDeviceSize original_alignment = pMemoryRequirements->alignment;
+            const uint32_t original_memory_type_bits = pMemoryRequirements->memoryTypeBits;
+
             const VkDeviceSize ntc_aligned_size = align_memory_size(
                 DEFAULT_NTC_WEIGHTS_SIZE,
-                pMemoryRequirements->alignment
+                original_alignment
             );
-            pMemoryRequirements->size = ntc_aligned_size;
 
-            VNTX_LOG_INFO(
-                "Overriding candidate VRAM memory requirements: original={} bytes -> NTC={} bytes (alignment={})",
-                original_size,
-                ntc_aligned_size,
-                pMemoryRequirements->alignment
-            );
+            if (should_override_memory_size(*device_data, image)) {
+                pMemoryRequirements->size = ntc_aligned_size;
+                VNTX_LOG_INFO(
+                    "Overriding candidate VRAM memory requirements: original={} bytes -> NTC={} bytes (alignment={})",
+                    original_size,
+                    ntc_aligned_size,
+                    original_alignment
+                );
+            } else {
+                pMemoryRequirements->size = original_size;
+                VNTX_LOG_DEBUG(
+                    "Retaining candidate original VRAM memory size (uncompressed fallback): size={} bytes alignment={}",
+                    original_size,
+                    original_alignment
+                );
+            }
+
+            pMemoryRequirements->alignment = original_alignment;
+            pMemoryRequirements->memoryTypeBits = original_memory_type_bits;
         }
     } catch (...) {
         // Safe pass-through
@@ -181,17 +206,32 @@ VKAPI_ATTR void VKAPI_CALL vntx_GetImageMemoryRequirements2(
 
         if (is_candidate) {
             const VkDeviceSize original_size = pMemoryRequirements->memoryRequirements.size;
+            const VkDeviceSize original_alignment = pMemoryRequirements->memoryRequirements.alignment;
+            const uint32_t original_memory_type_bits = pMemoryRequirements->memoryRequirements.memoryTypeBits;
+
             const VkDeviceSize ntc_aligned_size = align_memory_size(
                 DEFAULT_NTC_WEIGHTS_SIZE,
-                pMemoryRequirements->memoryRequirements.alignment
+                original_alignment
             );
-            pMemoryRequirements->memoryRequirements.size = ntc_aligned_size;
 
-            VNTX_LOG_INFO(
-                "Overriding candidate VRAM memory requirements (v2): original={} bytes -> NTC={} bytes",
-                original_size,
-                ntc_aligned_size
-            );
+            if (should_override_memory_size(*device_data, pInfo->image)) {
+                pMemoryRequirements->memoryRequirements.size = ntc_aligned_size;
+                VNTX_LOG_INFO(
+                    "Overriding candidate VRAM memory requirements (v2): original={} bytes -> NTC={} bytes",
+                    original_size,
+                    ntc_aligned_size
+                );
+            } else {
+                pMemoryRequirements->memoryRequirements.size = original_size;
+                VNTX_LOG_DEBUG(
+                    "Retaining candidate original VRAM memory size (v2 uncompressed fallback): size={} bytes alignment={}",
+                    original_size,
+                    original_alignment
+                );
+            }
+
+            pMemoryRequirements->memoryRequirements.alignment = original_alignment;
+            pMemoryRequirements->memoryRequirements.memoryTypeBits = original_memory_type_bits;
         }
     } catch (...) {
         // Safe pass-through
