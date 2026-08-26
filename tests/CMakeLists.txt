@@ -5,6 +5,7 @@ add_executable(ntc_headless_test
     headless/test_header_layout.cpp
     headless/test_filter.cpp
     headless/test_vulkan_interception.cpp
+    headless/test_visual_quality.cpp
 )
 
 target_include_directories(ntc_headless_test

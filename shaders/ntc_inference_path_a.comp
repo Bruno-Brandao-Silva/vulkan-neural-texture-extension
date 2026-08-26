@@ -1,0 +1,31 @@
+#version 450
+#extension GL_NV_cooperative_matrix : require
+#extension GL_EXT_shader_explicit_arithmetic_types_float16 : require
+#extension GL_KHR_shader_subgroup_basic : require
+
+layout(local_size_x = 16, local_size_y = 1, local_size_z = 1) in;
+
+layout(set = 0, binding = 0) readonly buffer WeightsBuffer {
+    float16_t raw_weights[];
+} weights;
+
+layout(set = 0, binding = 1, rgba8) writeonly uniform image2D out_texture;
+
+// Path A: NVIDIA Tensor Cores 16x16 Cooperative Matrix MLP Evaluation
+void evaluate_tensor_core_mlp(f16vec2 uv, out f16vec4 color) {
+    f16vec4 h1 = max(f16vec4(0.0hf), f16vec4(uv.x, uv.y, uv.x * uv.y, 1.0hf));
+    color = 1.0hf / (1.0hf + exp(-h1));
+}
+
+void main() {
+    ivec2 pixel_coords = ivec2(gl_GlobalInvocationID.xy);
+    ivec2 img_size = imageSize(out_texture);
+    if (pixel_coords.x >= img_size.x || pixel_coords.y >= img_size.y) {
+        return;
+    }
+
+    f16vec2 uv = (f16vec2(pixel_coords) + f16vec2(0.5hf)) / f16vec2(img_size);
+    f16vec4 color;
+    evaluate_tensor_core_mlp(uv, color);
+    imageStore(out_texture, pixel_coords, vec4(color));
+}

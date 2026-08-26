@@ -26,6 +26,13 @@ struct DeviceData {
     PFN_vkDestroyDevice next_destroy_device{nullptr};
     PFN_vkCreateImage next_create_image{nullptr};
     PFN_vkDestroyImage next_destroy_image{nullptr};
+    PFN_vkGetImageMemoryRequirements next_get_image_memory_requirements{nullptr};
+    PFN_vkGetImageMemoryRequirements2 next_get_image_memory_requirements2{nullptr};
+    PFN_vkBindImageMemory next_bind_image_memory{nullptr};
+    PFN_vkBindImageMemory2 next_bind_image_memory2{nullptr};
+    PFN_vkCmdCopyBufferToImage next_cmd_copy_buffer_to_image{nullptr};
+    PFN_vkCreateShaderModule next_create_shader_module{nullptr};
+    PFN_vkDestroyShaderModule next_destroy_shader_module{nullptr};
 
     std::shared_mutex image_mutex;
     std::unordered_set<VkImage> candidate_images;
@@ -115,6 +122,53 @@ VKAPI_ATTR VkResult VKAPI_CALL vntx_CreateImage(
 VKAPI_ATTR void VKAPI_CALL vntx_DestroyImage(
     VkDevice device,
     VkImage image,
+    const VkAllocationCallbacks* pAllocator
+);
+
+VKAPI_ATTR void VKAPI_CALL vntx_GetImageMemoryRequirements(
+    VkDevice device,
+    VkImage image,
+    VkMemoryRequirements* pMemoryRequirements
+);
+
+VKAPI_ATTR void VKAPI_CALL vntx_GetImageMemoryRequirements2(
+    VkDevice device,
+    const VkImageMemoryRequirementsInfo2* pInfo,
+    VkMemoryRequirements2* pMemoryRequirements
+);
+
+VKAPI_ATTR VkResult VKAPI_CALL vntx_BindImageMemory(
+    VkDevice device,
+    VkImage image,
+    VkDeviceMemory memory,
+    VkDeviceSize memoryOffset
+);
+
+VKAPI_ATTR VkResult VKAPI_CALL vntx_BindImageMemory2(
+    VkDevice device,
+    uint32_t bindInfoCount,
+    const VkBindImageMemoryInfo* pBindInfos
+);
+
+VKAPI_ATTR void VKAPI_CALL vntx_CmdCopyBufferToImage(
+    VkCommandBuffer commandBuffer,
+    VkBuffer srcBuffer,
+    VkImage dstImage,
+    VkImageLayout dstImageLayout,
+    uint32_t regionCount,
+    const VkBufferImageCopy* pRegions
+);
+
+VKAPI_ATTR VkResult VKAPI_CALL vntx_CreateShaderModule(
+    VkDevice device,
+    const VkShaderModuleCreateInfo* pCreateInfo,
+    const VkAllocationCallbacks* pAllocator,
+    VkShaderModule* pShaderModule
+);
+
+VKAPI_ATTR void VKAPI_CALL vntx_DestroyShaderModule(
+    VkDevice device,
+    VkShaderModule shaderModule,
     const VkAllocationCallbacks* pAllocator
 );
 

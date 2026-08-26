@@ -2,6 +2,7 @@ add_library(vntx_layer SHARED
     src/layer.cpp
     src/filter.cpp
     src/hooks.cpp
+    src/spirv_rewriter.cpp
 )
 
 target_include_directories(vntx_layer
