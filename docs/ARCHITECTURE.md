@@ -52,10 +52,10 @@
 
 ## 2. Component Breakdown
 
-### 2.1 Implicit Vulkan Layer (`libvk_ntc_layer.so`)
+### 2.1 Implicit Vulkan Layer (`libvntx_layer.so`)
 The core interceptor library registered with Vulkan Loader via JSON manifest.
-- **Manifest Location:** `~/.local/share/vulkan/implicit_layer.d/vk_ntc_layer.json`
-- **Activation Control:** Enabled globally or per-process via environment variable (`ENABLE_NTC=1`).
+- **Manifest Location:** `/usr/share/vulkan/implicit_layer.d/vntx_layer.json`
+- **Activation Control:** Activated automatically (100% Plug & Play). Can be disabled per-process via environment variable (`DISABLE_VNTX=1`).
 
 ### 2.2 Texture Candidate Filtering Engine
 To prevent system instability or rendering corruption, the layer applies strict eligibility rules during `vkCreateImage` interception:
@@ -65,7 +65,6 @@ To prevent system instability or rendering corruption, the layer applies strict 
 2. **Exclusion Flags:** MUST NOT contain:
    - `VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT` (Render Targets)
    - `VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT` (Depth Buffers)
-   - `VK_IMAGE_USAGE_STORAGE_BIT` (Writable Compute Storage Images)
 3. **Dimensions:** `width >= 1024` AND `height >= 1024`.
 4. **Image Type:** MUST be `VK_IMAGE_TYPE_2D`.
 

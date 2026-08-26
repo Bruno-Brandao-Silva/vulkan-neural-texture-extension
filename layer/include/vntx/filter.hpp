@@ -13,7 +13,7 @@ constexpr uint32_t MIN_CANDIDATE_DIMENSION = 1024;
 ///
 /// Rules from ARCHITECTURE.md Section 2.2:
 /// 1. Usage Flags: VK_IMAGE_USAGE_SAMPLED_BIT MUST be present.
-/// 2. Exclusion Flags: MUST NOT contain COLOR_ATTACHMENT, DEPTH_STENCIL_ATTACHMENT, or STORAGE.
+/// 2. Exclusion Flags: MUST NOT contain COLOR_ATTACHMENT or DEPTH_STENCIL_ATTACHMENT.
 /// 3. Dimensions: width >= 1024 AND height >= 1024.
 /// 4. Image Type: MUST be VK_IMAGE_TYPE_2D.
 ///

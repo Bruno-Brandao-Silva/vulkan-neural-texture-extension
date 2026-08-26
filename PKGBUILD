@@ -1,7 +1,7 @@
 # Maintainer: Bruno Brandão Silva <bruno.brandao@cmsw.com>
 pkgname=vntx-git
 _pkgname=vntx
-pkgver=0.1.0
+pkgver=0.1.0.r16.47a1095
 pkgrel=1
 pkgdesc="Vulkan Neural Texture Compression Extension - Layer, CLI & Native GUI"
 arch=('x86_64')

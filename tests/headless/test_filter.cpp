@@ -94,13 +94,15 @@ TEST(FilterTest, RejectsDepthStencilBuffers) {
     EXPECT_FALSE(get_filter_rejection_reason(info_depth).empty());
 }
 
-TEST(FilterTest, RejectsStorageComputeImages) {
-    const auto info_storage = make_default_create_info(
+TEST(FilterTest, AcceptsVKD3DDirectX12HeapTextures) {
+    auto info_vkd3d = make_default_create_info(
         2048, 2048,
-        VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_STORAGE_BIT
+        VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_STORAGE_BIT |
+        VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT
     );
-    EXPECT_FALSE(is_candidate_texture(info_storage));
-    EXPECT_FALSE(get_filter_rejection_reason(info_storage).empty());
+    info_vkd3d.flags = VK_IMAGE_CREATE_MUTABLE_FORMAT_BIT | VK_IMAGE_CREATE_ALIAS_BIT;
+    EXPECT_TRUE(is_candidate_texture(info_vkd3d));
+    EXPECT_TRUE(get_filter_rejection_reason(info_vkd3d).empty());
 }
 
 TEST(FilterTest, RejectsNon2DImageTypes) {

@@ -23,14 +23,17 @@ set_target_properties(vntx_layer PROPERTIES
     VISIBILITY_INLINES_HIDDEN OFF
 )
 
-set(VNTX_LAYER_OUTPUT_PATH "$<TARGET_FILE:vntx_layer>")
 configure_file(
     ${CMAKE_CURRENT_SOURCE_DIR}/manifest/vntx_layer.json.in
     ${CMAKE_BINARY_DIR}/vntx_layer.json
-    @ONLY
+    COPYONLY
 )
 configure_file(
     ${CMAKE_CURRENT_SOURCE_DIR}/manifest/vntx_layer.json.in
     ${CMAKE_BINARY_DIR}/manifest/vntx_layer.json
-    @ONLY
+    COPYONLY
 )
+
+install(TARGETS vntx_layer DESTINATION lib)
+install(FILES ${CMAKE_BINARY_DIR}/vntx_layer.json DESTINATION share/vulkan/implicit_layer.d)
+

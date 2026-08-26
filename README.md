@@ -20,7 +20,7 @@ By moving texture evaluation to the GPU's AI/Compute cores, VNTX reduces static 
   - **Path A (NVIDIA Tensor Cores):** Leverages `VK_NV_cooperative_matrix` for near-zero latency decompression on hardware matrix cores.
   - **Path B (Generic SIMD Fallback):** Uses FP16 vector arithmetic (`VK_EXT_shader_explicit_arithmetic_types_int16`) for broad compatibility across AMD RDNA, Intel Arc, and legacy GPUs.
 - **High-Performance CLI (`vntx`):** Rust-based command-line tool for Steam library scanning, xxHash3 checksum generation, parallel offline texture compression, and local cache management.
-- **Native Graphical Interface (`vntx-gui`):** Instant telemetry dashboard, Steam game manager with 1-click launch command copy (`ENABLE_VNTX=1 %command%`), and live training progress monitoring.
+- **Native Graphical Interface (`vntx-gui`):** Instant telemetry dashboard, Steam game manager, and live training progress monitoring.
 - **Zero-Invasiveness & Fallback Safety:** Modifies zero game files on disk. If a cache miss or allocation error occurs, VNTX instantly falls back to standard native Vulkan allocation without crashing the application.
 
 ---
@@ -115,10 +115,11 @@ cp build/layer/manifest/vntx_layer.json ~/.local/share/vulkan/implicit_layer.d/
 ## Usage
 
 ### 1. Activating for Steam Games
-Add the environment variable to your game's Steam Launch Options:
-```text
-ENABLE_VNTX=1 %command%
-```
+VNTX is registered system-wide as a Vulkan implicit layer (`/usr/share/vulkan/implicit_layer.d/vntx_layer.json` & `/usr/lib/libvntx_layer.so`).
+It is activated automatically **100% Plug & Play** for all native Vulkan games and Steam titles running via Proton / Pressure-Vessel / VKD3D-Proton.
+**No custom Steam Launch Options (`%command%`) or environment variables are required!**
+
+*(Optional: To explicitly disable VNTX for a specific title, set `DISABLE_VNTX=1 %command%` in Steam Launch Options).*
 
 ### 2. Desktop GUI (`vntx-gui`)
 Launch the native desktop interface:
