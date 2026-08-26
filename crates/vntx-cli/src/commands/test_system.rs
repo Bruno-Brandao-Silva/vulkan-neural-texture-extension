@@ -30,10 +30,7 @@ pub fn execute(args: &TestSystemArgs, _config: &VntxConfig) -> Result<(), VntxEr
 
     match found_lib {
         Some(lib_path) => {
-            print_ok(&format!(
-                "Shared library found at {}",
-                lib_path.display()
-            ));
+            print_ok(&format!("Shared library found at {}", lib_path.display()));
 
             // Run ldd check
             let ldd_output = Command::new("ldd").arg(lib_path).output();
@@ -58,7 +55,9 @@ pub fn execute(args: &TestSystemArgs, _config: &VntxConfig) -> Result<(), VntxEr
             }
         }
         None => {
-            print_err("Shared library 'libvntx_layer.so' not found in /usr/lib/ or build/ directory.");
+            print_err(
+                "Shared library 'libvntx_layer.so' not found in /usr/lib/ or build/ directory.",
+            );
             println!("   Hint: Run 'sudo ./install.sh' to install system-wide.");
         }
     }
@@ -72,32 +71,30 @@ pub fn execute(args: &TestSystemArgs, _config: &VntxConfig) -> Result<(), VntxEr
     let found_manifest = manifest_paths.iter().find(|p| p.exists());
 
     match found_manifest {
-        Some(manifest_path) => {
-            match fs::read_to_string(manifest_path) {
-                Ok(content) => {
-                    if content.contains("VK_LAYER_VNTX_neural_texture")
-                        && content.contains("libvntx_layer.so")
-                    {
-                        print_ok(&format!(
-                            "Implicit layer manifest valid at {}",
-                            manifest_path.display()
-                        ));
-                        checks_passed += 1;
-                    } else {
-                        print_err(&format!(
-                            "Manifest at {} missing expected layer definitions",
-                            manifest_path.display()
-                        ));
-                    }
-                }
-                Err(err) => {
+        Some(manifest_path) => match fs::read_to_string(manifest_path) {
+            Ok(content) => {
+                if content.contains("VK_LAYER_VNTX_neural_texture")
+                    && content.contains("libvntx_layer.so")
+                {
+                    print_ok(&format!(
+                        "Implicit layer manifest valid at {}",
+                        manifest_path.display()
+                    ));
+                    checks_passed += 1;
+                } else {
                     print_err(&format!(
-                        "Failed to read manifest {}: {err}",
+                        "Manifest at {} missing expected layer definitions",
                         manifest_path.display()
                     ));
                 }
             }
-        }
+            Err(err) => {
+                print_err(&format!(
+                    "Failed to read manifest {}: {err}",
+                    manifest_path.display()
+                ));
+            }
+        },
         None => {
             print_err("Implicit layer manifest 'vntx_layer.json' not found in /usr/share/vulkan/implicit_layer.d/");
         }
