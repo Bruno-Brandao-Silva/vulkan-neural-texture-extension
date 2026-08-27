@@ -6,7 +6,21 @@
 use eframe::egui;
 use vntx_gui::VntxGuiApp;
 
+fn is_wsl() -> bool {
+    std::env::var_os("WSL_DISTRO_NAME").is_some()
+        || std::fs::read_to_string("/proc/version")
+            .map(|v| v.to_lowercase().contains("microsoft"))
+            .unwrap_or(false)
+}
+
 fn main() -> eframe::Result<()> {
+    // In WSL2 / WSLg environments, the Wayland compositor clipboard socket frequently
+    // resets connections with winit/smithay-clipboard. Automatically fallback to X11 on WSL
+    // unless VNTX_FORCE_WAYLAND is explicitly requested.
+    if is_wsl() && std::env::var_os("VNTX_FORCE_WAYLAND").is_none() {
+        std::env::remove_var("WAYLAND_DISPLAY");
+    }
+
     tracing_subscriber::fmt()
         .with_env_filter("info")
         .with_target(false)
@@ -26,3 +40,4 @@ fn main() -> eframe::Result<()> {
         Box::new(|_cc| Box::new(VntxGuiApp::new())),
     )
 }
+
