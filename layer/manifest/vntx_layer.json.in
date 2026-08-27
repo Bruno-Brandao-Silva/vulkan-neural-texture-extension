@@ -11,6 +11,9 @@
             "vkGetInstanceProcAddr": "vntx_GetInstanceProcAddr",
             "vkGetDeviceProcAddr": "vntx_GetDeviceProcAddr"
         },
+        "enable_environment": {
+            "ENABLE_VNTX": "1"
+        },
         "disable_environment": {
             "DISABLE_VNTX": "1"
         }

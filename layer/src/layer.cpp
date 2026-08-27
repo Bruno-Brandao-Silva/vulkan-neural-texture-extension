@@ -418,6 +418,8 @@ VKAPI_ATTR PFN_vkVoidFunction VKAPI_CALL vntx_GetDeviceProcAddr(
         if (device != VK_NULL_HANDLE) {
             const auto* const device_data = vntx::LayerContext::get().get_device_data(device);
             if (device_data && device_data->next_get_device_proc_addr) {
+                // Pass through Swapchain, Present (vkQueuePresentKHR, vkCreateSwapchainKHR), and unintercepted calls
+                // directly to downstream dispatch chain for overlay compatibility (MangoHud, Steam Overlay, OBS).
                 return device_data->next_get_device_proc_addr(device, pName);
             }
         }
