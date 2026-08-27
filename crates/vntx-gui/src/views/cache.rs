@@ -42,6 +42,7 @@ pub fn render(app: &mut VntxGuiApp, ui: &mut Ui) {
 
     // Summary banner
     ui.group(|ui| {
+        ui.set_width(ui.available_width());
         ui.horizontal(|ui| {
             ui.label(
                 RichText::new(format!(
@@ -63,6 +64,7 @@ pub fn render(app: &mut VntxGuiApp, ui: &mut Ui) {
 
     if app.cached_files.is_empty() {
         ui.group(|ui| {
+            ui.set_width(ui.available_width());
             ui.label("No cached neural textures found on disk.");
             ui.label("Run the Compressor or 'vntx compress' from the command line to generate neural textures.");
         });
@@ -86,6 +88,7 @@ pub fn render(app: &mut VntxGuiApp, ui: &mut Ui) {
             };
 
             ui.group(|ui| {
+                ui.set_width(ui.available_width());
                 ui.horizontal(|ui| {
                     ui.vertical(|ui| {
                         ui.label(RichText::new(&file.file_name).strong());
@@ -122,6 +125,7 @@ pub fn render(app: &mut VntxGuiApp, ui: &mut Ui) {
             ui.add_space(4.0_f32);
         }
     });
+
 
     if let Some(del_path) = file_to_delete {
         if std::fs::remove_file(&del_path).is_ok() {

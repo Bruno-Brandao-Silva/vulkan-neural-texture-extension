@@ -168,24 +168,25 @@ pub fn get_recommended_settings() -> RecommendedSettings {
         RecommendedSettings {
             recommended_quality: "max-savings",
             recommended_precision: "int8",
-            reason: "NVIDIA Tensor Cores detected: hardware INT8 matrix multiplication enables 4x VRAM reduction at maximum throughput.".to_string(),
-            guidance_box: "Modo Ideal: INT8 Quantized (Max Savings) com aceleração por Tensor Cores. Máxima economia de VRAM com alta fidelidade visual.".to_string(),
+            reason: "NVIDIA Tensor Cores / Hardware Matrix Accelerators detected: dedicated silicon INT8 matrix multiplication enables 4x VRAM reduction at peak throughput.".to_string(),
+            guidance_box: "Motor INT8 Hardware Ativo: Aceleração nativa por Tensor Cores / RDNA4 Matrix. Máxima economia de VRAM sem custo de FPS.".to_string(),
         }
     } else if caps.is_nvidia {
         RecommendedSettings {
             recommended_quality: "balanced",
             recommended_precision: "fp16",
-            reason: "NVIDIA GPU detected: FP16 Standard delivers high fidelity and solid VRAM savings.".to_string(),
-            guidance_box: "Modo Ideal: FP16 Standard (Balanced) com 3 camadas MLP. Equilíbrio perfeito entre compressão e fidelidade visual em texturas 2K/4K.".to_string(),
+            reason: "NVIDIA GPU detected: FP16 Standard delivers high fidelity and solid VRAM savings via Vulkan Compute.".to_string(),
+            guidance_box: "Motor FP16 Standard Ativo: Execução por Compute Shaders Vulkan (3 camadas MLP). Equilíbrio perfeito entre compressão e fidelidade visual.".to_string(),
         }
     } else {
         RecommendedSettings {
             recommended_quality: "balanced",
             recommended_precision: "fp16",
-            reason: "Vulkan GPU detected: FP16 provides optimal compatibility and decompression speed.".to_string(),
-            guidance_box: "Modo Ideal: FP16 Standard com Guardrails Anti-Stutter (2.5ms). Compatibilidade total e transcodificação suave no buffer de staging.".to_string(),
+            reason: "Vulkan GPU / Software Driver detected: FP16 provides universal compatibility and smooth staging transcoding.".to_string(),
+            guidance_box: "Motor FP16 Standard Ativo: Execução universal via Compute Shaders Vulkan com Guardrails Anti-Stutter (2.5ms).".to_string(),
         }
     }
 }
+
 
 

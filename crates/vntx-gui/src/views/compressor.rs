@@ -36,6 +36,7 @@ pub fn render(app: &mut VntxGuiApp, ui: &mut Ui) {
 
     // 1. Target Game Selector
     ui.group(|ui| {
+        ui.set_width(ui.available_width());
         ui.label(RichText::new("Target Game:").strong());
         let current_label = if let Some(selected_id) = app.selected_game_id {
             game_names
@@ -64,6 +65,7 @@ pub fn render(app: &mut VntxGuiApp, ui: &mut Ui) {
 
     // 2. Quality Presets & Threads
     ui.group(|ui| {
+        ui.set_width(ui.available_width());
         ui.horizontal(|ui| {
             ui.label(RichText::new("Compression Presets:").strong());
             ui.label(
@@ -103,6 +105,7 @@ pub fn render(app: &mut VntxGuiApp, ui: &mut Ui) {
 
     // 3. Anti-Stutter Guardrails Panel
     ui.group(|ui| {
+        ui.set_width(ui.available_width());
         ui.horizontal(|ui| {
             ui.label(
                 RichText::new("🛡️ Anti-Stutter Guardrails & Filter Thresholds:")
@@ -116,6 +119,7 @@ pub fn render(app: &mut VntxGuiApp, ui: &mut Ui) {
             )
             .on_hover_text("Mecanismos anti-engasgo (anti-stutter) que garantem taxa de quadros estável em tempo de execução.");
         });
+
         ui.add_space(4.0_f32);
 
         ui.horizontal(|ui| {
@@ -286,8 +290,10 @@ pub fn render(app: &mut VntxGuiApp, ui: &mut Ui) {
 
     // 4. Progress and Result Status Box
     ui.group(|ui| {
+        ui.set_width(ui.available_width());
         ui.heading(RichText::new("Task Status").size(16.0_f32));
         ui.add_space(6.0_f32);
+
 
         match &app.compression_status {
             CompressionStatus::Idle => {

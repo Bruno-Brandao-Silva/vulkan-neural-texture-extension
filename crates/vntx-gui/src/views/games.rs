@@ -71,6 +71,7 @@ pub fn render(app: &mut VntxGuiApp, ui: &mut Ui) {
                 .count();
 
             ui.group(|ui| {
+                ui.set_width(ui.available_width());
                 ui.horizontal(|ui| {
                     ui.vertical(|ui| {
                         ui.horizontal(|ui| {
@@ -138,5 +139,6 @@ pub fn render(app: &mut VntxGuiApp, ui: &mut Ui) {
             ui.add_space(4.0_f32);
         }
     });
+
 
 }

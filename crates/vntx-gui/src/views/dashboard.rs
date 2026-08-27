@@ -152,47 +152,66 @@ pub fn render(app: &mut VntxGuiApp, ui: &mut Ui) {
     #[allow(clippy::cast_precision_loss)]
     let size_mb = app.cache_stats.total_size_bytes as f64 / (1024.0 * 1024.0);
 
-    // 3. Key Metrics Cards
-    ui.horizontal(|ui| {
-        let card_width = 175.0_f32;
-        let card_height = 85.0_f32;
-
-        render_metric_card(
-            ui,
-            card_width,
-            card_height,
-            "Estimated VRAM Saved",
-            &format!("{saved_mb:.1} MB"),
-            Color32::from_rgb(76, 175, 80),
-        );
-
-        render_metric_card(
-            ui,
-            card_width,
-            card_height,
-            "VRAM In Use",
-            &format!("{} MB", app.gpu_telemetry.used_vram_mb),
-            Color32::from_rgb(33, 150, 243),
-        );
-
-        render_metric_card(
-            ui,
-            card_width,
-            card_height,
-            "Cached Textures",
-            &format!("{} assets", app.cache_stats.total_files),
-            Color32::from_rgb(171, 71, 188),
-        );
-
-        render_metric_card(
-            ui,
-            card_width,
-            card_height,
-            "Disk Cache Size",
-            &format!("{size_mb:.2} MB"),
-            Color32::from_rgb(255, 152, 0),
-        );
-    });
+    // 3. Key Metrics Cards (Full-Width Responsive Grid)
+    let available = ui.available_width();
+    if available >= 640.0 {
+        ui.columns(4, |cols| {
+            render_metric_card(
+                &mut cols[0],
+                "Estimated VRAM Saved",
+                &format!("{saved_mb:.1} MB"),
+                Color32::from_rgb(76, 175, 80),
+            );
+            render_metric_card(
+                &mut cols[1],
+                "VRAM In Use",
+                &format!("{} MB", app.gpu_telemetry.used_vram_mb),
+                Color32::from_rgb(33, 150, 243),
+            );
+            render_metric_card(
+                &mut cols[2],
+                "Cached Textures",
+                &format!("{} assets", app.cache_stats.total_files),
+                Color32::from_rgb(171, 71, 188),
+            );
+            render_metric_card(
+                &mut cols[3],
+                "Disk Cache Size",
+                &format!("{size_mb:.2} MB"),
+                Color32::from_rgb(255, 152, 0),
+            );
+        });
+    } else {
+        ui.columns(2, |cols| {
+            render_metric_card(
+                &mut cols[0],
+                "Estimated VRAM Saved",
+                &format!("{saved_mb:.1} MB"),
+                Color32::from_rgb(76, 175, 80),
+            );
+            render_metric_card(
+                &mut cols[1],
+                "VRAM In Use",
+                &format!("{} MB", app.gpu_telemetry.used_vram_mb),
+                Color32::from_rgb(33, 150, 243),
+            );
+        });
+        ui.add_space(8.0_f32);
+        ui.columns(2, |cols| {
+            render_metric_card(
+                &mut cols[0],
+                "Cached Textures",
+                &format!("{} assets", app.cache_stats.total_files),
+                Color32::from_rgb(171, 71, 188),
+            );
+            render_metric_card(
+                &mut cols[1],
+                "Disk Cache Size",
+                &format!("{size_mb:.2} MB"),
+                Color32::from_rgb(255, 152, 0),
+            );
+        });
+    }
 
     ui.add_space(20.0_f32);
     ui.separator();
@@ -226,6 +245,7 @@ pub fn render(app: &mut VntxGuiApp, ui: &mut Ui) {
 
     ui.add_space(16.0_f32);
     ui.group(|ui| {
+        ui.set_width(ui.available_width());
         ui.label(RichText::new("ℹ️ Dynamic Neural Texture Extension").strong());
         ui.label("• Staging Buffer Transcoding: Neural textures are decompressed in host staging memory on copy commands.");
         ui.label("• Anti-Stutter Guardrail: Any transcoding taking > 2.5ms falls back to pass-through, eliminating stutter.");
@@ -235,18 +255,18 @@ pub fn render(app: &mut VntxGuiApp, ui: &mut Ui) {
 
 fn render_metric_card(
     ui: &mut Ui,
-    width: f32,
-    height: f32,
     title: &str,
     value: &str,
     color: Color32,
 ) {
+    let available_w = ui.available_width();
     egui::Frame::group(ui.style())
         .stroke(Stroke::new(1.0_f32, Color32::from_gray(60)))
         .fill(Color32::from_gray(30))
         .inner_margin(12.0_f32)
         .show(ui, |ui| {
-            ui.set_min_size(egui::vec2(width, height));
+            ui.set_width(available_w);
+            ui.set_min_height(75.0_f32);
             ui.label(
                 RichText::new(title)
                     .size(12.0_f32)
@@ -256,4 +276,5 @@ fn render_metric_card(
             ui.label(RichText::new(value).size(18.0_f32).strong().color(color));
         });
 }
+
 
