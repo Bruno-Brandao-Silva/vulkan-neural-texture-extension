@@ -305,6 +305,9 @@ VKAPI_ATTR VkResult VKAPI_CALL vntx_CreateDevice(
             device_data->next_cmd_copy_buffer_to_image = reinterpret_cast<PFN_vkCmdCopyBufferToImage>(
                 next_get_device_proc_addr(*pDevice, "vkCmdCopyBufferToImage")
             );
+            device_data->next_cmd_copy_buffer_to_image2 = reinterpret_cast<PFN_vkCmdCopyBufferToImage2>(
+                next_get_device_proc_addr(*pDevice, "vkCmdCopyBufferToImage2")
+            );
             device_data->next_create_shader_module = reinterpret_cast<PFN_vkCreateShaderModule>(
                 next_get_device_proc_addr(*pDevice, "vkCreateShaderModule")
             );
@@ -376,6 +379,7 @@ VKAPI_ATTR PFN_vkVoidFunction VKAPI_CALL vntx_GetInstanceProcAddr(
         if (name == "vkBindImageMemory") return reinterpret_cast<PFN_vkVoidFunction>(vntx_BindImageMemory);
         if (name == "vkBindImageMemory2") return reinterpret_cast<PFN_vkVoidFunction>(vntx_BindImageMemory2);
         if (name == "vkCmdCopyBufferToImage") return reinterpret_cast<PFN_vkVoidFunction>(vntx_CmdCopyBufferToImage);
+        if (name == "vkCmdCopyBufferToImage2") return reinterpret_cast<PFN_vkVoidFunction>(vntx_CmdCopyBufferToImage2);
         if (name == "vkCreateShaderModule") return reinterpret_cast<PFN_vkVoidFunction>(vntx_CreateShaderModule);
         if (name == "vkDestroyShaderModule") return reinterpret_cast<PFN_vkVoidFunction>(vntx_DestroyShaderModule);
 
@@ -412,6 +416,7 @@ VKAPI_ATTR PFN_vkVoidFunction VKAPI_CALL vntx_GetDeviceProcAddr(
         if (name == "vkBindImageMemory") return reinterpret_cast<PFN_vkVoidFunction>(vntx_BindImageMemory);
         if (name == "vkBindImageMemory2") return reinterpret_cast<PFN_vkVoidFunction>(vntx_BindImageMemory2);
         if (name == "vkCmdCopyBufferToImage") return reinterpret_cast<PFN_vkVoidFunction>(vntx_CmdCopyBufferToImage);
+        if (name == "vkCmdCopyBufferToImage2") return reinterpret_cast<PFN_vkVoidFunction>(vntx_CmdCopyBufferToImage2);
         if (name == "vkCreateShaderModule") return reinterpret_cast<PFN_vkVoidFunction>(vntx_CreateShaderModule);
         if (name == "vkDestroyShaderModule") return reinterpret_cast<PFN_vkVoidFunction>(vntx_DestroyShaderModule);
 

@@ -105,6 +105,50 @@ TEST(FilterTest, AcceptsVKD3DDirectX12HeapTextures) {
     EXPECT_TRUE(get_filter_rejection_reason(info_vkd3d).empty());
 }
 
+TEST(FilterTest, AcceptsBCBlockCompressionFormats) {
+    const std::vector<VkFormat> bc_formats = {
+        VK_FORMAT_BC1_RGB_UNORM_BLOCK,
+        VK_FORMAT_BC1_RGB_SRGB_BLOCK,
+        VK_FORMAT_BC1_RGBA_UNORM_BLOCK,
+        VK_FORMAT_BC1_RGBA_SRGB_BLOCK,
+        VK_FORMAT_BC2_UNORM_BLOCK,
+        VK_FORMAT_BC2_SRGB_BLOCK,
+        VK_FORMAT_BC3_UNORM_BLOCK,
+        VK_FORMAT_BC3_SRGB_BLOCK,
+        VK_FORMAT_BC4_UNORM_BLOCK,
+        VK_FORMAT_BC4_SNORM_BLOCK,
+        VK_FORMAT_BC5_UNORM_BLOCK,
+        VK_FORMAT_BC5_SNORM_BLOCK,
+        VK_FORMAT_BC6H_UFLOAT_BLOCK,
+        VK_FORMAT_BC6H_SFLOAT_BLOCK,
+        VK_FORMAT_BC7_UNORM_BLOCK,
+        VK_FORMAT_BC7_SRGB_BLOCK,
+    };
+
+    for (const auto format : bc_formats) {
+        auto info = make_default_create_info(2048, 2048);
+        info.format = format;
+        EXPECT_TRUE(is_candidate_texture(info)) << "Failed for format " << static_cast<int>(format);
+        EXPECT_TRUE(get_filter_rejection_reason(info).empty());
+    }
+}
+
+TEST(FilterTest, AcceptsMipmappedDynamicStreamingTextures) {
+    // 4 mip levels
+    auto info_mips_4 = make_default_create_info(2048, 2048);
+    info_mips_4.mipLevels = 4;
+    info_mips_4.format = VK_FORMAT_BC7_UNORM_BLOCK;
+    EXPECT_TRUE(is_candidate_texture(info_mips_4));
+    EXPECT_TRUE(get_filter_rejection_reason(info_mips_4).empty());
+
+    // 12 mip levels (full mip chain for 2048x2048)
+    auto info_mips_12 = make_default_create_info(2048, 2048);
+    info_mips_12.mipLevels = 12;
+    info_mips_12.format = VK_FORMAT_BC1_RGBA_UNORM_BLOCK;
+    EXPECT_TRUE(is_candidate_texture(info_mips_12));
+    EXPECT_TRUE(get_filter_rejection_reason(info_mips_12).empty());
+}
+
 TEST(FilterTest, RejectsNon2DImageTypes) {
     const auto info_1d = make_default_create_info(
         2048, 1,

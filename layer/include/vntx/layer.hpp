@@ -32,6 +32,7 @@ struct DeviceData {
     PFN_vkBindImageMemory next_bind_image_memory{nullptr};
     PFN_vkBindImageMemory2 next_bind_image_memory2{nullptr};
     PFN_vkCmdCopyBufferToImage next_cmd_copy_buffer_to_image{nullptr};
+    PFN_vkCmdCopyBufferToImage2 next_cmd_copy_buffer_to_image2{nullptr};
     PFN_vkCreateShaderModule next_create_shader_module{nullptr};
     PFN_vkDestroyShaderModule next_destroy_shader_module{nullptr};
 
@@ -176,6 +177,11 @@ VKAPI_ATTR void VKAPI_CALL vntx_CmdCopyBufferToImage(
     VkImageLayout dstImageLayout,
     uint32_t regionCount,
     const VkBufferImageCopy* pRegions
+);
+
+VKAPI_ATTR void VKAPI_CALL vntx_CmdCopyBufferToImage2(
+    VkCommandBuffer commandBuffer,
+    const VkCopyBufferToImageInfo2* pCopyBufferToImageInfo
 );
 
 VKAPI_ATTR VkResult VKAPI_CALL vntx_CreateShaderModule(

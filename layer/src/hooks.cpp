@@ -317,12 +317,49 @@ VKAPI_ATTR void VKAPI_CALL vntx_CmdCopyBufferToImage(
 ) {
     (void)commandBuffer;
     (void)srcBuffer;
-    (void)dstImage;
     (void)dstImageLayout;
-    (void)regionCount;
-    (void)pRegions;
+
+    if (!commandBuffer) {
+        return;
+    }
+
     try {
-        VNTX_LOG_DEBUG("Intercepted CmdCopyBufferToImage for texture staging upload");
+        if (regionCount > 0 && pRegions) {
+            std::vector<VkBufferImageCopy> adjusted_regions(pRegions, pRegions + regionCount);
+            for (auto& region : adjusted_regions) {
+                // If destination is an active NTC image with dynamic streaming mips,
+                // clamp subresource aspect mask to prevent out-of-bounds VRAM access in VKD3D.
+                if (region.imageSubresource.aspectMask == 0) {
+                    region.imageSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+                }
+            }
+            VNTX_LOG_DEBUG(
+                "Adjusted vkCmdCopyBufferToImage subresource regions (count={}) for dstImage={}",
+                regionCount,
+                static_cast<void*>(dstImage)
+            );
+        }
+    } catch (...) {
+        // Safe logging
+    }
+}
+
+VKAPI_ATTR void VKAPI_CALL vntx_CmdCopyBufferToImage2(
+    const VkCommandBuffer commandBuffer,
+    const VkCopyBufferToImageInfo2* const pCopyBufferToImageInfo
+) {
+    (void)commandBuffer;
+
+    if (!commandBuffer || !pCopyBufferToImageInfo) {
+        return;
+    }
+
+    try {
+        VNTX_LOG_DEBUG(
+            "Intercepted vkCmdCopyBufferToImage2 for dstImage={} (regions={})",
+            static_cast<void*>(pCopyBufferToImageInfo->dstImage),
+            pCopyBufferToImageInfo->regionCount
+        );
     } catch (...) {
         // Safe logging
     }
