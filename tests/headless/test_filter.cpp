@@ -14,7 +14,7 @@ VkImageCreateInfo make_default_create_info(
     VkImageCreateInfo info{};
     info.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
     info.imageType = image_type;
-    info.format = VK_FORMAT_R8G8B8A8_UNORM;
+    info.format = VK_FORMAT_BC7_UNORM_BLOCK;
     info.extent.width = width;
     info.extent.height = height;
     info.extent.depth = 1;
@@ -166,3 +166,41 @@ TEST(FilterTest, RejectsNon2DImageTypes) {
     EXPECT_FALSE(is_candidate_texture(info_3d));
     EXPECT_FALSE(get_filter_rejection_reason(info_3d).empty());
 }
+
+TEST(FilterTest, RejectsUncompressedFormats) {
+    const std::vector<VkFormat> uncompressed_formats = {
+        VK_FORMAT_R8G8B8A8_UNORM,
+        VK_FORMAT_R8G8B8A8_SRGB,
+        VK_FORMAT_B8G8R8A8_UNORM,
+        VK_FORMAT_R16G16B16A16_SFLOAT,
+        VK_FORMAT_R32G32B32A32_SFLOAT,
+        VK_FORMAT_R8_UNORM,
+        VK_FORMAT_R8G8_UNORM,
+    };
+
+    for (const auto format : uncompressed_formats) {
+        auto info = make_default_create_info(2048, 2048);
+        info.format = format;
+        EXPECT_FALSE(is_candidate_texture(info)) << "Should reject format " << static_cast<int>(format);
+        EXPECT_FALSE(get_filter_rejection_reason(info).empty());
+    }
+}
+
+TEST(FilterTest, LatencyGuardrailBudgetCheck) {
+    EXPECT_TRUE(is_within_latency_budget(0.0));
+    EXPECT_TRUE(is_within_latency_budget(1.0));
+    EXPECT_TRUE(is_within_latency_budget(2.49));
+    EXPECT_TRUE(is_within_latency_budget(2.50));
+
+    EXPECT_FALSE(is_within_latency_budget(2.51));
+    EXPECT_FALSE(is_within_latency_budget(3.0));
+    EXPECT_FALSE(is_within_latency_budget(10.0));
+
+    EXPECT_TRUE(is_within_latency_budget_us(2500));
+    EXPECT_FALSE(is_within_latency_budget_us(2501));
+
+    const TranscodingLatencyGuard guard;
+    EXPECT_TRUE(guard.within_budget());
+    EXPECT_GE(guard.elapsed_ms(), 0.0);
+}
+

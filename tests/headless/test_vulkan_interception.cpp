@@ -81,7 +81,7 @@ TEST(VulkanInterceptionTest, HeadlessLavaPipeDeviceInitialization) {
     VkImageCreateInfo candidate_img_info{};
     candidate_img_info.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
     candidate_img_info.imageType = VK_IMAGE_TYPE_2D;
-    candidate_img_info.format = VK_FORMAT_R8G8B8A8_UNORM;
+    candidate_img_info.format = VK_FORMAT_BC7_UNORM_BLOCK;
     candidate_img_info.extent.width = 2048;
     candidate_img_info.extent.height = 2048;
     candidate_img_info.extent.depth = 1;
@@ -99,7 +99,13 @@ TEST(VulkanInterceptionTest, HeadlessLavaPipeDeviceInitialization) {
     EXPECT_EQ(vkCreateImage(device, &candidate_img_info, nullptr, &candidate_img), VK_SUCCESS);
     EXPECT_NE(candidate_img, VK_NULL_HANDLE);
 
-    // 5. Test Non-Candidate Image Creation (Sub-1024)
+    // 5. Verify Native Memory Requirements Preservation
+    VkMemoryRequirements mem_reqs{};
+    vkGetImageMemoryRequirements(device, candidate_img, &mem_reqs);
+    EXPECT_GT(mem_reqs.size, 0u);
+    EXPECT_GT(mem_reqs.alignment, 0u);
+
+    // 6. Test Non-Candidate Image Creation (Sub-1024)
     VkImageCreateInfo non_candidate_info = candidate_img_info;
     non_candidate_info.extent.width = 512;
     non_candidate_info.extent.height = 512;
@@ -109,7 +115,7 @@ TEST(VulkanInterceptionTest, HeadlessLavaPipeDeviceInitialization) {
     EXPECT_EQ(vkCreateImage(device, &non_candidate_info, nullptr, &non_candidate_img), VK_SUCCESS);
     EXPECT_NE(non_candidate_img, VK_NULL_HANDLE);
 
-    // 6. Clean Destruction of all objects
+    // 7. Clean Destruction of all objects
     vkDestroyImage(device, candidate_img, nullptr);
     vkDestroyImage(device, non_candidate_img, nullptr);
     vkDestroyDevice(device, nullptr);

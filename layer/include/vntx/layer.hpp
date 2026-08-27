@@ -56,6 +56,7 @@ public:
     void register_device(VkDevice device, std::unique_ptr<DeviceData> data);
     void unregister_device(VkDevice device);
     [[nodiscard]] DeviceData* get_device_data(VkDevice device) const;
+    [[nodiscard]] DeviceData* get_device_data_from_command_buffer(VkCommandBuffer commandBuffer) const;
 
 private:
     LayerContext() = default;

@@ -83,7 +83,19 @@ DeviceData* LayerContext::get_device_data(const VkDevice device) const {
     }
 }
 
+DeviceData* LayerContext::get_device_data_from_command_buffer(const VkCommandBuffer commandBuffer) const {
+    try {
+        if (!commandBuffer) return nullptr;
+        std::shared_lock<std::shared_mutex> lock(device_map_mutex_);
+        const auto it = device_map_.find(get_dispatch_key(commandBuffer));
+        return (it != device_map_.end()) ? it->second.get() : nullptr;
+    } catch (...) {
+        return nullptr;
+    }
+}
+
 } // namespace vntx
+
 
 extern "C" {
 

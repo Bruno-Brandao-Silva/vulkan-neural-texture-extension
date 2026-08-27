@@ -11,37 +11,6 @@ constexpr VkImageUsageFlags EXCLUDED_ATTACHMENT_FLAGS =
 
 } // namespace
 
-bool is_supported_texture_format(const VkFormat format) noexcept {
-    // 1. Block Compression BC1..BC7 formats (DX12 / VKD3D dynamic texture streaming)
-    if (format >= VK_FORMAT_BC1_RGB_UNORM_BLOCK && format <= VK_FORMAT_BC7_SRGB_BLOCK) {
-        return true;
-    }
-
-    // 2. Uncompressed color texture formats
-    switch (format) {
-        case VK_FORMAT_R8G8B8A8_UNORM:
-        case VK_FORMAT_R8G8B8A8_SRGB:
-        case VK_FORMAT_R8G8B8A8_SNORM:
-        case VK_FORMAT_B8G8R8A8_UNORM:
-        case VK_FORMAT_B8G8R8A8_SRGB:
-        case VK_FORMAT_B8G8R8A8_SNORM:
-        case VK_FORMAT_R8G8B8_UNORM:
-        case VK_FORMAT_R8G8B8_SRGB:
-        case VK_FORMAT_B8G8R8_UNORM:
-        case VK_FORMAT_B8G8R8_SRGB:
-        case VK_FORMAT_R16G16B16A16_UNORM:
-        case VK_FORMAT_R16G16B16A16_SNORM:
-        case VK_FORMAT_R16G16B16A16_SFLOAT:
-        case VK_FORMAT_R32G32B32A32_SFLOAT:
-        case VK_FORMAT_R8_UNORM:
-        case VK_FORMAT_R8_SRGB:
-        case VK_FORMAT_R8G8_UNORM:
-        case VK_FORMAT_R8G8_SRGB:
-            return true;
-        default:
-            return false;
-    }
-}
 
 bool is_candidate_texture(const VkImageCreateInfo& create_info) noexcept {
     if (create_info.imageType != VK_IMAGE_TYPE_2D) {
