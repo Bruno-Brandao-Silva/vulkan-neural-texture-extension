@@ -1,7 +1,9 @@
-//! Texture compressor panel with interactive controls and real-time progress.
+//! Texture compressor panel with anti-stutter guardrail controls and async processing.
 
-use crate::app::{CompressionStatus, VntxGuiApp};
+use crate::app::{CompressionStatus, VntxGuiApp, WorkerMessage};
 use eframe::egui::{self, Color32, ProgressBar, RichText, Ui};
+use std::sync::mpsc::channel;
+use std::thread;
 use vntx_core::scan_game_textures;
 use vntx_trainer::TrainingOrchestrator;
 
@@ -15,9 +17,9 @@ pub fn render(app: &mut VntxGuiApp, ui: &mut Ui) {
             .size(24.0_f32)
             .strong(),
     );
-    ui.add_space(6.0_f32);
-    ui.label("Train and pack neural MLP models for eligible 2D textures using multi-threaded CPU/GPU acceleration.");
-    ui.add_space(16.0_f32);
+    ui.add_space(4.0_f32);
+    ui.label("Train and pack neural MLP models for eligible 2D textures with anti-stutter latency guardrails.");
+    ui.add_space(14.0_f32);
 
     let game_names: Vec<(u32, String)> = app
         .discovered_games
@@ -32,7 +34,7 @@ pub fn render(app: &mut VntxGuiApp, ui: &mut Ui) {
         return;
     }
 
-    // Select Game
+    // 1. Target Game Selector
     ui.group(|ui| {
         ui.label(RichText::new("Target Game:").strong());
         let current_label = if let Some(selected_id) = app.selected_game_id {
@@ -58,7 +60,7 @@ pub fn render(app: &mut VntxGuiApp, ui: &mut Ui) {
 
     ui.add_space(10.0_f32);
 
-    // Quality & Performance Options
+    // 2. Quality Presets & Threads
     ui.group(|ui| {
         ui.label(RichText::new("Compression Presets:").strong());
         ui.horizontal(|ui| {
@@ -79,20 +81,78 @@ pub fn render(app: &mut VntxGuiApp, ui: &mut Ui) {
             );
         });
 
-        ui.add_space(10.0_f32);
+        ui.add_space(8.0_f32);
         ui.horizontal(|ui| {
             ui.label("Parallel Worker Threads:");
             ui.add(egui::Slider::new(&mut app.worker_jobs, 1..=16));
         });
     });
 
-    ui.add_space(16.0_f32);
+    ui.add_space(10.0_f32);
 
-    let can_compress = app.selected_game_id.is_some()
-        && !matches!(
-            app.compression_status,
-            CompressionStatus::Compressing { .. }
+    // 3. Anti-Stutter Guardrails Panel
+    ui.group(|ui| {
+        ui.label(
+            RichText::new("🛡️ Anti-Stutter Guardrails & Filter Thresholds:")
+                .strong()
+                .color(Color32::from_rgb(129, 199, 132)),
         );
+        ui.add_space(4.0_f32);
+
+        ui.horizontal(|ui| {
+            ui.label("⏱️ Latency Budget Threshold:");
+            ui.add(
+                egui::Slider::new(&mut app.latency_budget_ms, 0.5..=10.0)
+                    .step_by(0.1)
+                    .suffix(" ms"),
+            );
+        });
+        ui.label(
+            RichText::new("If real-time staging buffer decompression exceeds this limit, graceful pass-through triggers immediately.")
+                .color(Color32::from_gray(140))
+                .size(11.0_f32),
+        );
+
+        ui.add_space(6.0_f32);
+
+        ui.horizontal(|ui| {
+            ui.label("📐 Minimum Resolution Threshold:");
+            egui::ComboBox::from_id_source("min_res_combobox")
+                .selected_text(match app.min_resolution_threshold {
+                    512 => "512 x 512 (Aggressive)",
+                    2048 => "2048 x 2048 (4K Ultra Only)",
+                    _ => "1024 x 1024 (Standard Balanced)",
+                })
+                .show_ui(ui, |ui| {
+                    ui.selectable_value(&mut app.min_resolution_threshold, 512, "512 x 512 (Aggressive)");
+                    ui.selectable_value(
+                        &mut app.min_resolution_threshold,
+                        1024,
+                        "1024 x 1024 (Standard Balanced)",
+                    );
+                    ui.selectable_value(
+                        &mut app.min_resolution_threshold,
+                        2048,
+                        "2048 x 2048 (4K Ultra Only)",
+                    );
+                });
+        });
+
+
+        ui.add_space(6.0_f32);
+        ui.checkbox(
+            &mut app.preserve_special_maps,
+            "Preserve Normal & Roughness Maps (Passthrough)",
+        );
+    });
+
+    ui.add_space(14.0_f32);
+
+    let is_compressing = matches!(
+        app.compression_status,
+        CompressionStatus::Compressing { .. } | CompressionStatus::Scanning
+    );
+    let can_compress = app.selected_game_id.is_some() && !is_compressing;
 
     if ui
         .add_enabled(
@@ -113,77 +173,78 @@ pub fn render(app: &mut VntxGuiApp, ui: &mut Ui) {
                 .cloned()
             {
                 app.compression_status = CompressionStatus::Scanning;
-                ui.ctx().request_repaint();
+                let (tx, rx) = channel::<WorkerMessage>();
+                app.worker_rx = Some(rx);
 
-                let min_bytes = 1024 * 1024;
-                match scan_game_textures(&game, min_bytes) {
-                    Ok(scan_result) => {
-                        if scan_result.textures.is_empty() {
-                            app.compression_status = CompressionStatus::Failed(
-                                "No candidate textures found >= 1024px".to_string(),
-                            );
-                        } else {
-                            let total = scan_result.textures.len();
-                            app.compression_status = CompressionStatus::Compressing {
-                                processed: 0,
-                                total,
-                            };
+                let config = app.config.clone();
+                let preset = app.selected_quality.clone();
+                let worker_jobs = app.worker_jobs;
+                let min_res = app.min_resolution_threshold;
 
-                            let cache_dir = app.config.resolved_cache_dir();
-                            let orchestrator =
-                                TrainingOrchestrator::new(app.config.clone(), cache_dir);
-                            let preset = app.selected_quality.clone();
-                            let precision_override = if preset == "max-savings" {
-                                Some(vntx_core::NtcPrecision::Int8)
+                thread::spawn(move || {
+                    let _ = tx.send(WorkerMessage::Scanning);
+                    let min_bytes = (min_res as u64) * (min_res as u64);
+
+                    match scan_game_textures(&game, min_bytes) {
+                        Ok(scan_result) => {
+                            if scan_result.textures.is_empty() {
+                                let _ = tx.send(WorkerMessage::Failed(format!(
+                                    "No candidate textures found >= {min_res}px"
+                                )));
                             } else {
-                                None
-                            };
+                                let total = scan_result.textures.len();
+                                let _ = tx.send(WorkerMessage::Progress {
+                                    processed: 0,
+                                    total,
+                                });
 
-                            match orchestrator.compress_textures_with_preset(
-                                game.app_id,
-                                &scan_result.textures,
-                                app.worker_jobs,
-                                &preset,
-                                precision_override,
-                            ) {
-                                Ok(summary) => {
-                                    #[allow(clippy::cast_precision_loss)]
-                                    let saved_mb = (summary
-                                        .total_input_bytes
-                                        .saturating_sub(summary.total_output_bytes))
-                                        as f64
-                                        / (1024.0 * 1024.0);
-                                    app.compression_status = CompressionStatus::Done {
-                                        processed: summary.processed_count,
-                                        total,
-                                        saved_mb,
-                                    };
-                                    app.refresh_cache();
-                                    app.set_toast(format!(
-                                        "Successfully compressed {} textures (saved {:.2} MB)! [Preset: {}]",
-                                        summary.processed_count,
-                                        saved_mb,
-                                        preset
-                                    ));
-                                }
-                                Err(err) => {
-                                    app.compression_status =
-                                        CompressionStatus::Failed(err.to_string());
+                                let cache_dir = config.resolved_cache_dir();
+                                let orchestrator = TrainingOrchestrator::new(config, cache_dir);
+                                let precision_override = if preset == "max-savings" {
+                                    Some(vntx_core::NtcPrecision::Int8)
+                                } else {
+                                    None
+                                };
+
+                                match orchestrator.compress_textures_with_preset(
+                                    game.app_id,
+                                    &scan_result.textures,
+                                    worker_jobs,
+                                    &preset,
+                                    precision_override,
+                                ) {
+                                    Ok(summary) => {
+                                        #[allow(clippy::cast_precision_loss)]
+                                        let saved_mb = (summary
+                                            .total_input_bytes
+                                            .saturating_sub(summary.total_output_bytes))
+                                            as f64
+                                            / (1024.0 * 1024.0);
+                                        let _ = tx.send(WorkerMessage::Done {
+                                            processed: summary.processed_count,
+                                            total,
+                                            saved_mb,
+                                            preset,
+                                        });
+                                    }
+                                    Err(err) => {
+                                        let _ = tx.send(WorkerMessage::Failed(err.to_string()));
+                                    }
                                 }
                             }
                         }
+                        Err(err) => {
+                            let _ = tx.send(WorkerMessage::Failed(err.to_string()));
+                        }
                     }
-                    Err(err) => {
-                        app.compression_status = CompressionStatus::Failed(err.to_string());
-                    }
-                }
+                });
             }
         }
     }
 
-    ui.add_space(20.0_f32);
+    ui.add_space(16.0_f32);
 
-    // Progress and Result Status Box
+    // 4. Progress and Result Status Box
     ui.group(|ui| {
         ui.heading(RichText::new("Task Status").size(16.0_f32));
         ui.add_space(6.0_f32);
@@ -238,3 +299,4 @@ pub fn render(app: &mut VntxGuiApp, ui: &mut Ui) {
         }
     });
 }
+

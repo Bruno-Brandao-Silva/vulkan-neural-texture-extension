@@ -70,6 +70,56 @@ pub fn render(app: &mut VntxGuiApp, ui: &mut Ui) {
 
         ui.add_space(12.0_f32);
 
+        // Guardrails Section
+        ui.group(|ui| {
+            ui.heading(RichText::new("Anti-Stutter Guardrails").size(16.0_f32));
+            ui.add_space(6.0_f32);
+
+            ui.horizontal(|ui| {
+                ui.label("Max Latency Budget (ms):");
+                ui.add(
+                    egui::Slider::new(&mut app.config.guardrails.max_latency_ms, 0.5..=10.0)
+                        .step_by(0.1)
+                        .suffix(" ms"),
+                );
+            });
+
+            ui.horizontal(|ui| {
+                ui.label("Min Resolution Filter:");
+                egui::ComboBox::from_id_source("settings_min_res_cb")
+                    .selected_text(match app.config.guardrails.min_resolution_threshold {
+                        512 => "512 x 512",
+                        2048 => "2048 x 2048",
+                        _ => "1024 x 1024",
+                    })
+                    .show_ui(ui, |ui| {
+                        ui.selectable_value(
+                            &mut app.config.guardrails.min_resolution_threshold,
+                            512,
+                            "512 x 512",
+                        );
+                        ui.selectable_value(
+                            &mut app.config.guardrails.min_resolution_threshold,
+                            1024,
+                            "1024 x 1024",
+                        );
+                        ui.selectable_value(
+                            &mut app.config.guardrails.min_resolution_threshold,
+                            2048,
+                            "2048 x 2048",
+                        );
+                    });
+            });
+
+
+            ui.checkbox(
+                &mut app.config.guardrails.preserve_special_maps,
+                "Preserve Normal and Roughness Maps",
+            );
+        });
+
+        ui.add_space(12.0_f32);
+
         // Steam Libraries Section
         ui.group(|ui| {
             ui.heading(RichText::new("Steam Library Search Paths").size(16.0_f32));
@@ -93,6 +143,10 @@ pub fn render(app: &mut VntxGuiApp, ui: &mut Ui) {
             )
             .clicked()
         {
+            app.latency_budget_ms = app.config.guardrails.max_latency_ms;
+            app.min_resolution_threshold = app.config.guardrails.min_resolution_threshold;
+            app.preserve_special_maps = app.config.guardrails.preserve_special_maps;
+
             let default_path = VntxConfig::default_config_path();
             match app.config.save_to_path(&default_path) {
                 Ok(()) => {
@@ -106,3 +160,4 @@ pub fn render(app: &mut VntxGuiApp, ui: &mut Ui) {
         }
     });
 }
+

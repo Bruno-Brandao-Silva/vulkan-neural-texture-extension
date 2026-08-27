@@ -64,10 +64,31 @@ pub fn render(app: &mut VntxGuiApp, ui: &mut Ui) {
         for game in filtered_games {
             #[allow(clippy::cast_precision_loss)]
             let disk_gb = game.size_on_disk as f64 / (1024.0 * 1024.0 * 1024.0);
+            let cached_count = app
+                .cached_files
+                .iter()
+                .filter(|f| f.app_id == game.app_id)
+                .count();
+
             ui.group(|ui| {
                 ui.horizontal(|ui| {
                     ui.vertical(|ui| {
-                        ui.label(RichText::new(&game.name).size(16.0_f32).strong());
+                        ui.horizontal(|ui| {
+                            ui.label(RichText::new(&game.name).size(16.0_f32).strong());
+                            if cached_count > 0 {
+                                ui.label(
+                                    RichText::new(format!("⚡ VNTX Ready ({cached_count} cached)"))
+                                        .color(Color32::from_rgb(76, 175, 80))
+                                        .strong(),
+                                );
+                            } else {
+                                ui.label(
+                                    RichText::new("⚪ Not compressed")
+                                        .color(Color32::from_gray(140)),
+                                );
+                            }
+                        });
+
                         ui.label(
                             RichText::new(format!(
                                 "AppID: {} | Size on Disk: {disk_gb:.1} GB",
@@ -86,7 +107,7 @@ pub fn render(app: &mut VntxGuiApp, ui: &mut Ui) {
                         // Launch options button
                         if ui
                             .button(
-                                RichText::new("📋 Copy Launch Command")
+                                RichText::new("📋 Copy Launch Options")
                                     .color(Color32::from_rgb(100, 181, 246)),
                             )
                             .on_hover_text(
@@ -117,4 +138,5 @@ pub fn render(app: &mut VntxGuiApp, ui: &mut Ui) {
             ui.add_space(4.0_f32);
         }
     });
+
 }

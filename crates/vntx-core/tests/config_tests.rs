@@ -15,8 +15,13 @@ fn test_default_config_values() {
     assert_eq!(config.training.max_parallel_jobs, 4);
     assert_eq!(config.training.target_precision, "fp16");
 
+    assert!((config.guardrails.max_latency_ms - 2.5).abs() < f64::EPSILON);
+    assert_eq!(config.guardrails.min_resolution_threshold, 1024);
+    assert!(config.guardrails.preserve_special_maps);
+
     assert_eq!(config.paths.steam_libraries.len(), 2);
 }
+
 
 #[test]
 fn test_config_save_and_load_round_trip() {

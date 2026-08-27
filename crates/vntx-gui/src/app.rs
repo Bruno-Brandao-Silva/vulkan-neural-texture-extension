@@ -2,9 +2,11 @@
 
 use crate::views;
 use eframe::egui::{self, Color32, RichText, TopBottomPanel};
+use std::sync::mpsc::Receiver;
 use std::time::{Duration, Instant};
 use vntx_core::{
-    discover_steam_games, CacheManager, CacheStats, CachedFile, InstalledGame, VntxConfig,
+    discover_steam_games, query_gpu_telemetry, CacheManager, CacheStats, CachedFile, GpuTelemetry,
+    InstalledGame, VntxConfig,
 };
 
 /// Navigation tab identifiers.
@@ -21,6 +23,33 @@ pub enum Tab {
     Cache,
     /// Settings and configuration.
     Settings,
+}
+
+/// Asynchronous worker message.
+#[derive(Debug, Clone)]
+pub enum WorkerMessage {
+    /// Scanning directories.
+    Scanning,
+    /// Texture compression progress.
+    Progress {
+        /// Processed texture count.
+        processed: usize,
+        /// Total texture count.
+        total: usize,
+    },
+    /// Compression finished.
+    Done {
+        /// Number processed.
+        processed: usize,
+        /// Total textures count.
+        total: usize,
+        /// Saved VRAM in megabytes.
+        saved_mb: f64,
+        /// Preset name.
+        preset: String,
+    },
+    /// Compression failed.
+    Failed(String),
 }
 
 /// Compression task state.
@@ -82,11 +111,29 @@ pub struct VntxGuiApp {
     /// Selected quality preset.
     pub selected_quality: String,
 
+    /// Latency budget guardrail in milliseconds.
+    pub latency_budget_ms: f64,
+
+    /// Minimum resolution threshold in pixels.
+    pub min_resolution_threshold: u32,
+
+    /// Whether to preserve normal and roughness maps from compression.
+    pub preserve_special_maps: bool,
+
     /// Number of worker threads.
     pub worker_jobs: usize,
 
     /// Transient toast notification message.
     pub toast_message: Option<(String, Instant)>,
+
+    /// Real-time GPU and VRAM hardware telemetry.
+    pub gpu_telemetry: GpuTelemetry,
+
+    /// Timestamp of last telemetry query.
+    pub last_telemetry_poll: Instant,
+
+    /// Receiver for asynchronous background tasks.
+    pub worker_rx: Option<Receiver<WorkerMessage>>,
 }
 
 impl VntxGuiApp {
@@ -96,6 +143,11 @@ impl VntxGuiApp {
         let config = VntxConfig::load_or_default();
         let cache_dir = config.resolved_cache_dir();
         let cache_mgr = CacheManager::new(cache_dir);
+        let gpu_telemetry = query_gpu_telemetry();
+
+        let latency_budget_ms = config.guardrails.max_latency_ms;
+        let min_resolution_threshold = config.guardrails.min_resolution_threshold;
+        let preserve_special_maps = config.guardrails.preserve_special_maps;
 
         let mut app = Self {
             config,
@@ -108,8 +160,14 @@ impl VntxGuiApp {
             cache_stats: CacheStats::default(),
             compression_status: CompressionStatus::Idle,
             selected_quality: "balanced".to_string(),
+            latency_budget_ms,
+            min_resolution_threshold,
+            preserve_special_maps,
             worker_jobs: 4,
             toast_message: None,
+            gpu_telemetry,
+            last_telemetry_poll: Instant::now(),
+            worker_rx: None,
         };
 
         app.refresh_all();
@@ -120,6 +178,7 @@ impl VntxGuiApp {
     pub fn refresh_all(&mut self) {
         self.refresh_games();
         self.refresh_cache();
+        self.refresh_telemetry();
     }
 
     /// Refreshes discovered Steam games.
@@ -138,6 +197,12 @@ impl VntxGuiApp {
         }
     }
 
+    /// Refreshes GPU hardware telemetry.
+    pub fn refresh_telemetry(&mut self) {
+        self.gpu_telemetry = query_gpu_telemetry();
+        self.last_telemetry_poll = Instant::now();
+    }
+
     /// Sets a temporary toast notification.
     pub fn set_toast(&mut self, message: impl Into<String>) {
         self.toast_message = Some((message.into(), Instant::now()));
@@ -152,6 +217,50 @@ impl Default for VntxGuiApp {
 
 impl eframe::App for VntxGuiApp {
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
+        // Poll asynchronous background compression worker messages
+        if let Some(ref rx) = self.worker_rx {
+            while let Ok(msg) = rx.try_recv() {
+                match msg {
+                    WorkerMessage::Scanning => {
+                        self.compression_status = CompressionStatus::Scanning;
+                    }
+                    WorkerMessage::Progress { processed, total } => {
+                        self.compression_status = CompressionStatus::Compressing { processed, total };
+                    }
+                    WorkerMessage::Done {
+                        processed,
+                        total,
+                        saved_mb,
+                        preset,
+                    } => {
+                        self.compression_status = CompressionStatus::Done {
+                            processed,
+                            total,
+                            saved_mb,
+                        };
+                        self.refresh_cache();
+                        self.set_toast(format!(
+                            "Successfully compressed {processed} of {total} textures (saved {saved_mb:.2} MB)! [Preset: {preset}]"
+                        ));
+                        self.worker_rx = None;
+                        break;
+                    }
+                    WorkerMessage::Failed(err) => {
+                        self.compression_status = CompressionStatus::Failed(err);
+                        self.worker_rx = None;
+                        break;
+                    }
+                }
+            }
+            ctx.request_repaint_after(Duration::from_millis(16));
+        }
+
+        // Periodic telemetry refresh every 2.5 seconds
+        if self.last_telemetry_poll.elapsed() > Duration::from_millis(2500) {
+            self.gpu_telemetry = query_gpu_telemetry();
+            self.last_telemetry_poll = Instant::now();
+        }
+
         // Top Navigation Bar
         TopBottomPanel::top("top_header").show(ctx, |ui| {
             ui.add_space(6.0_f32);
@@ -206,3 +315,4 @@ impl eframe::App for VntxGuiApp {
         });
     }
 }
+

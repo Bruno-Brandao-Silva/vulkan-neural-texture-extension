@@ -67,3 +67,83 @@ pub fn detect_gpu_hardware() -> GpuCapabilities {
         optimal_precision,
     }
 }
+
+/// Real-time GPU and VRAM hardware telemetry.
+#[derive(Debug, Clone, PartialEq, Eq, Default)]
+pub struct GpuTelemetry {
+    /// GPU Device name.
+    pub device_name: String,
+    /// Total VRAM in megabytes.
+    pub total_vram_mb: u64,
+    /// Used VRAM in megabytes.
+    pub used_vram_mb: u64,
+    /// Free VRAM in megabytes.
+    pub free_vram_mb: u64,
+    /// GPU core utilization percentage (0-100).
+    pub gpu_utilization: u32,
+    /// GPU temperature in degrees Celsius.
+    pub temperature_c: u32,
+    /// Whether hardware telemetry was queried successfully.
+    pub is_available: bool,
+}
+
+/// Queries real-time GPU telemetry using `nvidia-smi` or fallback hardware detection.
+#[must_use]
+pub fn query_gpu_telemetry() -> GpuTelemetry {
+    if let Ok(output) = std::process::Command::new("nvidia-smi")
+        .args([
+            "--query-gpu=name,memory.total,memory.used,memory.free,utilization.gpu,temperature.gpu",
+            "--format=csv,noheader,nounits",
+        ])
+        .output()
+    {
+        if output.status.success() {
+            if let Ok(text) = String::from_utf8(output.stdout) {
+                if let Some(line) = text.lines().next() {
+                    let parts: Vec<&str> = line.split(',').map(str::trim).collect();
+                    if parts.len() >= 6 {
+                        let name = parts[0].to_string();
+                        let total = parts[1].parse::<u64>().unwrap_or(0);
+                        let used = parts[2].parse::<u64>().unwrap_or(0);
+                        let free = parts[3].parse::<u64>().unwrap_or(0);
+                        let util = parts[4].parse::<u32>().unwrap_or(0);
+                        let temp = parts[5].parse::<u32>().unwrap_or(0);
+
+                        return GpuTelemetry {
+                            device_name: name,
+                            total_vram_mb: total,
+                            used_vram_mb: used,
+                            free_vram_mb: free,
+                            gpu_utilization: util,
+                            temperature_c: temp,
+                            is_available: true,
+                        };
+                    }
+                }
+            }
+        }
+    }
+
+    // Fallback: query capabilities
+    let caps = detect_gpu_hardware();
+    let device_name = if caps.is_nvidia {
+        if caps.has_tensor_cores {
+            "NVIDIA RTX / Tensor GPU (DirectX 12 / Vulkan)".to_string()
+        } else {
+            "NVIDIA GPU (Vulkan)".to_string()
+        }
+    } else {
+        "Vulkan Compatible GPU".to_string()
+    };
+
+    GpuTelemetry {
+        device_name,
+        total_vram_mb: 8192,
+        used_vram_mb: 0,
+        free_vram_mb: 8192,
+        gpu_utilization: 0,
+        temperature_c: 0,
+        is_available: false,
+    }
+}
+

@@ -6,7 +6,7 @@ use std::fs;
 use std::path::{Path, PathBuf};
 
 /// Top-level configuration representation matching `~/.config/ntc/ntc.toml`.
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Default)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Default)]
 pub struct VntxConfig {
     /// General system options.
     #[serde(default)]
@@ -16,10 +16,15 @@ pub struct VntxConfig {
     #[serde(default)]
     pub training: TrainingConfig,
 
+    /// Real-time guardrail options for runtime layer and offline compressor.
+    #[serde(default)]
+    pub guardrails: GuardrailConfig,
+
     /// Library and directory search paths.
     #[serde(default)]
     pub paths: PathsConfig,
 }
+
 
 /// General framework options.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
@@ -84,9 +89,33 @@ impl Default for TrainingConfig {
     }
 }
 
+/// Real-time guardrail options for runtime layer and offline compressor.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct GuardrailConfig {
+    /// Maximum allowable latency budget in milliseconds (default: 2.5 ms).
+    pub max_latency_ms: f64,
+
+    /// Minimum texture resolution threshold in pixels (512, 1024, 2048, default: 1024).
+    pub min_resolution_threshold: u32,
+
+    /// Whether to preserve normal and roughness maps from compression (pass-through).
+    pub preserve_special_maps: bool,
+}
+
+impl Default for GuardrailConfig {
+    fn default() -> Self {
+        Self {
+            max_latency_ms: 2.5,
+            min_resolution_threshold: 1024,
+            preserve_special_maps: true,
+        }
+    }
+}
+
 /// Game search and library paths.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct PathsConfig {
+
     /// Root Steam library directories.
     pub steam_libraries: Vec<String>,
 
