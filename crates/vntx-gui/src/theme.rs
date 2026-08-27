@@ -48,60 +48,11 @@ pub const ROUNDING_MD: Rounding = Rounding::same(8.0_f32);
 pub const ROUNDING_PILL: Rounding = Rounding::same(16.0_f32);
 
 // ==============================================================================
-// 3. Universal Icon Glyph Constants (Tofu-Free across all Linux distros)
+// 3. Informational Constants & Glyphs
 // ==============================================================================
 
-/// Brand Logo / Neural Icon
-pub const ICON_VNTX: &str = "";
-/// Dashboard Tab Icon
-pub const ICON_DASHBOARD: &str = "";
-/// Steam Games Tab Icon
-pub const ICON_GAMES: &str = "";
-/// Neural Compressor Tab Icon
-pub const ICON_COMPRESSOR: &str = "";
-/// Cache Manager Tab Icon
-pub const ICON_CACHE: &str = "";
-/// Settings Tab Icon
-pub const ICON_SETTINGS: &str = "";
-/// Library Paths Icon
-pub const ICON_PATHS: &str = "";
-
-/// Refresh Action Icon
-pub const ICON_REFRESH: &str = "";
-/// Search Input Icon
-pub const ICON_SEARCH: &str = "";
-/// Clear / Cancel Icon
-pub const ICON_CLEAR: &str = "";
-/// Delete / Purge Icon
-pub const ICON_DELETE: &str = "";
-/// Copy to Clipboard Icon
-pub const ICON_COPY: &str = "";
-/// Help / Info Tooltip Icon
+/// Help / Info Tooltip Indicator
 pub const ICON_INFO: &str = "(?)";
-/// Check / Success Status Icon
-pub const ICON_CHECK: &str = "";
-/// Error / Fail Status Icon
-pub const ICON_ERROR: &str = "";
-/// Recommendation Star Icon
-pub const ICON_STAR: &str = "";
-
-/// Status Bullet (Active / Enabled)
-pub const ICON_STATUS_ACTIVE: &str = "";
-/// Status Bullet (Inactive / Disabled)
-pub const ICON_STATUS_INACTIVE: &str = "";
-/// Status Bullet (Standby / Warning)
-pub const ICON_STATUS_STANDBY: &str = "";
-
-/// Hardware GPU Icon
-pub const ICON_GPU: &str = "";
-/// Anti-Stutter Shield Icon
-pub const ICON_SHIELD: &str = "";
-/// Rocket Launch Action Icon
-pub const ICON_ROCKET: &str = "";
-/// Lightbulb Recommendation Icon
-pub const ICON_LIGHTBULB: &str = "";
-/// Save Changes Icon
-pub const ICON_SAVE: &str = "";
 
 // ==============================================================================
 // 4. Custom Theme Application & Embedded Icon Font Registration
