@@ -30,8 +30,9 @@ fn main() -> eframe::Result<()> {
 
     let mut viewport = egui::ViewportBuilder::default()
         .with_title("VNTX - Vulkan Neural Texture Extension")
-        .with_inner_size([960.0, 640.0])
+        .with_inner_size([1920.0, 1080.0])
         .with_min_inner_size([720.0, 480.0])
+        .with_maximized(true)
         .with_app_id("vntx-gui");
 
     if let Some(ic) = icon {

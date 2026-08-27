@@ -152,7 +152,7 @@ impl VntxGuiApp {
         let mut app = Self {
             config,
             cache_mgr,
-            selected_tab: Tab::Dashboard,
+            selected_tab: Tab::Settings,
             discovered_games: Vec::new(),
             game_search_query: String::new(),
             selected_game_id: None,
