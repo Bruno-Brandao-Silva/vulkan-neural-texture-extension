@@ -1,7 +1,7 @@
 //! Modern Design System & Theme Engine for `vntx-gui`.
 //!
 //! Provides standardized color palettes, typography styling, elevated card frames,
-//! pill status badges, universal basic Unicode icon constants, and expressive hero empty states.
+//! pill status badges, embedded Lucide TTF icon font, and expressive hero empty states.
 
 use eframe::egui::{
     self, Button, Color32, Frame, Margin, RichText, Rounding, Stroke, Ui, Vec2, Visuals,
@@ -48,7 +48,7 @@ pub const ROUNDING_MD: Rounding = Rounding::same(8.0_f32);
 pub const ROUNDING_PILL: Rounding = Rounding::same(16.0_f32);
 
 // ==============================================================================
-// 3. Universal Basic Unicode Icon Constants (100% Tofu-Free across all Linux distros)
+// 3. Universal Icon Glyph Constants (Tofu-Free across all Linux distros)
 // ==============================================================================
 
 /// Brand Logo / Neural Icon
@@ -104,10 +104,10 @@ pub const ICON_LIGHTBULB: &str = "★";
 pub const ICON_SAVE: &str = "✓";
 
 // ==============================================================================
-// 4. Custom Theme Application
+// 4. Custom Theme Application & Embedded Icon Font Registration
 // ==============================================================================
 
-/// Applies the modern dark design system to the `egui` context.
+/// Applies the modern dark design system and loads embedded TTF icon fonts into `egui`.
 pub fn apply_custom_theme(ctx: &egui::Context) {
     let mut visuals = Visuals::dark();
 
@@ -145,6 +145,20 @@ pub fn apply_custom_theme(ctx: &egui::Context) {
     visuals.selection.stroke = Stroke::new(1.0_f32, Color32::WHITE);
 
     ctx.set_visuals(visuals);
+
+    // Embed and register Lucide TTF icon font
+    let mut fonts = egui::FontDefinitions::default();
+    fonts.font_data.insert(
+        "lucide".to_owned(),
+        egui::FontData::from_static(include_bytes!("../assets/lucide.ttf")),
+    );
+    if let Some(family) = fonts.families.get_mut(&egui::FontFamily::Proportional) {
+        family.push("lucide".to_owned());
+    }
+    if let Some(family) = fonts.families.get_mut(&egui::FontFamily::Monospace) {
+        family.push("lucide".to_owned());
+    }
+    ctx.set_fonts(fonts);
 
     let mut style = (*ctx.style()).clone();
     style.spacing.item_spacing = Vec2::new(10.0_f32, 10.0_f32);
