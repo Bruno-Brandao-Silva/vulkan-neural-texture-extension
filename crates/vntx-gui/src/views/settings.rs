@@ -3,8 +3,7 @@
 use crate::app::VntxGuiApp;
 use crate::theme::{
     btn_primary, card_frame, help_tooltip, page_header, pill_badge, ACCENT_BLUE, ACCENT_GREEN,
-    ICON_LIGHTBULB, ICON_PATHS, ICON_SAVE, ICON_SEARCH, ICON_SETTINGS, ICON_SHIELD, ICON_STAR,
-    ICON_STATUS_ACTIVE, ICON_STATUS_INACTIVE, ICON_VNTX, TEXT_MUTED, TEXT_PRIMARY,
+    TEXT_MUTED, TEXT_PRIMARY,
 };
 use eframe::egui::{self, Color32, RichText, Ui};
 use vntx_core::{get_recommended_settings, VntxConfig};
@@ -12,6 +11,8 @@ use vntx_core::{get_recommended_settings, VntxConfig};
 /// Renders the settings view.
 pub fn render(app: &mut VntxGuiApp, ui: &mut Ui) {
     ui.set_min_size(ui.available_size());
+    ui.set_width(ui.available_width());
+    ui.set_height(ui.available_height());
 
     ui.horizontal(|ui| {
         ui.set_width(ui.available_width());
@@ -24,10 +25,7 @@ pub fn render(app: &mut VntxGuiApp, ui: &mut Ui) {
             ),
         );
         ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-            if ui
-                .add(btn_primary(format!("{} Save Settings", ICON_SAVE)))
-                .clicked()
-            {
+            if ui.add(btn_primary("Save Settings")).clicked() {
                 save_settings(app);
             }
         });
@@ -37,13 +35,17 @@ pub fn render(app: &mut VntxGuiApp, ui: &mut Ui) {
         .auto_shrink([false, false])
         .show(ui, |ui| {
             ui.set_min_size(ui.available_size());
+            ui.set_width(ui.available_width());
+            ui.set_height(ui.available_height());
             let available_width = ui.available_width();
             let use_two_columns = available_width >= 680.0_f32;
 
             if use_two_columns {
                 ui.columns(2, |columns| {
                     columns[0].set_min_size(columns[0].available_size());
+                    columns[0].set_width(columns[0].available_width());
                     columns[1].set_min_size(columns[1].available_size());
+                    columns[1].set_width(columns[1].available_width());
                     // Left Column (50%): Diagnostics + General + Paths
                     render_left_column(app, &mut columns[0]);
                     // Right Column (50%): Compression Defaults + Guardrails + Save Action
@@ -61,13 +63,12 @@ pub fn render(app: &mut VntxGuiApp, ui: &mut Ui) {
 fn render_left_column(app: &mut VntxGuiApp, ui: &mut Ui) {
     let gpu_caps = vntx_core::detect_gpu_hardware();
     let rec = get_recommended_settings();
-    let available_w = ui.available_width();
 
     // 1. System Capabilities & Hardware Diagnostics
     card_frame().show(ui, |ui| {
-        ui.set_width(available_w);
+        ui.set_width(ui.available_width());
         ui.heading(
-            RichText::new(format!("{} System Capabilities & Diagnostics", ICON_SEARCH))
+            RichText::new("System Capabilities & Diagnostics")
                 .size(15.5_f32)
                 .strong()
                 .color(TEXT_PRIMARY),
@@ -84,14 +85,14 @@ fn render_left_column(app: &mut VntxGuiApp, ui: &mut Ui) {
             if gpu_caps.has_tensor_cores {
                 pill_badge(
                     ui,
-                    &format!("{} Active (Hardware INT8 Matrix Acceleration)", ICON_STATUS_ACTIVE),
+                    "Active (Hardware INT8 Matrix Acceleration)",
                     Color32::from_rgb(6, 78, 59),
                     ACCENT_GREEN,
                 );
             } else {
                 pill_badge(
                     ui,
-                    &format!("{} Não Detectado (Standard Vulkan Compute)", ICON_STATUS_INACTIVE),
+                    "Not Detected (Standard Vulkan Compute)",
                     Color32::from_rgb(60, 45, 20),
                     Color32::from_rgb(255, 193, 7),
                 );
@@ -103,14 +104,14 @@ fn render_left_column(app: &mut VntxGuiApp, ui: &mut Ui) {
             if gpu_caps.has_tensor_cores {
                 pill_badge(
                     ui,
-                    &format!("FP16: {} | INT8 Quantized: {} (Hardware)", ICON_STATUS_ACTIVE, ICON_STATUS_ACTIVE),
+                    "FP16: Active | INT8 Quantized: Active (Hardware)",
                     Color32::from_rgb(6, 78, 59),
                     ACCENT_GREEN,
                 );
             } else {
                 pill_badge(
                     ui,
-                    &format!("FP16: {} (Shader) | INT8: {} (Emulado)", ICON_STATUS_ACTIVE, ICON_STATUS_INACTIVE),
+                    "FP16: Active (Shader) | INT8: Inactive (Emulated)",
                     Color32::from_rgb(45, 55, 72),
                     TEXT_MUTED,
                 );
@@ -137,7 +138,7 @@ fn render_left_column(app: &mut VntxGuiApp, ui: &mut Ui) {
         ui.horizontal(|ui| {
             ui.label(RichText::new("Driver Engine:").strong().color(TEXT_PRIMARY));
             ui.label(
-                RichText::new(format!("{} Vulkan Neural Extension Engine Ready", ICON_STATUS_ACTIVE))
+                RichText::new("Vulkan Neural Extension Engine Ready")
                     .color(ACCENT_GREEN),
             );
         });
@@ -149,7 +150,6 @@ fn render_left_column(app: &mut VntxGuiApp, ui: &mut Ui) {
             ui.set_width(ui.available_width());
             ui.vertical(|ui| {
                 ui.horizontal(|ui| {
-                    ui.label(RichText::new(ICON_LIGHTBULB).size(16.0_f32).color(ACCENT_BLUE));
                     ui.label(
                         RichText::new("Ideal Engine Recommendation")
                             .size(14.0_f32)
@@ -177,9 +177,9 @@ fn render_left_column(app: &mut VntxGuiApp, ui: &mut Ui) {
 
     // 2. General Settings
     card_frame().show(ui, |ui| {
-        ui.set_width(available_w);
+        ui.set_width(ui.available_width());
         ui.heading(
-            RichText::new(format!("{} General Settings", ICON_SETTINGS))
+            RichText::new("General Settings")
                 .size(15.5_f32)
                 .strong()
                 .color(TEXT_PRIMARY),
@@ -231,9 +231,9 @@ fn render_left_column(app: &mut VntxGuiApp, ui: &mut Ui) {
 
     // 3. Steam Libraries Section
     card_frame().show(ui, |ui| {
-        ui.set_width(available_w);
+        ui.set_width(ui.available_width());
         ui.heading(
-            RichText::new(format!("{} Steam Library Search Paths", ICON_PATHS))
+            RichText::new("Steam Library Search Paths")
                 .size(15.5_f32)
                 .strong()
                 .color(TEXT_PRIMARY),
@@ -251,13 +251,12 @@ fn render_left_column(app: &mut VntxGuiApp, ui: &mut Ui) {
 
 fn render_right_column(app: &mut VntxGuiApp, ui: &mut Ui) {
     let rec = get_recommended_settings();
-    let available_w = ui.available_width();
 
     // 4. Training & Compression Defaults
     card_frame().show(ui, |ui| {
-        ui.set_width(available_w);
+        ui.set_width(ui.available_width());
         ui.heading(
-            RichText::new(format!("{} Training & Compression Defaults", ICON_VNTX))
+            RichText::new("Training & Compression Defaults")
                 .size(15.5_f32)
                 .strong()
                 .color(TEXT_PRIMARY),
@@ -271,17 +270,17 @@ fn render_right_column(app: &mut VntxGuiApp, ui: &mut Ui) {
                 "Preset padrão para treinamento de texturas:\n• Fast: 1 camada MLP (máxima velocidade).\n• Balanced: 3 camadas MLP (ótimo para texturas 2K/4K).\n• Max Savings: Quantização INT8 densa.",
             );
             let fast_label = if rec.recommended_quality == "fast" {
-                format!("Fast (1 Layer MLP) {} (Recomendado)", ICON_STAR)
+                "Fast (1 Layer MLP) (Recommended)".to_string()
             } else {
                 "Fast (1 Layer MLP)".to_string()
             };
             let balanced_label = if rec.recommended_quality == "balanced" {
-                format!("Balanced (3 Layers MLP) {} (Recomendado)", ICON_STAR)
+                "Balanced (3 Layers MLP) (Recommended)".to_string()
             } else {
                 "Balanced (3 Layers MLP)".to_string()
             };
             let max_label = if rec.recommended_quality == "max-savings" {
-                format!("Max Savings (INT8 Quantized) {} (Recomendado)", ICON_STAR)
+                "Max Savings (INT8 Quantized) (Recommended)".to_string()
             } else {
                 "Max Savings (INT8 Quantized)".to_string()
             };
@@ -306,12 +305,12 @@ fn render_right_column(app: &mut VntxGuiApp, ui: &mut Ui) {
                 "Precisão dos pesos neurais:\n• FP16: Qualidade visual máxima (padrão).\n• INT8: Reduz o tamanho de VRAM pela metade usando aceleração por Tensor Cores sem perda perceptível de qualidade.",
             );
             let fp16_label = if rec.recommended_precision == "fp16" {
-                format!("FP16 Standard {} (Recomendado)", ICON_STAR)
+                "FP16 Standard (Recommended)".to_string()
             } else {
                 "FP16 Standard".to_string()
             };
             let int8_label = if rec.recommended_precision == "int8" {
-                format!("INT8 Quantized {} (Recomendado)", ICON_STAR)
+                "INT8 Quantized (Recommended)".to_string()
             } else {
                 "INT8 Quantized".to_string()
             };
@@ -335,10 +334,10 @@ fn render_right_column(app: &mut VntxGuiApp, ui: &mut Ui) {
                 ui,
                 "Número de threads de CPU / GPU executadas em paralelo durante a compressão em lote.",
             );
-            ui.add(egui::Slider::new(
-                &mut app.config.training.max_parallel_jobs,
-                1..=16,
-            ));
+            ui.add(
+                egui::Slider::new(&mut app.config.training.max_parallel_jobs, 1..=16)
+                    .trailing_fill(true),
+            );
         });
     });
 
@@ -346,9 +345,9 @@ fn render_right_column(app: &mut VntxGuiApp, ui: &mut Ui) {
 
     // 5. Anti-Stutter Guardrails
     card_frame().show(ui, |ui| {
-        ui.set_width(available_w);
+        ui.set_width(ui.available_width());
         ui.heading(
-            RichText::new(format!("{} Anti-Stutter Guardrails", ICON_SHIELD))
+            RichText::new("Anti-Stutter Guardrails")
                 .size(15.5_f32)
                 .strong()
                 .color(ACCENT_GREEN),
@@ -364,7 +363,8 @@ fn render_right_column(app: &mut VntxGuiApp, ui: &mut Ui) {
             ui.add(
                 egui::Slider::new(&mut app.config.guardrails.max_latency_ms, 0.5..=10.0)
                     .step_by(0.1)
-                    .suffix(" ms"),
+                    .suffix(" ms")
+                    .trailing_fill(true),
             );
         });
 
@@ -415,11 +415,9 @@ fn render_right_column(app: &mut VntxGuiApp, ui: &mut Ui) {
 
     // 6. Save Action Button Container (Right-aligned auto-width button)
     ui.horizontal(|ui| {
+        ui.set_width(ui.available_width());
         ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-            if ui
-                .add(btn_primary(format!("{} Save All Changes", ICON_SAVE)))
-                .clicked()
-            {
+            if ui.add(btn_primary("Save All Changes")).clicked() {
                 save_settings(app);
             }
         });

@@ -52,56 +52,56 @@ pub const ROUNDING_PILL: Rounding = Rounding::same(16.0_f32);
 // ==============================================================================
 
 /// Brand Logo / Neural Icon
-pub const ICON_VNTX: &str = "⚡";
+pub const ICON_VNTX: &str = "";
 /// Dashboard Tab Icon
-pub const ICON_DASHBOARD: &str = "◈";
+pub const ICON_DASHBOARD: &str = "";
 /// Steam Games Tab Icon
-pub const ICON_GAMES: &str = "▶";
+pub const ICON_GAMES: &str = "";
 /// Neural Compressor Tab Icon
-pub const ICON_COMPRESSOR: &str = "⚡";
+pub const ICON_COMPRESSOR: &str = "";
 /// Cache Manager Tab Icon
-pub const ICON_CACHE: &str = "▣";
+pub const ICON_CACHE: &str = "";
 /// Settings Tab Icon
-pub const ICON_SETTINGS: &str = "⚙";
+pub const ICON_SETTINGS: &str = "";
 /// Library Paths Icon
-pub const ICON_PATHS: &str = "◈";
+pub const ICON_PATHS: &str = "";
 
 /// Refresh Action Icon
-pub const ICON_REFRESH: &str = "↻";
+pub const ICON_REFRESH: &str = "";
 /// Search Input Icon
-pub const ICON_SEARCH: &str = "⌕";
+pub const ICON_SEARCH: &str = "";
 /// Clear / Cancel Icon
-pub const ICON_CLEAR: &str = "✕";
+pub const ICON_CLEAR: &str = "";
 /// Delete / Purge Icon
-pub const ICON_DELETE: &str = "✕";
+pub const ICON_DELETE: &str = "";
 /// Copy to Clipboard Icon
-pub const ICON_COPY: &str = "❐";
+pub const ICON_COPY: &str = "";
 /// Help / Info Tooltip Icon
-pub const ICON_INFO: &str = "ℹ";
+pub const ICON_INFO: &str = "(?)";
 /// Check / Success Status Icon
-pub const ICON_CHECK: &str = "✓";
+pub const ICON_CHECK: &str = "";
 /// Error / Fail Status Icon
-pub const ICON_ERROR: &str = "✗";
+pub const ICON_ERROR: &str = "";
 /// Recommendation Star Icon
-pub const ICON_STAR: &str = "★";
+pub const ICON_STAR: &str = "";
 
 /// Status Bullet (Active / Enabled)
 pub const ICON_STATUS_ACTIVE: &str = "●";
 /// Status Bullet (Inactive / Disabled)
 pub const ICON_STATUS_INACTIVE: &str = "○";
 /// Status Bullet (Standby / Warning)
-pub const ICON_STATUS_STANDBY: &str = "◐";
+pub const ICON_STATUS_STANDBY: &str = "○";
 
 /// Hardware GPU Icon
-pub const ICON_GPU: &str = "◈";
+pub const ICON_GPU: &str = "";
 /// Anti-Stutter Shield Icon
-pub const ICON_SHIELD: &str = "◆";
+pub const ICON_SHIELD: &str = "";
 /// Rocket Launch Action Icon
-pub const ICON_ROCKET: &str = "⚡";
+pub const ICON_ROCKET: &str = "";
 /// Lightbulb Recommendation Icon
-pub const ICON_LIGHTBULB: &str = "★";
+pub const ICON_LIGHTBULB: &str = "";
 /// Save Changes Icon
-pub const ICON_SAVE: &str = "✓";
+pub const ICON_SAVE: &str = "";
 
 // ==============================================================================
 // 4. Custom Theme Application & Embedded Icon Font Registration
@@ -164,6 +164,7 @@ pub fn apply_custom_theme(ctx: &egui::Context) {
     style.spacing.item_spacing = Vec2::new(10.0_f32, 10.0_f32);
     style.spacing.button_padding = Vec2::new(12.0_f32, 7.0_f32);
     style.spacing.window_margin = Margin::same(16.0_f32);
+    style.spacing.slider_width = 180.0_f32;
     ctx.set_style(style);
 }
 
@@ -265,8 +266,10 @@ pub fn hero_empty_state(
         ui.set_width(available_w);
         ui.vertical_centered(|ui| {
             ui.add_space(20.0_f32);
-            ui.label(RichText::new(icon).size(52.0_f32));
-            ui.add_space(10.0_f32);
+            if !icon.is_empty() {
+                ui.label(RichText::new(icon).size(52.0_f32));
+                ui.add_space(10.0_f32);
+            }
             ui.label(
                 RichText::new(title)
                     .size(19.0_f32)

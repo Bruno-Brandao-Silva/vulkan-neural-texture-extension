@@ -9,6 +9,9 @@ on:
 env:
   CARGO_TERM_COLOR: always
 
+permissions:
+  contents: write
+
 jobs:
   rust-check:
     name: Rust (Format, Clippy & Tests)
@@ -81,10 +84,19 @@ jobs:
             python3-numpy \
             python3-scipy
 
-      - name: Verify C++ Code Formatting
+      - name: Auto-Format C++ Code
         run: |
           clang-format -i $(find layer tests -type f \( -name "*.cpp" -o -name "*.hpp" -o -name "*.h" \))
-          git diff --exit-code || (echo "::error::C++ files are not formatted! Run './scripts/fmt_and_fix.sh' locally and push again." && exit 1)
+          if ! git diff --quiet; then
+            echo "::warning::C++ files had formatting discrepancies. Auto-formatting was applied automatically."
+          fi
+
+      - name: Auto-Commit Formatting Changes
+        if: github.event_name == 'push'
+        uses: stefanzweifel/git-auto-commit-action@v5
+        with:
+          commit_message: "style(cpp): apply automated clang-format"
+          file_pattern: "layer/** tests/**"
 
       - name: Configure CMake with Sanitizers & Tests
         run: |

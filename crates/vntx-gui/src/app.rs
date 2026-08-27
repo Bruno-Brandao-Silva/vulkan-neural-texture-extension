@@ -152,7 +152,7 @@ impl VntxGuiApp {
         let mut app = Self {
             config,
             cache_mgr,
-            selected_tab: Tab::Settings,
+            selected_tab: Tab::Dashboard,
             discovered_games: Vec::new(),
             game_search_query: String::new(),
             selected_game_id: None,
@@ -274,8 +274,9 @@ impl eframe::App for VntxGuiApp {
             )
             .show(ctx, |ui| {
                 ui.horizontal(|ui| {
+                    ui.set_width(ui.available_width());
                     ui.heading(
-                        RichText::new("⚡ VNTX")
+                        RichText::new("VNTX")
                             .size(20.0_f32)
                             .strong()
                             .color(crate::theme::ACCENT_GREEN),
@@ -289,24 +290,15 @@ impl eframe::App for VntxGuiApp {
                     ui.add_space(24.0_f32);
 
                     let tabs = [
-                        (
-                            Tab::Dashboard,
-                            format!("{} Dashboard", crate::theme::ICON_DASHBOARD),
-                        ),
-                        (Tab::Games, format!("{} Games", crate::theme::ICON_GAMES)),
-                        (
-                            Tab::Compressor,
-                            format!("{} Compressor", crate::theme::ICON_COMPRESSOR),
-                        ),
-                        (Tab::Cache, format!("{} Cache", crate::theme::ICON_CACHE)),
-                        (
-                            Tab::Settings,
-                            format!("{} Settings", crate::theme::ICON_SETTINGS),
-                        ),
+                        (Tab::Dashboard, "Dashboard"),
+                        (Tab::Games, "Games"),
+                        (Tab::Compressor, "Compressor"),
+                        (Tab::Cache, "Cache"),
+                        (Tab::Settings, "Settings"),
                     ];
 
-                    for (tab, label) in &tabs {
-                        let is_active = self.selected_tab == *tab;
+                    for (tab, label) in tabs {
+                        let is_active = self.selected_tab == tab;
                         let text = if is_active {
                             RichText::new(label)
                                 .size(14.0_f32)
@@ -327,7 +319,7 @@ impl eframe::App for VntxGuiApp {
                             .rounding(crate::theme::ROUNDING_MD);
 
                         if ui.add(btn).clicked() {
-                            self.selected_tab = *tab;
+                            self.selected_tab = tab;
                         }
                     }
                 });
@@ -346,11 +338,6 @@ impl eframe::App for VntxGuiApp {
                     .show(ctx, |ui| {
                         ui.horizontal(|ui| {
                             ui.label(
-                                RichText::new("ℹ")
-                                    .color(crate::theme::ACCENT_GREEN)
-                                    .size(14.0_f32),
-                            );
-                            ui.label(
                                 RichText::new(msg)
                                     .color(crate::theme::TEXT_PRIMARY)
                                     .strong(),
@@ -365,6 +352,8 @@ impl eframe::App for VntxGuiApp {
         // Central Content Area
         egui::CentralPanel::default().show(ctx, |ui| {
             ui.set_min_size(ui.available_size());
+            ui.set_width(ui.available_width());
+            ui.set_height(ui.available_height());
             match self.selected_tab {
                 Tab::Dashboard => views::dashboard::render(self, ui),
                 Tab::Games => views::games::render(self, ui),
