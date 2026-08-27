@@ -227,7 +227,8 @@ impl eframe::App for VntxGuiApp {
                         self.compression_status = CompressionStatus::Scanning;
                     }
                     WorkerMessage::Progress { processed, total } => {
-                        self.compression_status = CompressionStatus::Compressing { processed, total };
+                        self.compression_status =
+                            CompressionStatus::Compressing { processed, total };
                     }
                     WorkerMessage::Done {
                         processed,
@@ -362,5 +363,3 @@ impl eframe::App for VntxGuiApp {
         });
     }
 }
-
-

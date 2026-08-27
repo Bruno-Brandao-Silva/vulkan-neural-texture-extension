@@ -22,7 +22,6 @@ fn test_default_config_values() {
     assert_eq!(config.paths.steam_libraries.len(), 2);
 }
 
-
 #[test]
 fn test_config_save_and_load_round_trip() {
     let dir = tempdir().expect("temp dir");

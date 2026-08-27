@@ -203,5 +203,3 @@ pub fn render(app: &mut VntxGuiApp, ui: &mut Ui) {
         app.selected_tab = Tab::Compressor;
     }
 }
-
-

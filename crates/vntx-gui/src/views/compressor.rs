@@ -2,8 +2,8 @@
 
 use crate::app::{CompressionStatus, Tab, VntxGuiApp, WorkerMessage};
 use crate::theme::{
-    card_frame, hero_empty_state, page_header, ACCENT_BLUE, ACCENT_GREEN, ACCENT_RED,
-    ROUNDING_MD, TEXT_MUTED, TEXT_PRIMARY,
+    card_frame, hero_empty_state, page_header, ACCENT_BLUE, ACCENT_GREEN, ACCENT_RED, ROUNDING_MD,
+    TEXT_MUTED, TEXT_PRIMARY,
 };
 use eframe::egui::{self, Color32, ProgressBar, RichText, Ui};
 use std::sync::mpsc::channel;
@@ -389,5 +389,3 @@ pub fn render(app: &mut VntxGuiApp, ui: &mut Ui) {
         }
     });
 }
-
-

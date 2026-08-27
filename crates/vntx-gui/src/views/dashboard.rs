@@ -106,7 +106,8 @@ pub fn render(app: &mut VntxGuiApp, ui: &mut Ui) {
     ui.add_space(12.0_f32);
 
     // 2. Vulkan Implicit Layer Status & Interactive Toggle
-    let user_layer_path = expand_home_path("~/.local/share/vulkan/implicit_layer.d/vntx_layer.json");
+    let user_layer_path =
+        expand_home_path("~/.local/share/vulkan/implicit_layer.d/vntx_layer.json");
     let sys_layer_path = expand_home_path("/usr/share/vulkan/implicit_layer.d/vntx_layer.json");
     let is_layer_installed = user_layer_path.exists() || sys_layer_path.exists();
     let is_layer_enabled = is_layer_installed && app.config.general.enable_layer_by_default;
@@ -318,12 +319,7 @@ pub fn render(app: &mut VntxGuiApp, ui: &mut Ui) {
     });
 }
 
-fn render_metric_card(
-    ui: &mut Ui,
-    title: &str,
-    value: &str,
-    color: Color32,
-) {
+fn render_metric_card(ui: &mut Ui, title: &str, value: &str, color: Color32) {
     let available_w = ui.available_width();
     card_frame().show(ui, |ui| {
         ui.set_width(available_w);
@@ -333,6 +329,3 @@ fn render_metric_card(
         ui.label(RichText::new(value).size(20.0_f32).strong().color(color));
     });
 }
-
-
-

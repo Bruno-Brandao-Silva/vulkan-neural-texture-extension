@@ -25,7 +25,6 @@ pub struct VntxConfig {
     pub paths: PathsConfig,
 }
 
-
 /// General framework options.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct GeneralConfig {
@@ -115,7 +114,6 @@ impl Default for GuardrailConfig {
 /// Game search and library paths.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct PathsConfig {
-
     /// Root Steam library directories.
     pub steam_libraries: Vec<String>,
 

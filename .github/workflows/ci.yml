@@ -48,7 +48,8 @@ jobs:
             ${{ runner.os }}-cargo-
 
       - name: Verify Code Formatting
-        run: cargo fmt --check
+        run: |
+          cargo fmt --check || (echo "::error::Rust files are not formatted! Run './scripts/fmt_and_fix.sh' locally and push again." && exit 1)
 
       - name: Run Clippy Linter
         run: cargo clippy --workspace --all-targets -- -D warnings
@@ -74,10 +75,16 @@ jobs:
             vulkan-tools \
             mesa-vulkan-drivers \
             glslang-tools \
+            clang-format \
             python3 \
             python3-pip \
             python3-numpy \
             python3-scipy
+
+      - name: Verify C++ Code Formatting
+        run: |
+          clang-format -i $(find layer tests -type f \( -name "*.cpp" -o -name "*.hpp" -o -name "*.h" \))
+          git diff --exit-code || (echo "::error::C++ files are not formatted! Run './scripts/fmt_and_fix.sh' locally and push again." && exit 1)
 
       - name: Configure CMake with Sanitizers & Tests
         run: |
@@ -94,3 +101,4 @@ jobs:
           export VK_DRIVER_FILES=$(find /usr/share/vulkan/icd.d/ -name "lvp_icd*.json" | head -n 1)
           echo "Using Vulkan ICD: $VK_DRIVER_FILES"
           ctest --test-dir build --output-on-failure --verbose
+

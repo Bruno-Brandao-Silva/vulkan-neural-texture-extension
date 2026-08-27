@@ -43,11 +43,9 @@ fn main() -> eframe::Result<()> {
         ..Default::default()
     };
 
-
     eframe::run_native(
         "VNTX Control Panel",
         native_options,
         Box::new(|_cc| Box::new(VntxGuiApp::new())),
     )
 }
-

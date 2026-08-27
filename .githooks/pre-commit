@@ -1,0 +1,17 @@
+#!/usr/bin/env bash
+# ==============================================================================
+# VNTX Git Pre-Commit Hook
+# Automatically formats and applies linter fixes to changed files before commit.
+# Activate via: git config core.hooksPath .githooks
+# ==============================================================================
+
+set -e
+
+REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+cd "$REPO_ROOT"
+
+echo "[VNTX Pre-Commit] Running code formatting and linter auto-fixes..."
+./scripts/fmt_and_fix.sh
+
+# Automatically re-stage files if changes were introduced by formatting
+git update-index --again

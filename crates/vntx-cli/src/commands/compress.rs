@@ -74,7 +74,10 @@ pub fn execute(args: &CompressArgs, config: &VntxConfig) -> Result<(), VntxError
         None
     };
 
-    println!("Starting parallel compression using {jobs} worker threads (preset: {})...", args.quality);
+    println!(
+        "Starting parallel compression using {jobs} worker threads (preset: {})...",
+        args.quality
+    );
     let summary = orchestrator.compress_textures_with_preset(
         game.app_id,
         &scan_res.textures,

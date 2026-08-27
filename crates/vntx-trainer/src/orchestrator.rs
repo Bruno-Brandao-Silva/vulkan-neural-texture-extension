@@ -65,7 +65,9 @@ impl TrainingOrchestrator {
         let results: Vec<Result<(PathBuf, u64), String>> = pool.install(|| {
             textures
                 .par_iter()
-                .map(|tex| self.train_single_texture_with_preset(app_id, &tex.path, preset, precision))
+                .map(|tex| {
+                    self.train_single_texture_with_preset(app_id, &tex.path, preset, precision)
+                })
                 .collect()
         });
 

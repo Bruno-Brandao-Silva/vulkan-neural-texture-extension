@@ -174,4 +174,3 @@ pub fn render(app: &mut VntxGuiApp, ui: &mut Ui) {
         }
     });
 }
-

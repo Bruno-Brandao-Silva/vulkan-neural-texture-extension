@@ -68,5 +68,3 @@ fn test_gui_settings_picklist_and_preset_sync() {
     assert!((app.config.guardrails.max_latency_ms - 3.2).abs() < f64::EPSILON);
     assert_eq!(app.config.guardrails.min_resolution_threshold, 512);
 }
-
-

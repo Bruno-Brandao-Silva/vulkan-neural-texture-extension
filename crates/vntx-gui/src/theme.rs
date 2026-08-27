@@ -84,7 +84,6 @@ pub fn apply_custom_theme(ctx: &egui::Context) {
 }
 
 /// Returns a standardized elevated card frame with custom styling.
-#[must_use]
 pub fn card_frame() -> Frame {
     Frame::none()
         .fill(CARD_BG)
@@ -149,11 +148,7 @@ pub fn hero_empty_state(
                     .color(TEXT_PRIMARY),
             );
             ui.add_space(6.0_f32);
-            ui.label(
-                RichText::new(description)
-                    .size(13.0_f32)
-                    .color(TEXT_MUTED),
-            );
+            ui.label(RichText::new(description).size(13.0_f32).color(TEXT_MUTED));
             ui.add_space(14.0_f32);
 
             if let Some(lbl) = button_label {

@@ -46,5 +46,3 @@ pub use scanner::{
     discover_steam_games, find_game_by_query, is_texture_file, parse_acf_manifest,
     parse_vdf_library_folders, scan_game_textures, AssetScanResult, InstalledGame, ScannedTexture,
 };
-
-

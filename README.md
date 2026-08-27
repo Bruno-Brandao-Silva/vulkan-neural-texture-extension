@@ -152,6 +152,52 @@ vntx clean --all
 
 ---
 
+## 🛠️ Development & Contribution
+
+### Prerequisites & Environment Setup
+
+#### Arch Linux / CachyOS
+```bash
+sudo pacman -S base-devel cmake ninja clang rustup vulkan-devel vulkan-tools mesa libx11 libxcb libxcursor libxrandr wayland
+rustup default stable
+rustup component add clippy rustfmt
+```
+
+#### Ubuntu 24.04+ / Debian / WSL2
+```bash
+sudo apt update
+sudo apt install -y build-essential cmake ninja-build clang clang-format \
+  libvulkan-dev vulkan-tools mesa-vulkan-drivers glslang-tools pkg-config \
+  libx11-dev libxcb1-dev libxcursor-dev libxi-dev libxrandr-dev libwayland-dev libxkbcommon-dev
+curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
+rustup default stable
+rustup component add clippy rustfmt
+```
+
+### Git Pre-Commit Hooks
+Activate automated pre-commit formatting and linter auto-fixes:
+```bash
+git config core.hooksPath .githooks
+```
+
+### Mandatory Formatting & Auto-Fixes
+Before opening Pull Requests or creating commits, always execute the unified format script:
+```bash
+./scripts/fmt_and_fix.sh
+```
+This automatically runs `cargo fmt --all`, `cargo clippy --fix`, and `clang-format -i` across all Rust and C++ source files.
+
+### Running Test Suites Locally
+```bash
+# 1. Rust Workspace Test Suite
+cargo test --workspace
+
+# 2. Complete Headless WSL2 / LavaPipe End-to-End Test Suite
+./scripts/wsl2_test_runner.sh
+```
+
+---
+
 ## Documentation
 
 - [System Architecture](docs/ARCHITECTURE.md)

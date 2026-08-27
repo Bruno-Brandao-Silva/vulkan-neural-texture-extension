@@ -66,3 +66,4 @@
 32. **Clean Workspace Hygiene:** Temporary build artifacts, object files, binaries, and system files MUST NEVER be committed. The `.gitignore` file MUST be rigorously maintained.
 33. **No Secrets or Hardcoded Paths:** Hardcoding absolute local filesystem paths (e.g., `/home/user/`) or secrets is strictly prohibited. Use environment variables or relative system paths.
 34. **Minimal Dependencies:** Every new crate or external library dependency MUST be strictly justified. Prefer standard library solutions or pre-existing dependencies whenever feasible.
+35. **Mandatory Pre-Commit Automated Formatting:** All developers and automated AI agents MUST execute `./scripts/fmt_and_fix.sh` (enforcing `cargo fmt`, `cargo clippy --fix`, and `clang-format`) as the mandatory final step before generating any git commit or pull request.

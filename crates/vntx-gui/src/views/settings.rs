@@ -10,12 +10,8 @@ use vntx_core::{get_recommended_settings, VntxConfig};
 
 /// Helper to render an inline help question mark icon with a detailed hover tooltip.
 fn help_tooltip(ui: &mut Ui, text: &str) {
-    ui.label(
-        RichText::new("ℹ")
-            .color(ACCENT_BLUE)
-            .size(13.0_f32),
-    )
-    .on_hover_text(text);
+    ui.label(RichText::new("ℹ").color(ACCENT_BLUE).size(13.0_f32))
+        .on_hover_text(text);
 }
 
 /// Renders the settings view.
@@ -23,7 +19,10 @@ pub fn render(app: &mut VntxGuiApp, ui: &mut Ui) {
     page_header(
         ui,
         "Preferences & Configuration",
-        &format!("Configuration file: {}", VntxConfig::default_config_path().display()),
+        &format!(
+            "Configuration file: {}",
+            VntxConfig::default_config_path().display()
+        ),
     );
 
     egui::ScrollArea::vertical().show(ui, |ui| {
@@ -397,8 +396,3 @@ fn render_right_column(app: &mut VntxGuiApp, ui: &mut Ui) {
         }
     }
 }
-
-
-
-
-

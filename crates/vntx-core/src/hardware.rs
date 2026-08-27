@@ -187,6 +187,3 @@ pub fn get_recommended_settings() -> RecommendedSettings {
         }
     }
 }
-
-
-
