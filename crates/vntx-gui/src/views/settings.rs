@@ -11,7 +11,10 @@ use vntx_core::{get_recommended_settings, VntxConfig};
 
 /// Renders the settings view.
 pub fn render(app: &mut VntxGuiApp, ui: &mut Ui) {
+    ui.set_min_size(ui.available_size());
+
     ui.horizontal(|ui| {
+        ui.set_width(ui.available_width());
         page_header(
             ui,
             "Preferences & Configuration",
@@ -33,11 +36,14 @@ pub fn render(app: &mut VntxGuiApp, ui: &mut Ui) {
     egui::ScrollArea::vertical()
         .auto_shrink([false, false])
         .show(ui, |ui| {
+            ui.set_min_size(ui.available_size());
             let available_width = ui.available_width();
             let use_two_columns = available_width >= 680.0_f32;
 
             if use_two_columns {
                 ui.columns(2, |columns| {
+                    columns[0].set_min_size(columns[0].available_size());
+                    columns[1].set_min_size(columns[1].available_size());
                     // Left Column (50%): Diagnostics + General + Paths
                     render_left_column(app, &mut columns[0]);
                     // Right Column (50%): Compression Defaults + Guardrails + Save Action
@@ -186,7 +192,10 @@ fn render_left_column(app: &mut VntxGuiApp, ui: &mut Ui) {
                 ui,
                 "Caminho no disco onde as texturas comprimidas (.ntc) são armazenadas.\nPadrão: ~/.cache/ntc",
             );
-            ui.text_edit_singleline(&mut app.config.general.cache_dir);
+            ui.add(
+                egui::TextEdit::singleline(&mut app.config.general.cache_dir)
+                    .desired_width(ui.available_width()),
+            );
         });
 
         ui.horizontal(|ui| {
@@ -234,7 +243,7 @@ fn render_left_column(app: &mut VntxGuiApp, ui: &mut Ui) {
         for (idx, path) in app.config.paths.steam_libraries.iter_mut().enumerate() {
             ui.horizontal(|ui| {
                 ui.label(RichText::new(format!("{}:", idx + 1)).color(TEXT_MUTED));
-                ui.text_edit_singleline(path);
+                ui.add(egui::TextEdit::singleline(path).desired_width(ui.available_width()));
             });
         }
     });

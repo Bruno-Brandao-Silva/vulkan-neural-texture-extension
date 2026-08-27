@@ -363,12 +363,15 @@ impl eframe::App for VntxGuiApp {
         }
 
         // Central Content Area
-        egui::CentralPanel::default().show(ctx, |ui| match self.selected_tab {
-            Tab::Dashboard => views::dashboard::render(self, ui),
-            Tab::Games => views::games::render(self, ui),
-            Tab::Compressor => views::compressor::render(self, ui),
-            Tab::Cache => views::cache::render(self, ui),
-            Tab::Settings => views::settings::render(self, ui),
+        egui::CentralPanel::default().show(ctx, |ui| {
+            ui.set_min_size(ui.available_size());
+            match self.selected_tab {
+                Tab::Dashboard => views::dashboard::render(self, ui),
+                Tab::Games => views::games::render(self, ui),
+                Tab::Compressor => views::compressor::render(self, ui),
+                Tab::Cache => views::cache::render(self, ui),
+                Tab::Settings => views::settings::render(self, ui),
+            }
         });
     }
 }
