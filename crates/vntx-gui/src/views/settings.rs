@@ -57,6 +57,7 @@ pub fn render(app: &mut VntxGuiApp, ui: &mut Ui) {
                 ui.add_space(12.0_f32);
                 render_right_column(app, ui);
             }
+            ui.add_space(16.0_f32);
         });
 }
 

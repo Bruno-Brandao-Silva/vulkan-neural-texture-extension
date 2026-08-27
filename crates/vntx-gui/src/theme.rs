@@ -178,7 +178,7 @@ pub fn card_frame() -> Frame {
         .fill(CARD_BG)
         .stroke(Stroke::new(1.0_f32, CARD_STROKE))
         .rounding(ROUNDING_LG)
-        .inner_margin(Margin::same(14.0_f32))
+        .inner_margin(Margin::same(16.0_f32))
 }
 
 /// Builds a styled primary action button with Neon Green accent.

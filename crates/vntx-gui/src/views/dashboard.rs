@@ -289,6 +289,7 @@ pub fn render(app: &mut VntxGuiApp, ui: &mut Ui) {
                 .size(12.0_f32),
         );
     });
+        ui.add_space(16.0_f32);
     });
 }
 

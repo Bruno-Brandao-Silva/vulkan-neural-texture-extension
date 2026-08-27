@@ -169,8 +169,9 @@ pub fn render(app: &mut VntxGuiApp, ui: &mut Ui) {
                         });
                     });
                 });
-                ui.add_space(6.0_f32);
+                ui.add_space(10.0_f32);
             }
+            ui.add_space(16.0_f32);
         });
 
     if let Some(del_path) = file_to_delete {

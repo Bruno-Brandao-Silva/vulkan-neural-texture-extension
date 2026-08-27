@@ -270,7 +270,7 @@ impl eframe::App for VntxGuiApp {
                 egui::Frame::none()
                     .fill(crate::theme::CARD_BG)
                     .stroke(egui::Stroke::new(1.0_f32, crate::theme::CARD_STROKE))
-                    .inner_margin(egui::Margin::symmetric(16.0_f32, 10.0_f32)),
+                    .inner_margin(egui::Margin::symmetric(24.0_f32, 12.0_f32)),
             )
             .show(ctx, |ui| {
                 ui.horizontal(|ui| {
@@ -333,7 +333,7 @@ impl eframe::App for VntxGuiApp {
                         egui::Frame::none()
                             .fill(crate::theme::CARD_BG)
                             .stroke(egui::Stroke::new(1.0_f32, crate::theme::ACCENT_GREEN))
-                            .inner_margin(egui::Margin::symmetric(16.0_f32, 8.0_f32)),
+                            .inner_margin(egui::Margin::symmetric(24.0_f32, 10.0_f32)),
                     )
                     .show(ctx, |ui| {
                         ui.horizontal(|ui| {
@@ -349,18 +349,24 @@ impl eframe::App for VntxGuiApp {
             }
         }
 
-        // Central Content Area
-        egui::CentralPanel::default().show(ctx, |ui| {
-            ui.set_min_size(ui.available_size());
-            ui.set_width(ui.available_width());
-            ui.set_height(ui.available_height());
-            match self.selected_tab {
-                Tab::Dashboard => views::dashboard::render(self, ui),
-                Tab::Games => views::games::render(self, ui),
-                Tab::Compressor => views::compressor::render(self, ui),
-                Tab::Cache => views::cache::render(self, ui),
-                Tab::Settings => views::settings::render(self, ui),
-            }
-        });
+        // Central Content Area with SafeView Margins
+        let central_frame = egui::Frame::none()
+            .fill(crate::theme::BG_APP)
+            .inner_margin(egui::Margin::symmetric(24.0_f32, 18.0_f32));
+
+        egui::CentralPanel::default()
+            .frame(central_frame)
+            .show(ctx, |ui| {
+                ui.set_min_size(ui.available_size());
+                ui.set_width(ui.available_width());
+                ui.set_height(ui.available_height());
+                match self.selected_tab {
+                    Tab::Dashboard => views::dashboard::render(self, ui),
+                    Tab::Games => views::games::render(self, ui),
+                    Tab::Compressor => views::compressor::render(self, ui),
+                    Tab::Cache => views::cache::render(self, ui),
+                    Tab::Settings => views::settings::render(self, ui),
+                }
+            });
     }
 }
