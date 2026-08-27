@@ -1,9 +1,10 @@
 #include <gtest/gtest.h>
-#include "vntx/format.hpp"
 
 #include <cstddef>
 #include <fstream>
 #include <vector>
+
+#include "vntx/format.hpp"
 
 using namespace vntx;
 
@@ -91,11 +92,9 @@ TEST(HeaderLayoutTest, HeaderValidationLogic) {
 }
 
 TEST(HeaderLayoutTest, LoadExportedPythonFixture) {
-    const std::string fixture_paths[] = {
-        "tests/fixtures/sample_texture.ntc",
-        "../tests/fixtures/sample_texture.ntc",
-        "../../tests/fixtures/sample_texture.ntc"
-    };
+    const std::string fixture_paths[] = {"tests/fixtures/sample_texture.ntc",
+                                         "../tests/fixtures/sample_texture.ntc",
+                                         "../../tests/fixtures/sample_texture.ntc"};
 
     std::ifstream file;
     for (const auto& path : fixture_paths) {

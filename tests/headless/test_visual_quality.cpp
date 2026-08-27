@@ -1,28 +1,25 @@
 #include <gtest/gtest.h>
-#include "vntx/format.hpp"
-#include "vntx/filter.hpp"
-#include "vntx/spirv.hpp"
-#include "vntx/spirv_rewriter.hpp"
-#include "vntx/layer.hpp"
 
 #include <algorithm>
 #include <cmath>
 #include <cstdint>
 #include <filesystem>
 #include <fstream>
-#include <vector>
 #include <string>
+#include <vector>
+
+#include "vntx/filter.hpp"
+#include "vntx/format.hpp"
+#include "vntx/layer.hpp"
+#include "vntx/spirv.hpp"
+#include "vntx/spirv_rewriter.hpp"
 
 using namespace vntx;
 
 namespace {
 
-void write_ppm_image(
-    const std::filesystem::path& filepath,
-    const std::vector<uint8_t>& rgb_data,
-    const uint32_t width,
-    const uint32_t height
-) {
+void write_ppm_image(const std::filesystem::path& filepath, const std::vector<uint8_t>& rgb_data,
+                     const uint32_t width, const uint32_t height) {
     if (filepath.has_parent_path()) {
         std::filesystem::create_directories(filepath.parent_path());
     }
@@ -31,7 +28,7 @@ void write_ppm_image(
     out.write(reinterpret_cast<const char*>(rgb_data.data()), rgb_data.size());
 }
 
-} // namespace
+}  // namespace
 
 TEST(VisualQualityTest, GeneratesReferenceAndNeuralRenders) {
     const uint32_t width = 1024;
@@ -79,18 +76,18 @@ TEST(VisualQualityTest, GeneratesReferenceAndNeuralRenders) {
     EXPECT_TRUE(ntc_check.is_open());
 
     constexpr float ssim_score = 0.9984f;
-    std::cout << "[VNTX][SSIM] Neural Texture Decompression SSIM: " << ssim_score << " (Target >= 0.98)\n";
+    std::cout << "[VNTX][SSIM] Neural Texture Decompression SSIM: " << ssim_score
+              << " (Target >= 0.98)\n";
     EXPECT_GE(ssim_score, 0.98f);
 }
 
 TEST(VisualQualityTest, SpirvRewritingPreservesIntegrity) {
     // Construct valid synthetic SPIR-V module containing OpImageSampleImplicitLod (87)
     std::vector<uint32_t> spirv_code = {
-        spv::SPIRV_MAGIC_NUMBER,
-        spv::SPIRV_VERSION_1_3,
-        0x00140000u, // Generator magic
-        10u,         // Bound
-        0u,          // Schema
+        spv::SPIRV_MAGIC_NUMBER, spv::SPIRV_VERSION_1_3,
+        0x00140000u,  // Generator magic
+        10u,          // Bound
+        0u,           // Schema
         // OpMemoryModel Logical GLSL450 (3 words, opcode 14)
         (3u << 16u) | static_cast<uint32_t>(spv::OpCode::OpMemoryModel), 0u, 1u,
         // OpImageSampleImplicitLod (5 words, opcode 87)
@@ -98,14 +95,10 @@ TEST(VisualQualityTest, SpirvRewritingPreservesIntegrity) {
         // OpReturn (1 word, opcode 253)
         (1u << 16u) | static_cast<uint32_t>(spv::OpCode::OpReturn),
         // OpFunctionEnd (1 word, opcode 56)
-        (1u << 16u) | static_cast<uint32_t>(spv::OpCode::OpFunctionEnd)
-    };
+        (1u << 16u) | static_cast<uint32_t>(spv::OpCode::OpFunctionEnd)};
 
-    const auto result = spv::rewrite_shader_bytecode(
-        spirv_code.data(),
-        spirv_code.size(),
-        {.enable_tensor_cores = true}
-    );
+    const auto result = spv::rewrite_shader_bytecode(spirv_code.data(), spirv_code.size(),
+                                                     {.enable_tensor_cores = true});
 
     EXPECT_TRUE(result.modified);
     EXPECT_EQ(result.sample_instructions_found, 1u);

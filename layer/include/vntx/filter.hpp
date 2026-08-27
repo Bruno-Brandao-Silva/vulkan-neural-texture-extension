@@ -1,6 +1,7 @@
 #pragma once
 
 #include <vulkan/vulkan.h>
+
 #include <chrono>
 #include <cstdint>
 #include <string>
@@ -10,13 +11,15 @@ namespace vntx {
 /// Minimum dimension in pixels for texture candidate eligibility.
 constexpr uint32_t MIN_CANDIDATE_DIMENSION = 1024;
 
-/// Maximum allowed latency budget for dynamic texture transcoding in milliseconds (anti-stutter guardrail).
+/// Maximum allowed latency budget for dynamic texture transcoding in milliseconds (anti-stutter
+/// guardrail).
 constexpr double MAX_TRANSCODING_LATENCY_MS = 2.5;
 
 /// Maximum allowed latency budget for dynamic texture transcoding in microseconds.
 constexpr uint64_t MAX_TRANSCODING_BUDGET_US = 2500;
 
-/// @brief Checks whether a measured transcoding duration is within the anti-stutter latency budget (<= 2.5ms).
+/// @brief Checks whether a measured transcoding duration is within the anti-stutter latency budget
+/// (<= 2.5ms).
 [[nodiscard]] constexpr bool is_within_latency_budget(const double duration_ms) noexcept {
     return duration_ms <= MAX_TRANSCODING_LATENCY_MS;
 }
@@ -26,7 +29,8 @@ constexpr uint64_t MAX_TRANSCODING_BUDGET_US = 2500;
     return duration_us <= MAX_TRANSCODING_BUDGET_US;
 }
 
-/// @brief RAII latency guard for measuring texture transcoding time against the anti-stutter budget.
+/// @brief RAII latency guard for measuring texture transcoding time against the anti-stutter
+/// budget.
 class TranscodingLatencyGuard {
 public:
     TranscodingLatencyGuard() noexcept : start_(std::chrono::steady_clock::now()) {}
@@ -39,8 +43,7 @@ public:
     [[nodiscard]] uint64_t elapsed_us() const noexcept {
         const auto now = std::chrono::steady_clock::now();
         return static_cast<uint64_t>(
-            std::chrono::duration_cast<std::chrono::microseconds>(now - start_).count()
-        );
+            std::chrono::duration_cast<std::chrono::microseconds>(now - start_).count());
     }
 
     [[nodiscard]] bool within_budget() const noexcept {
@@ -51,7 +54,8 @@ private:
     std::chrono::steady_clock::time_point start_;
 };
 
-/// @brief Checks whether a VkFormat is eligible for Neural Texture Compression (strictly BC1-BC7 formats).
+/// @brief Checks whether a VkFormat is eligible for Neural Texture Compression (strictly BC1-BC7
+/// formats).
 [[nodiscard]] constexpr bool is_supported_texture_format(const VkFormat format) noexcept {
     return (format >= VK_FORMAT_BC1_RGB_UNORM_BLOCK && format <= VK_FORMAT_BC7_SRGB_BLOCK);
 }
@@ -76,5 +80,4 @@ private:
 /// @return Human-readable reason string if rejected, empty string if accepted.
 [[nodiscard]] std::string get_filter_rejection_reason(const VkImageCreateInfo& create_info);
 
-} // namespace vntx
-
+}  // namespace vntx

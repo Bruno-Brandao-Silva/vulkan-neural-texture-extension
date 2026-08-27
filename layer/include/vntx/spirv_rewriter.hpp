@@ -1,8 +1,9 @@
 #pragma once
 
-#include "vntx/spirv.hpp"
-#include <vector>
 #include <unordered_set>
+#include <vector>
+
+#include "vntx/spirv.hpp"
 
 namespace vntx::spv {
 
@@ -21,11 +22,9 @@ struct RewriteResult {
 
 /// @brief Inspects and modifies SPIR-V bytecode to replace texture sampling with NTC inference.
 ///
-/// If rewriting cannot be safely performed, returns the original bytecode unmodified with `modified = false`.
-[[nodiscard]] RewriteResult rewrite_shader_bytecode(
-    const uint32_t* words,
-    size_t size_in_words,
-    const RewriteOptions& options = {}
-);
+/// If rewriting cannot be safely performed, returns the original bytecode unmodified with `modified
+/// = false`.
+[[nodiscard]] RewriteResult rewrite_shader_bytecode(const uint32_t* words, size_t size_in_words,
+                                                    const RewriteOptions& options = {});
 
-} // namespace vntx::spv
+}  // namespace vntx::spv

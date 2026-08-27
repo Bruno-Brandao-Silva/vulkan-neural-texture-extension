@@ -1,8 +1,9 @@
 #include <gtest/gtest.h>
-#include "vntx/layer.hpp"
-#include "vntx/filter.hpp"
 
 #include <vector>
+
+#include "vntx/filter.hpp"
+#include "vntx/layer.hpp"
 
 TEST(VulkanInterceptionTest, LayerEntrypointsExported) {
     EXPECT_NE(vntx_GetInstanceProcAddr(VK_NULL_HANDLE, "vkGetInstanceProcAddr"), nullptr);
@@ -42,7 +43,8 @@ TEST(VulkanInterceptionTest, HeadlessLavaPipeDeviceInitialization) {
     VkInstance instance = VK_NULL_HANDLE;
     const VkResult inst_res = vkCreateInstance(&instance_create_info, nullptr, &instance);
     if (inst_res != VK_SUCCESS) {
-        GTEST_SKIP() << "Vulkan instance creation unavailable on this environment (result=" << inst_res << ")";
+        GTEST_SKIP() << "Vulkan instance creation unavailable on this environment (result="
+                     << inst_res << ")";
     }
     ASSERT_EQ(inst_res, VK_SUCCESS);
     ASSERT_NE(instance, VK_NULL_HANDLE);
@@ -122,4 +124,4 @@ TEST(VulkanInterceptionTest, HeadlessLavaPipeDeviceInitialization) {
     vkDestroyInstance(instance, nullptr);
 }
 
-#endif // VNTX_HAS_VULKAN_LOADER
+#endif  // VNTX_HAS_VULKAN_LOADER

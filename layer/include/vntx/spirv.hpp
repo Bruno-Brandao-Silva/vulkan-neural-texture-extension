@@ -1,10 +1,10 @@
 #pragma once
 
-#include <cstdint>
 #include <cstddef>
+#include <cstdint>
 #include <span>
-#include <vector>
 #include <string_view>
+#include <vector>
 
 namespace vntx::spv {
 
@@ -73,13 +73,12 @@ struct InstructionView {
         return (word_count > 1) ? words[1] : 0u;
     }
 
-    [[nodiscard]] uint32_t result_id() const noexcept {
-        return (word_count > 2) ? words[2] : 0u;
-    }
+    [[nodiscard]] uint32_t result_id() const noexcept { return (word_count > 2) ? words[2] : 0u; }
 };
 
 /// @brief Validates if a memory buffer is a valid SPIR-V module.
-[[nodiscard]] inline bool is_valid_spirv(const uint32_t* const words, const size_t size_in_words) noexcept {
+[[nodiscard]] inline bool is_valid_spirv(const uint32_t* const words,
+                                         const size_t size_in_words) noexcept {
     if (!words || size_in_words < SPIRV_HEADER_WORDS) {
         return false;
     }
@@ -97,4 +96,4 @@ struct InstructionView {
     };
 }
 
-} // namespace vntx::spv
+}  // namespace vntx::spv

@@ -1,13 +1,11 @@
 #include "vntx/spirv_rewriter.hpp"
+
 #include "vntx/logging.hpp"
 
 namespace vntx::spv {
 
-RewriteResult rewrite_shader_bytecode(
-    const uint32_t* const words,
-    const size_t size_in_words,
-    const RewriteOptions& options
-) {
+RewriteResult rewrite_shader_bytecode(const uint32_t* const words, const size_t size_in_words,
+                                      const RewriteOptions& options) {
     RewriteResult result{};
     if (!is_valid_spirv(words, size_in_words)) {
         VNTX_LOG_WARN("SPIR-V rewriter received invalid or corrupted bytecode header");
@@ -34,11 +32,8 @@ RewriteResult rewrite_shader_bytecode(
             opcode == OpCode::OpImageSampleDrefImplicitLod ||
             opcode == OpCode::OpImageSampleDrefExplicitLod) {
             result.sample_instructions_found++;
-            VNTX_LOG_DEBUG(
-                "Found texture sample instruction opcode={} at word offset {}",
-                opcode_raw,
-                idx
-            );
+            VNTX_LOG_DEBUG("Found texture sample instruction opcode={} at word offset {}",
+                           opcode_raw, idx);
         }
 
         idx += word_count;
@@ -47,14 +42,11 @@ RewriteResult rewrite_shader_bytecode(
     if (result.sample_instructions_found > 0) {
         result.modified = true;
         result.sample_instructions_rewritten = result.sample_instructions_found;
-        VNTX_LOG_INFO(
-            "SPIR-V rewriter detected {} texture sampling instructions (TensorCores={})",
-            result.sample_instructions_found,
-            options.enable_tensor_cores
-        );
+        VNTX_LOG_INFO("SPIR-V rewriter detected {} texture sampling instructions (TensorCores={})",
+                      result.sample_instructions_found, options.enable_tensor_cores);
     }
 
     return result;
 }
 
-} // namespace vntx::spv
+}  // namespace vntx::spv

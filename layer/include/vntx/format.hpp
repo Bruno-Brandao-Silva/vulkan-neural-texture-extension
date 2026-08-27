@@ -10,19 +10,19 @@ namespace vntx {
 ///
 /// Must match SPEC_FILE_FORMAT.md and the Rust `NtcHeader` layout byte-by-byte.
 struct NtcHeader {
-    uint8_t  magic[4];          ///< Magic Identifier ("NTC1")
-    uint32_t version;           ///< Format Version (1)
-    uint64_t texture_hash;      ///< xxHash3 64-bit checksum
-    uint32_t original_width;    ///< Original uncompressed width
-    uint32_t original_height;   ///< Original uncompressed height
-    uint8_t  channels;          ///< 3 = RGB, 4 = RGBA
-    uint8_t  precision;         ///< 0 = FP16, 1 = INT8
-    uint16_t layers_count;      ///< Total MLP layers (default: 3)
-    uint16_t hidden_dim;        ///< Neurons per hidden layer (default: 64)
-    uint16_t reserved_flags;    ///< Reserved flags (0x0000)
-    uint64_t weights_offset;    ///< Offset to payload (64)
-    uint64_t weights_size;      ///< Payload size in bytes
-    uint8_t  padding[16];       ///< Zero padding to 64 bytes
+    uint8_t magic[4];          ///< Magic Identifier ("NTC1")
+    uint32_t version;          ///< Format Version (1)
+    uint64_t texture_hash;     ///< xxHash3 64-bit checksum
+    uint32_t original_width;   ///< Original uncompressed width
+    uint32_t original_height;  ///< Original uncompressed height
+    uint8_t channels;          ///< 3 = RGB, 4 = RGBA
+    uint8_t precision;         ///< 0 = FP16, 1 = INT8
+    uint16_t layers_count;     ///< Total MLP layers (default: 3)
+    uint16_t hidden_dim;       ///< Neurons per hidden layer (default: 64)
+    uint16_t reserved_flags;   ///< Reserved flags (0x0000)
+    uint64_t weights_offset;   ///< Offset to payload (64)
+    uint64_t weights_size;     ///< Payload size in bytes
+    uint8_t padding[16];       ///< Zero padding to 64 bytes
 };
 #pragma pack(pop)
 
@@ -50,12 +50,10 @@ enum class Channels : uint8_t {
 };
 
 /// @brief Calculates the expected byte size of the weight payload.
-[[nodiscard]] constexpr uint64_t calculate_expected_weights_size(
-    const uint16_t layers_count,
-    const uint16_t hidden_dim,
-    const uint8_t channels,
-    const uint8_t precision
-) noexcept {
+[[nodiscard]] constexpr uint64_t calculate_expected_weights_size(const uint16_t layers_count,
+                                                                 const uint16_t hidden_dim,
+                                                                 const uint8_t channels,
+                                                                 const uint8_t precision) noexcept {
     const uint64_t hidden = hidden_dim;
     const uint64_t ch = channels;
     const uint64_t layers = layers_count;
@@ -94,9 +92,8 @@ enum class Channels : uint8_t {
         return false;
     }
     const uint64_t expected = calculate_expected_weights_size(
-        header.layers_count, header.hidden_dim, header.channels, header.precision
-    );
+        header.layers_count, header.hidden_dim, header.channels, header.precision);
     return header.weights_size == expected;
 }
 
-} // namespace vntx
+}  // namespace vntx

@@ -1,9 +1,10 @@
 #include <gtest/gtest.h>
-#include "vntx/filter.hpp"
 
 #include <chrono>
 #include <thread>
 #include <vector>
+
+#include "vntx/filter.hpp"
 
 using namespace vntx;
 
@@ -28,7 +29,7 @@ TEST(GuardrailBenchmarkTest, ImmediateExecutionWithinBudget) {
 
 TEST(GuardrailBenchmarkTest, GracefulPassThroughTriggerOnBudgetExceeded) {
     const TranscodingLatencyGuard guard;
-    
+
     // Simulate a heavy or stalled neural decompression workload exceeding 2.5ms
     std::this_thread::sleep_for(std::chrono::milliseconds(3));
 
@@ -57,7 +58,6 @@ TEST(GuardrailBenchmarkTest, MultithreadedNonBlockingLatencyEvaluation) {
             }
         });
     }
-
 
     for (auto& worker : workers) {
         worker.join();

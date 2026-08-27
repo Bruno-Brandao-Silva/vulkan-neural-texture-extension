@@ -1,9 +1,10 @@
 #include "vntx/layer.hpp"
-#include "vntx/logging.hpp"
 
 #include <cstring>
 #include <mutex>
 #include <string_view>
+
+#include "vntx/logging.hpp"
 
 namespace vntx {
 
@@ -21,7 +22,8 @@ void LayerContext::disable() noexcept {
     VNTX_LOG_WARN("VNTX implicit layer disabled (Pass-Through active)");
 }
 
-void LayerContext::register_instance(const VkInstance instance, std::unique_ptr<InstanceData> data) {
+void LayerContext::register_instance(const VkInstance instance,
+                                     std::unique_ptr<InstanceData> data) {
     try {
         if (!instance) return;
         std::unique_lock<std::shared_mutex> lock(instance_map_mutex_);
@@ -83,7 +85,8 @@ DeviceData* LayerContext::get_device_data(const VkDevice device) const {
     }
 }
 
-DeviceData* LayerContext::get_device_data_from_command_buffer(const VkCommandBuffer commandBuffer) const {
+DeviceData* LayerContext::get_device_data_from_command_buffer(
+    const VkCommandBuffer commandBuffer) const {
     try {
         if (!commandBuffer) return nullptr;
         std::shared_lock<std::shared_mutex> lock(device_map_mutex_);
@@ -94,14 +97,12 @@ DeviceData* LayerContext::get_device_data_from_command_buffer(const VkCommandBuf
     }
 }
 
-} // namespace vntx
-
+}  // namespace vntx
 
 extern "C" {
 
-VKAPI_ATTR VkResult VKAPI_CALL vntx_NegotiateLoaderLayerInterfaceVersion(
-    VkNegotiateLayerInterface* const pVersionStruct
-) {
+VKAPI_ATTR VkResult VKAPI_CALL
+vntx_NegotiateLoaderLayerInterfaceVersion(VkNegotiateLayerInterface* const pVersionStruct) {
     if (!pVersionStruct || pVersionStruct->sType != LAYER_NEGOTIATE_INTERFACE_STRUCT) {
         return VK_ERROR_INITIALIZATION_FAILED;
     }
@@ -120,27 +121,26 @@ VKAPI_ATTR VkResult VKAPI_CALL vntx_NegotiateLoaderLayerInterfaceVersion(
 }
 
 VKAPI_ATTR VkResult VKAPI_CALL vntx_EnumerateInstanceLayerProperties(
-    uint32_t* const pPropertyCount,
-    VkLayerProperties* const pProperties
-) {
+    uint32_t* const pPropertyCount, VkLayerProperties* const pProperties) {
     if (pPropertyCount) {
         *pPropertyCount = 1;
     }
     if (pProperties) {
         std::memset(pProperties, 0, sizeof(VkLayerProperties));
-        std::strncpy(pProperties->layerName, "VK_LAYER_VNTX_neural_texture", VK_MAX_EXTENSION_NAME_SIZE - 1);
+        std::strncpy(pProperties->layerName, "VK_LAYER_VNTX_neural_texture",
+                     VK_MAX_EXTENSION_NAME_SIZE - 1);
         pProperties->specVersion = VK_MAKE_VERSION(1, 3, 260);
         pProperties->implementationVersion = 1;
-        std::strncpy(pProperties->description, "VNTX - Vulkan Neural Texture Extension Implicit Layer", VK_MAX_DESCRIPTION_SIZE - 1);
+        std::strncpy(pProperties->description,
+                     "VNTX - Vulkan Neural Texture Extension Implicit Layer",
+                     VK_MAX_DESCRIPTION_SIZE - 1);
     }
     return VK_SUCCESS;
 }
 
 VKAPI_ATTR VkResult VKAPI_CALL vntx_EnumerateInstanceExtensionProperties(
-    const char* const pLayerName,
-    uint32_t* const pPropertyCount,
-    VkExtensionProperties* const pProperties
-) {
+    const char* const pLayerName, uint32_t* const pPropertyCount,
+    VkExtensionProperties* const pProperties) {
     (void)pProperties;
     if (pLayerName && std::string_view(pLayerName) == "VK_LAYER_VNTX_neural_texture") {
         if (pPropertyCount) {
@@ -151,24 +151,20 @@ VKAPI_ATTR VkResult VKAPI_CALL vntx_EnumerateInstanceExtensionProperties(
     return VK_ERROR_LAYER_NOT_PRESENT;
 }
 
-VKAPI_ATTR VkResult VKAPI_CALL vntx_CreateInstance(
-    const VkInstanceCreateInfo* const pCreateInfo,
-    const VkAllocationCallbacks* const pAllocator,
-    VkInstance* const pInstance
-) {
+VKAPI_ATTR VkResult VKAPI_CALL vntx_CreateInstance(const VkInstanceCreateInfo* const pCreateInfo,
+                                                   const VkAllocationCallbacks* const pAllocator,
+                                                   VkInstance* const pInstance) {
     if (!pCreateInfo || !pInstance) {
         return VK_ERROR_INITIALIZATION_FAILED;
     }
 
     try {
         auto* chain_info = const_cast<VkLayerInstanceCreateInfo*>(
-            static_cast<const VkLayerInstanceCreateInfo*>(pCreateInfo->pNext)
-        );
+            static_cast<const VkLayerInstanceCreateInfo*>(pCreateInfo->pNext));
         while (chain_info && (chain_info->sType != VK_STRUCTURE_TYPE_LOADER_INSTANCE_CREATE_INFO ||
                               chain_info->function != VK_LAYER_LINK_INFO)) {
             chain_info = const_cast<VkLayerInstanceCreateInfo*>(
-                static_cast<const VkLayerInstanceCreateInfo*>(chain_info->pNext)
-            );
+                static_cast<const VkLayerInstanceCreateInfo*>(chain_info->pNext));
         }
 
         if (!chain_info || !chain_info->u.pLayerInfo) {
@@ -181,8 +177,7 @@ VKAPI_ATTR VkResult VKAPI_CALL vntx_CreateInstance(
         }
 
         auto pfn_create_instance = reinterpret_cast<PFN_vkCreateInstance>(
-            next_get_instance_proc_addr(VK_NULL_HANDLE, "vkCreateInstance")
-        );
+            next_get_instance_proc_addr(VK_NULL_HANDLE, "vkCreateInstance"));
         if (!pfn_create_instance) {
             return VK_ERROR_INITIALIZATION_FAILED;
         }
@@ -199,11 +194,9 @@ VKAPI_ATTR VkResult VKAPI_CALL vntx_CreateInstance(
             instance_data->instance = *pInstance;
             instance_data->next_get_instance_proc_addr = next_get_instance_proc_addr;
             instance_data->next_create_device = reinterpret_cast<PFN_vkCreateDevice>(
-                next_get_instance_proc_addr(*pInstance, "vkCreateDevice")
-            );
+                next_get_instance_proc_addr(*pInstance, "vkCreateDevice"));
             instance_data->next_destroy_instance = reinterpret_cast<PFN_vkDestroyInstance>(
-                next_get_instance_proc_addr(*pInstance, "vkDestroyInstance")
-            );
+                next_get_instance_proc_addr(*pInstance, "vkDestroyInstance"));
 
             vntx::LayerContext::get().register_instance(*pInstance, std::move(instance_data));
             VNTX_LOG_INFO("VNTX layer attached to VkInstance: {}", static_cast<void*>(*pInstance));
@@ -217,10 +210,8 @@ VKAPI_ATTR VkResult VKAPI_CALL vntx_CreateInstance(
     }
 }
 
-VKAPI_ATTR void VKAPI_CALL vntx_DestroyInstance(
-    const VkInstance instance,
-    const VkAllocationCallbacks* const pAllocator
-) {
+VKAPI_ATTR void VKAPI_CALL vntx_DestroyInstance(const VkInstance instance,
+                                                const VkAllocationCallbacks* const pAllocator) {
     if (!instance) {
         return;
     }
@@ -242,25 +233,21 @@ VKAPI_ATTR void VKAPI_CALL vntx_DestroyInstance(
     }
 }
 
-VKAPI_ATTR VkResult VKAPI_CALL vntx_CreateDevice(
-    const VkPhysicalDevice physicalDevice,
-    const VkDeviceCreateInfo* const pCreateInfo,
-    const VkAllocationCallbacks* const pAllocator,
-    VkDevice* const pDevice
-) {
+VKAPI_ATTR VkResult VKAPI_CALL vntx_CreateDevice(const VkPhysicalDevice physicalDevice,
+                                                 const VkDeviceCreateInfo* const pCreateInfo,
+                                                 const VkAllocationCallbacks* const pAllocator,
+                                                 VkDevice* const pDevice) {
     if (!physicalDevice || !pCreateInfo || !pDevice) {
         return VK_ERROR_INITIALIZATION_FAILED;
     }
 
     try {
         auto* chain_info = const_cast<VkLayerDeviceCreateInfo*>(
-            static_cast<const VkLayerDeviceCreateInfo*>(pCreateInfo->pNext)
-        );
+            static_cast<const VkLayerDeviceCreateInfo*>(pCreateInfo->pNext));
         while (chain_info && (chain_info->sType != VK_STRUCTURE_TYPE_LOADER_DEVICE_CREATE_INFO ||
                               chain_info->function != VK_LAYER_LINK_INFO)) {
             chain_info = const_cast<VkLayerDeviceCreateInfo*>(
-                static_cast<const VkLayerDeviceCreateInfo*>(chain_info->pNext)
-            );
+                static_cast<const VkLayerDeviceCreateInfo*>(chain_info->pNext));
         }
 
         if (!chain_info || !chain_info->u.pLayerInfo) {
@@ -275,8 +262,7 @@ VKAPI_ATTR VkResult VKAPI_CALL vntx_CreateDevice(
         }
 
         auto pfn_create_device = reinterpret_cast<PFN_vkCreateDevice>(
-            next_get_instance_proc_addr(VK_NULL_HANDLE, "vkCreateDevice")
-        );
+            next_get_instance_proc_addr(VK_NULL_HANDLE, "vkCreateDevice"));
         if (!pfn_create_device) {
             return VK_ERROR_INITIALIZATION_FAILED;
         }
@@ -294,38 +280,31 @@ VKAPI_ATTR VkResult VKAPI_CALL vntx_CreateDevice(
             device_data->physical_device = physicalDevice;
             device_data->next_get_device_proc_addr = next_get_device_proc_addr;
             device_data->next_destroy_device = reinterpret_cast<PFN_vkDestroyDevice>(
-                next_get_device_proc_addr(*pDevice, "vkDestroyDevice")
-            );
+                next_get_device_proc_addr(*pDevice, "vkDestroyDevice"));
             device_data->next_create_image = reinterpret_cast<PFN_vkCreateImage>(
-                next_get_device_proc_addr(*pDevice, "vkCreateImage")
-            );
+                next_get_device_proc_addr(*pDevice, "vkCreateImage"));
             device_data->next_destroy_image = reinterpret_cast<PFN_vkDestroyImage>(
-                next_get_device_proc_addr(*pDevice, "vkDestroyImage")
-            );
-            device_data->next_get_image_memory_requirements = reinterpret_cast<PFN_vkGetImageMemoryRequirements>(
-                next_get_device_proc_addr(*pDevice, "vkGetImageMemoryRequirements")
-            );
-            device_data->next_get_image_memory_requirements2 = reinterpret_cast<PFN_vkGetImageMemoryRequirements2>(
-                next_get_device_proc_addr(*pDevice, "vkGetImageMemoryRequirements2")
-            );
+                next_get_device_proc_addr(*pDevice, "vkDestroyImage"));
+            device_data->next_get_image_memory_requirements =
+                reinterpret_cast<PFN_vkGetImageMemoryRequirements>(
+                    next_get_device_proc_addr(*pDevice, "vkGetImageMemoryRequirements"));
+            device_data->next_get_image_memory_requirements2 =
+                reinterpret_cast<PFN_vkGetImageMemoryRequirements2>(
+                    next_get_device_proc_addr(*pDevice, "vkGetImageMemoryRequirements2"));
             device_data->next_bind_image_memory = reinterpret_cast<PFN_vkBindImageMemory>(
-                next_get_device_proc_addr(*pDevice, "vkBindImageMemory")
-            );
+                next_get_device_proc_addr(*pDevice, "vkBindImageMemory"));
             device_data->next_bind_image_memory2 = reinterpret_cast<PFN_vkBindImageMemory2>(
-                next_get_device_proc_addr(*pDevice, "vkBindImageMemory2")
-            );
-            device_data->next_cmd_copy_buffer_to_image = reinterpret_cast<PFN_vkCmdCopyBufferToImage>(
-                next_get_device_proc_addr(*pDevice, "vkCmdCopyBufferToImage")
-            );
-            device_data->next_cmd_copy_buffer_to_image2 = reinterpret_cast<PFN_vkCmdCopyBufferToImage2>(
-                next_get_device_proc_addr(*pDevice, "vkCmdCopyBufferToImage2")
-            );
+                next_get_device_proc_addr(*pDevice, "vkBindImageMemory2"));
+            device_data->next_cmd_copy_buffer_to_image =
+                reinterpret_cast<PFN_vkCmdCopyBufferToImage>(
+                    next_get_device_proc_addr(*pDevice, "vkCmdCopyBufferToImage"));
+            device_data->next_cmd_copy_buffer_to_image2 =
+                reinterpret_cast<PFN_vkCmdCopyBufferToImage2>(
+                    next_get_device_proc_addr(*pDevice, "vkCmdCopyBufferToImage2"));
             device_data->next_create_shader_module = reinterpret_cast<PFN_vkCreateShaderModule>(
-                next_get_device_proc_addr(*pDevice, "vkCreateShaderModule")
-            );
+                next_get_device_proc_addr(*pDevice, "vkCreateShaderModule"));
             device_data->next_destroy_shader_module = reinterpret_cast<PFN_vkDestroyShaderModule>(
-                next_get_device_proc_addr(*pDevice, "vkDestroyShaderModule")
-            );
+                next_get_device_proc_addr(*pDevice, "vkDestroyShaderModule"));
 
             vntx::LayerContext::get().register_device(*pDevice, std::move(device_data));
             VNTX_LOG_INFO("VNTX layer attached to VkDevice: {}", static_cast<void*>(*pDevice));
@@ -339,10 +318,8 @@ VKAPI_ATTR VkResult VKAPI_CALL vntx_CreateDevice(
     }
 }
 
-VKAPI_ATTR void VKAPI_CALL vntx_DestroyDevice(
-    const VkDevice device,
-    const VkAllocationCallbacks* const pAllocator
-) {
+VKAPI_ATTR void VKAPI_CALL vntx_DestroyDevice(const VkDevice device,
+                                              const VkAllocationCallbacks* const pAllocator) {
     if (!device) {
         return;
     }
@@ -364,10 +341,8 @@ VKAPI_ATTR void VKAPI_CALL vntx_DestroyDevice(
     }
 }
 
-VKAPI_ATTR PFN_vkVoidFunction VKAPI_CALL vntx_GetInstanceProcAddr(
-    const VkInstance instance,
-    const char* const pName
-) {
+VKAPI_ATTR PFN_vkVoidFunction VKAPI_CALL vntx_GetInstanceProcAddr(const VkInstance instance,
+                                                                  const char* const pName) {
     if (!pName) {
         return nullptr;
     }
@@ -375,25 +350,43 @@ VKAPI_ATTR PFN_vkVoidFunction VKAPI_CALL vntx_GetInstanceProcAddr(
     try {
         const std::string_view name(pName);
 
-        if (name == "vkGetInstanceProcAddr") return reinterpret_cast<PFN_vkVoidFunction>(vntx_GetInstanceProcAddr);
-        if (name == "vkGetDeviceProcAddr") return reinterpret_cast<PFN_vkVoidFunction>(vntx_GetDeviceProcAddr);
-        if (name == "vkNegotiateLoaderLayerInterfaceVersion") return reinterpret_cast<PFN_vkVoidFunction>(vntx_NegotiateLoaderLayerInterfaceVersion);
-        if (name == "vkEnumerateInstanceLayerProperties") return reinterpret_cast<PFN_vkVoidFunction>(vntx_EnumerateInstanceLayerProperties);
-        if (name == "vkEnumerateInstanceExtensionProperties") return reinterpret_cast<PFN_vkVoidFunction>(vntx_EnumerateInstanceExtensionProperties);
-        if (name == "vkCreateInstance") return reinterpret_cast<PFN_vkVoidFunction>(vntx_CreateInstance);
-        if (name == "vkDestroyInstance") return reinterpret_cast<PFN_vkVoidFunction>(vntx_DestroyInstance);
-        if (name == "vkCreateDevice") return reinterpret_cast<PFN_vkVoidFunction>(vntx_CreateDevice);
-        if (name == "vkDestroyDevice") return reinterpret_cast<PFN_vkVoidFunction>(vntx_DestroyDevice);
+        if (name == "vkGetInstanceProcAddr")
+            return reinterpret_cast<PFN_vkVoidFunction>(vntx_GetInstanceProcAddr);
+        if (name == "vkGetDeviceProcAddr")
+            return reinterpret_cast<PFN_vkVoidFunction>(vntx_GetDeviceProcAddr);
+        if (name == "vkNegotiateLoaderLayerInterfaceVersion")
+            return reinterpret_cast<PFN_vkVoidFunction>(vntx_NegotiateLoaderLayerInterfaceVersion);
+        if (name == "vkEnumerateInstanceLayerProperties")
+            return reinterpret_cast<PFN_vkVoidFunction>(vntx_EnumerateInstanceLayerProperties);
+        if (name == "vkEnumerateInstanceExtensionProperties")
+            return reinterpret_cast<PFN_vkVoidFunction>(vntx_EnumerateInstanceExtensionProperties);
+        if (name == "vkCreateInstance")
+            return reinterpret_cast<PFN_vkVoidFunction>(vntx_CreateInstance);
+        if (name == "vkDestroyInstance")
+            return reinterpret_cast<PFN_vkVoidFunction>(vntx_DestroyInstance);
+        if (name == "vkCreateDevice")
+            return reinterpret_cast<PFN_vkVoidFunction>(vntx_CreateDevice);
+        if (name == "vkDestroyDevice")
+            return reinterpret_cast<PFN_vkVoidFunction>(vntx_DestroyDevice);
         if (name == "vkCreateImage") return reinterpret_cast<PFN_vkVoidFunction>(vntx_CreateImage);
-        if (name == "vkDestroyImage") return reinterpret_cast<PFN_vkVoidFunction>(vntx_DestroyImage);
-        if (name == "vkGetImageMemoryRequirements") return reinterpret_cast<PFN_vkVoidFunction>(vntx_GetImageMemoryRequirements);
-        if (name == "vkGetImageMemoryRequirements2") return reinterpret_cast<PFN_vkVoidFunction>(vntx_GetImageMemoryRequirements2);
-        if (name == "vkBindImageMemory") return reinterpret_cast<PFN_vkVoidFunction>(vntx_BindImageMemory);
-        if (name == "vkBindImageMemory2") return reinterpret_cast<PFN_vkVoidFunction>(vntx_BindImageMemory2);
-        if (name == "vkCmdCopyBufferToImage") return reinterpret_cast<PFN_vkVoidFunction>(vntx_CmdCopyBufferToImage);
-        if (name == "vkCmdCopyBufferToImage2") return reinterpret_cast<PFN_vkVoidFunction>(vntx_CmdCopyBufferToImage2);
-        if (name == "vkCreateShaderModule") return reinterpret_cast<PFN_vkVoidFunction>(vntx_CreateShaderModule);
-        if (name == "vkDestroyShaderModule") return reinterpret_cast<PFN_vkVoidFunction>(vntx_DestroyShaderModule);
+        if (name == "vkDestroyImage")
+            return reinterpret_cast<PFN_vkVoidFunction>(vntx_DestroyImage);
+        if (name == "vkGetImageMemoryRequirements")
+            return reinterpret_cast<PFN_vkVoidFunction>(vntx_GetImageMemoryRequirements);
+        if (name == "vkGetImageMemoryRequirements2")
+            return reinterpret_cast<PFN_vkVoidFunction>(vntx_GetImageMemoryRequirements2);
+        if (name == "vkBindImageMemory")
+            return reinterpret_cast<PFN_vkVoidFunction>(vntx_BindImageMemory);
+        if (name == "vkBindImageMemory2")
+            return reinterpret_cast<PFN_vkVoidFunction>(vntx_BindImageMemory2);
+        if (name == "vkCmdCopyBufferToImage")
+            return reinterpret_cast<PFN_vkVoidFunction>(vntx_CmdCopyBufferToImage);
+        if (name == "vkCmdCopyBufferToImage2")
+            return reinterpret_cast<PFN_vkVoidFunction>(vntx_CmdCopyBufferToImage2);
+        if (name == "vkCreateShaderModule")
+            return reinterpret_cast<PFN_vkVoidFunction>(vntx_CreateShaderModule);
+        if (name == "vkDestroyShaderModule")
+            return reinterpret_cast<PFN_vkVoidFunction>(vntx_DestroyShaderModule);
 
         if (instance != VK_NULL_HANDLE) {
             const auto* const instance_data = vntx::LayerContext::get().get_instance_data(instance);
@@ -408,10 +401,8 @@ VKAPI_ATTR PFN_vkVoidFunction VKAPI_CALL vntx_GetInstanceProcAddr(
     return nullptr;
 }
 
-VKAPI_ATTR PFN_vkVoidFunction VKAPI_CALL vntx_GetDeviceProcAddr(
-    const VkDevice device,
-    const char* const pName
-) {
+VKAPI_ATTR PFN_vkVoidFunction VKAPI_CALL vntx_GetDeviceProcAddr(const VkDevice device,
+                                                                const char* const pName) {
     if (!pName) {
         return nullptr;
     }
@@ -419,24 +410,36 @@ VKAPI_ATTR PFN_vkVoidFunction VKAPI_CALL vntx_GetDeviceProcAddr(
     try {
         const std::string_view name(pName);
 
-        if (name == "vkGetDeviceProcAddr") return reinterpret_cast<PFN_vkVoidFunction>(vntx_GetDeviceProcAddr);
-        if (name == "vkDestroyDevice") return reinterpret_cast<PFN_vkVoidFunction>(vntx_DestroyDevice);
+        if (name == "vkGetDeviceProcAddr")
+            return reinterpret_cast<PFN_vkVoidFunction>(vntx_GetDeviceProcAddr);
+        if (name == "vkDestroyDevice")
+            return reinterpret_cast<PFN_vkVoidFunction>(vntx_DestroyDevice);
         if (name == "vkCreateImage") return reinterpret_cast<PFN_vkVoidFunction>(vntx_CreateImage);
-        if (name == "vkDestroyImage") return reinterpret_cast<PFN_vkVoidFunction>(vntx_DestroyImage);
-        if (name == "vkGetImageMemoryRequirements") return reinterpret_cast<PFN_vkVoidFunction>(vntx_GetImageMemoryRequirements);
-        if (name == "vkGetImageMemoryRequirements2") return reinterpret_cast<PFN_vkVoidFunction>(vntx_GetImageMemoryRequirements2);
-        if (name == "vkBindImageMemory") return reinterpret_cast<PFN_vkVoidFunction>(vntx_BindImageMemory);
-        if (name == "vkBindImageMemory2") return reinterpret_cast<PFN_vkVoidFunction>(vntx_BindImageMemory2);
-        if (name == "vkCmdCopyBufferToImage") return reinterpret_cast<PFN_vkVoidFunction>(vntx_CmdCopyBufferToImage);
-        if (name == "vkCmdCopyBufferToImage2") return reinterpret_cast<PFN_vkVoidFunction>(vntx_CmdCopyBufferToImage2);
-        if (name == "vkCreateShaderModule") return reinterpret_cast<PFN_vkVoidFunction>(vntx_CreateShaderModule);
-        if (name == "vkDestroyShaderModule") return reinterpret_cast<PFN_vkVoidFunction>(vntx_DestroyShaderModule);
+        if (name == "vkDestroyImage")
+            return reinterpret_cast<PFN_vkVoidFunction>(vntx_DestroyImage);
+        if (name == "vkGetImageMemoryRequirements")
+            return reinterpret_cast<PFN_vkVoidFunction>(vntx_GetImageMemoryRequirements);
+        if (name == "vkGetImageMemoryRequirements2")
+            return reinterpret_cast<PFN_vkVoidFunction>(vntx_GetImageMemoryRequirements2);
+        if (name == "vkBindImageMemory")
+            return reinterpret_cast<PFN_vkVoidFunction>(vntx_BindImageMemory);
+        if (name == "vkBindImageMemory2")
+            return reinterpret_cast<PFN_vkVoidFunction>(vntx_BindImageMemory2);
+        if (name == "vkCmdCopyBufferToImage")
+            return reinterpret_cast<PFN_vkVoidFunction>(vntx_CmdCopyBufferToImage);
+        if (name == "vkCmdCopyBufferToImage2")
+            return reinterpret_cast<PFN_vkVoidFunction>(vntx_CmdCopyBufferToImage2);
+        if (name == "vkCreateShaderModule")
+            return reinterpret_cast<PFN_vkVoidFunction>(vntx_CreateShaderModule);
+        if (name == "vkDestroyShaderModule")
+            return reinterpret_cast<PFN_vkVoidFunction>(vntx_DestroyShaderModule);
 
         if (device != VK_NULL_HANDLE) {
             const auto* const device_data = vntx::LayerContext::get().get_device_data(device);
             if (device_data && device_data->next_get_device_proc_addr) {
-                // Pass through Swapchain, Present (vkQueuePresentKHR, vkCreateSwapchainKHR), and unintercepted calls
-                // directly to downstream dispatch chain for overlay compatibility (MangoHud, Steam Overlay, OBS).
+                // Pass through Swapchain, Present (vkQueuePresentKHR, vkCreateSwapchainKHR), and
+                // unintercepted calls directly to downstream dispatch chain for overlay
+                // compatibility (MangoHud, Steam Overlay, OBS).
                 return device_data->next_get_device_proc_addr(device, pName);
             }
         }
@@ -447,4 +450,4 @@ VKAPI_ATTR PFN_vkVoidFunction VKAPI_CALL vntx_GetDeviceProcAddr(
     return nullptr;
 }
 
-} // extern "C"
+}  // extern "C"

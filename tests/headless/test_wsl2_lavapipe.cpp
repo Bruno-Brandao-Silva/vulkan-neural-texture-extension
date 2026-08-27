@@ -1,27 +1,30 @@
 #include <gtest/gtest.h>
-#include "vntx/layer.hpp"
-#include "vntx/filter.hpp"
 
 #include <cstring>
 #include <vector>
+
+#include "vntx/filter.hpp"
+#include "vntx/layer.hpp"
 
 #ifdef VNTX_HAS_VULKAN_LOADER
 
 namespace {
 
-uint32_t find_memory_type(VkPhysicalDevice physical_device, uint32_t type_filter, VkMemoryPropertyFlags properties) {
+uint32_t find_memory_type(VkPhysicalDevice physical_device, uint32_t type_filter,
+                          VkMemoryPropertyFlags properties) {
     VkPhysicalDeviceMemoryProperties mem_properties{};
     vkGetPhysicalDeviceMemoryProperties(physical_device, &mem_properties);
 
     for (uint32_t i = 0; i < mem_properties.memoryTypeCount; ++i) {
-        if ((type_filter & (1u << i)) && (mem_properties.memoryTypes[i].propertyFlags & properties) == properties) {
+        if ((type_filter & (1u << i)) &&
+            (mem_properties.memoryTypes[i].propertyFlags & properties) == properties) {
             return i;
         }
     }
     return 0;
 }
 
-} // anonymous namespace
+}  // anonymous namespace
 
 TEST(WSL2LavaPipeHarnessTest, StagingBufferToImageCopyLifecycle) {
     // 1. Create Vulkan Instance
@@ -40,7 +43,8 @@ TEST(WSL2LavaPipeHarnessTest, StagingBufferToImageCopyLifecycle) {
     VkInstance instance = VK_NULL_HANDLE;
     const VkResult inst_res = vkCreateInstance(&instance_create_info, nullptr, &instance);
     if (inst_res != VK_SUCCESS) {
-        GTEST_SKIP() << "Vulkan instance creation unavailable on this environment (result=" << inst_res << ")";
+        GTEST_SKIP() << "Vulkan instance creation unavailable on this environment (result="
+                     << inst_res << ")";
     }
     ASSERT_EQ(inst_res, VK_SUCCESS);
     ASSERT_NE(instance, VK_NULL_HANDLE);
@@ -83,7 +87,8 @@ TEST(WSL2LavaPipeHarnessTest, StagingBufferToImageCopyLifecycle) {
     constexpr uint32_t TEX_WIDTH = 1024;
     constexpr uint32_t TEX_HEIGHT = 1024;
     constexpr VkDeviceSize BC7_BLOCK_SIZE = 16;
-    constexpr VkDeviceSize BUFFER_SIZE = (TEX_WIDTH / 4) * (TEX_HEIGHT / 4) * BC7_BLOCK_SIZE; // 1 MB for 1024x1024 BC7
+    constexpr VkDeviceSize BUFFER_SIZE =
+        (TEX_WIDTH / 4) * (TEX_HEIGHT / 4) * BC7_BLOCK_SIZE;  // 1 MB for 1024x1024 BC7
 
     VkImageCreateInfo img_info{};
     img_info.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
@@ -110,9 +115,8 @@ TEST(WSL2LavaPipeHarnessTest, StagingBufferToImageCopyLifecycle) {
     VkMemoryAllocateInfo img_alloc_info{};
     img_alloc_info.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
     img_alloc_info.allocationSize = img_mem_reqs.size;
-    img_alloc_info.memoryTypeIndex = find_memory_type(
-        physical_device, img_mem_reqs.memoryTypeBits, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT
-    );
+    img_alloc_info.memoryTypeIndex = find_memory_type(physical_device, img_mem_reqs.memoryTypeBits,
+                                                      VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
 
     VkDeviceMemory dst_image_memory = VK_NULL_HANDLE;
     ASSERT_EQ(vkAllocateMemory(device, &img_alloc_info, nullptr, &dst_image_memory), VK_SUCCESS);
@@ -137,8 +141,7 @@ TEST(WSL2LavaPipeHarnessTest, StagingBufferToImageCopyLifecycle) {
     buf_alloc_info.allocationSize = buf_mem_reqs.size;
     buf_alloc_info.memoryTypeIndex = find_memory_type(
         physical_device, buf_mem_reqs.memoryTypeBits,
-        VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT
-    );
+        VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
 
     VkDeviceMemory staging_memory = VK_NULL_HANDLE;
     ASSERT_EQ(vkAllocateMemory(device, &buf_alloc_info, nullptr, &staging_memory), VK_SUCCESS);
@@ -187,14 +190,8 @@ TEST(WSL2LavaPipeHarnessTest, StagingBufferToImageCopyLifecycle) {
     copy_region.imageExtent = {TEX_WIDTH, TEX_HEIGHT, 1};
 
     // Staging Buffer to Image copy
-    vkCmdCopyBufferToImage(
-        cmd_buffer,
-        staging_buffer,
-        dst_image,
-        VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
-        1,
-        &copy_region
-    );
+    vkCmdCopyBufferToImage(cmd_buffer, staging_buffer, dst_image,
+                           VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &copy_region);
 
     ASSERT_EQ(vkEndCommandBuffer(cmd_buffer), VK_SUCCESS);
 
@@ -242,4 +239,4 @@ TEST(WSL2LavaPipeHarnessTest, MultipleBlockCompressedFormatsLifecycle) {
     }
 }
 
-#endif // VNTX_HAS_VULKAN_LOADER
+#endif  // VNTX_HAS_VULKAN_LOADER

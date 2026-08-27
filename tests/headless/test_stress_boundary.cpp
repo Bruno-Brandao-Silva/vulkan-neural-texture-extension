@@ -1,11 +1,12 @@
 #include <gtest/gtest.h>
-#include "vntx/layer.hpp"
-#include "vntx/filter.hpp"
-#include "vntx/format.hpp"
 
 #include <atomic>
 #include <thread>
 #include <vector>
+
+#include "vntx/filter.hpp"
+#include "vntx/format.hpp"
+#include "vntx/layer.hpp"
 
 using namespace vntx;
 
@@ -22,15 +23,19 @@ TEST(StressBoundaryTest, NullPointerEntrypointsReturnGracefully) {
     EXPECT_EQ(vntx_NegotiateLoaderLayerInterfaceVersion(nullptr), VK_ERROR_INITIALIZATION_FAILED);
 
     VkNegotiateLayerInterface bad_struct{};
-    bad_struct.sType = static_cast<VkNegotiateLayerStructType>(999); // Invalid struct type
-    EXPECT_EQ(vntx_NegotiateLoaderLayerInterfaceVersion(&bad_struct), VK_ERROR_INITIALIZATION_FAILED);
+    bad_struct.sType = static_cast<VkNegotiateLayerStructType>(999);  // Invalid struct type
+    EXPECT_EQ(vntx_NegotiateLoaderLayerInterfaceVersion(&bad_struct),
+              VK_ERROR_INITIALIZATION_FAILED);
 
     // 4. Enumerate layer/extension properties null safety
     EXPECT_EQ(vntx_EnumerateInstanceLayerProperties(nullptr, nullptr), VK_SUCCESS);
-    EXPECT_EQ(vntx_EnumerateInstanceExtensionProperties("invalid_layer", nullptr, nullptr), VK_ERROR_LAYER_NOT_PRESENT);
+    EXPECT_EQ(vntx_EnumerateInstanceExtensionProperties("invalid_layer", nullptr, nullptr),
+              VK_ERROR_LAYER_NOT_PRESENT);
 
     uint32_t ext_count = 0;
-    EXPECT_EQ(vntx_EnumerateInstanceExtensionProperties("VK_LAYER_VNTX_neural_texture", &ext_count, nullptr), VK_SUCCESS);
+    EXPECT_EQ(vntx_EnumerateInstanceExtensionProperties("VK_LAYER_VNTX_neural_texture", &ext_count,
+                                                        nullptr),
+              VK_SUCCESS);
     EXPECT_EQ(ext_count, 0u);
 }
 
@@ -44,17 +49,18 @@ TEST(StressBoundaryTest, CoreVulkanHooksNullPointerResilience) {
     EXPECT_NO_THROW(vntx_GetImageMemoryRequirements2(nullptr, nullptr, nullptr));
 
     // 3. Bind memory null pointers
-    EXPECT_EQ(vntx_BindImageMemory(nullptr, VK_NULL_HANDLE, VK_NULL_HANDLE, 0), VK_ERROR_INITIALIZATION_FAILED);
+    EXPECT_EQ(vntx_BindImageMemory(nullptr, VK_NULL_HANDLE, VK_NULL_HANDLE, 0),
+              VK_ERROR_INITIALIZATION_FAILED);
     EXPECT_EQ(vntx_BindImageMemory2(nullptr, 0, nullptr), VK_ERROR_INITIALIZATION_FAILED);
 
     // 4. Staging Buffer Copy null pointers
-    EXPECT_NO_THROW(vntx_CmdCopyBufferToImage(
-        nullptr, VK_NULL_HANDLE, VK_NULL_HANDLE, VK_IMAGE_LAYOUT_UNDEFINED, 0, nullptr
-    ));
+    EXPECT_NO_THROW(vntx_CmdCopyBufferToImage(nullptr, VK_NULL_HANDLE, VK_NULL_HANDLE,
+                                              VK_IMAGE_LAYOUT_UNDEFINED, 0, nullptr));
     EXPECT_NO_THROW(vntx_CmdCopyBufferToImage2(nullptr, nullptr));
 
     // 5. Shader module null pointers
-    EXPECT_EQ(vntx_CreateShaderModule(nullptr, nullptr, nullptr, nullptr), VK_ERROR_INITIALIZATION_FAILED);
+    EXPECT_EQ(vntx_CreateShaderModule(nullptr, nullptr, nullptr, nullptr),
+              VK_ERROR_INITIALIZATION_FAILED);
     EXPECT_NO_THROW(vntx_DestroyShaderModule(nullptr, VK_NULL_HANDLE, nullptr));
 }
 
@@ -135,7 +141,6 @@ TEST(StressBoundaryTest, MultithreadedConcurrencyStress) {
                 const double elapsed = guard.elapsed_ms();
                 EXPECT_GE(elapsed, 0.0);
                 EXPECT_EQ(is_within_latency_budget(elapsed), elapsed <= MAX_TRANSCODING_LATENCY_MS);
-
 
                 // Concurrent entrypoint resolution
                 const auto pfn = vntx_GetInstanceProcAddr(VK_NULL_HANDLE, "vkCreateImage");

@@ -1,4 +1,5 @@
 #include <gtest/gtest.h>
+
 #include "vntx/filter.hpp"
 
 using namespace vntx;
@@ -6,11 +7,9 @@ using namespace vntx;
 namespace {
 
 VkImageCreateInfo make_default_create_info(
-    const uint32_t width = 2048,
-    const uint32_t height = 2048,
+    const uint32_t width = 2048, const uint32_t height = 2048,
     const VkImageUsageFlags usage = VK_IMAGE_USAGE_SAMPLED_BIT,
-    const VkImageType image_type = VK_IMAGE_TYPE_2D
-) {
+    const VkImageType image_type = VK_IMAGE_TYPE_2D) {
     VkImageCreateInfo info{};
     info.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
     info.imageType = image_type;
@@ -28,7 +27,7 @@ VkImageCreateInfo make_default_create_info(
     return info;
 }
 
-} // namespace
+}  // namespace
 
 TEST(FilterTest, AcceptsValidSampled2DTextures) {
     // 1024x1024 minimum threshold
@@ -45,10 +44,10 @@ TEST(FilterTest, AcceptsValidSampled2DTextures) {
     EXPECT_TRUE(is_candidate_texture(info_4096));
 
     // SAMPLED with TRANSFER flags is still eligible
-    const auto info_sampled_transfer = make_default_create_info(
-        2048, 2048,
-        VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT
-    );
+    const auto info_sampled_transfer =
+        make_default_create_info(2048, 2048,
+                                 VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT |
+                                     VK_IMAGE_USAGE_TRANSFER_SRC_BIT);
     EXPECT_TRUE(is_candidate_texture(info_sampled_transfer));
 }
 
@@ -69,27 +68,21 @@ TEST(FilterTest, RejectsSub1024Dimensions) {
 
 TEST(FilterTest, RejectsMissingSampledFlag) {
     const auto info_no_sampled = make_default_create_info(
-        2048, 2048,
-        VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT
-    );
+        2048, 2048, VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT);
     EXPECT_FALSE(is_candidate_texture(info_no_sampled));
     EXPECT_EQ(get_filter_rejection_reason(info_no_sampled), "Missing VK_IMAGE_USAGE_SAMPLED_BIT");
 }
 
 TEST(FilterTest, RejectsColorAttachmentRenderTargets) {
     const auto info_color_target = make_default_create_info(
-        2048, 2048,
-        VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT
-    );
+        2048, 2048, VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT);
     EXPECT_FALSE(is_candidate_texture(info_color_target));
     EXPECT_FALSE(get_filter_rejection_reason(info_color_target).empty());
 }
 
 TEST(FilterTest, RejectsDepthStencilBuffers) {
     const auto info_depth = make_default_create_info(
-        2048, 2048,
-        VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT
-    );
+        2048, 2048, VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT);
     EXPECT_FALSE(is_candidate_texture(info_depth));
     EXPECT_FALSE(get_filter_rejection_reason(info_depth).empty());
 }
@@ -97,9 +90,8 @@ TEST(FilterTest, RejectsDepthStencilBuffers) {
 TEST(FilterTest, AcceptsVKD3DDirectX12HeapTextures) {
     auto info_vkd3d = make_default_create_info(
         2048, 2048,
-        VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_STORAGE_BIT |
-        VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT
-    );
+        VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT |
+            VK_IMAGE_USAGE_TRANSFER_DST_BIT);
     info_vkd3d.flags = VK_IMAGE_CREATE_MUTABLE_FORMAT_BIT | VK_IMAGE_CREATE_ALIAS_BIT;
     EXPECT_TRUE(is_candidate_texture(info_vkd3d));
     EXPECT_TRUE(get_filter_rejection_reason(info_vkd3d).empty());
@@ -107,21 +99,11 @@ TEST(FilterTest, AcceptsVKD3DDirectX12HeapTextures) {
 
 TEST(FilterTest, AcceptsBCBlockCompressionFormats) {
     const std::vector<VkFormat> bc_formats = {
-        VK_FORMAT_BC1_RGB_UNORM_BLOCK,
-        VK_FORMAT_BC1_RGB_SRGB_BLOCK,
-        VK_FORMAT_BC1_RGBA_UNORM_BLOCK,
-        VK_FORMAT_BC1_RGBA_SRGB_BLOCK,
-        VK_FORMAT_BC2_UNORM_BLOCK,
-        VK_FORMAT_BC2_SRGB_BLOCK,
-        VK_FORMAT_BC3_UNORM_BLOCK,
-        VK_FORMAT_BC3_SRGB_BLOCK,
-        VK_FORMAT_BC4_UNORM_BLOCK,
-        VK_FORMAT_BC4_SNORM_BLOCK,
-        VK_FORMAT_BC5_UNORM_BLOCK,
-        VK_FORMAT_BC5_SNORM_BLOCK,
-        VK_FORMAT_BC6H_UFLOAT_BLOCK,
-        VK_FORMAT_BC6H_SFLOAT_BLOCK,
-        VK_FORMAT_BC7_UNORM_BLOCK,
+        VK_FORMAT_BC1_RGB_UNORM_BLOCK, VK_FORMAT_BC1_RGB_SRGB_BLOCK, VK_FORMAT_BC1_RGBA_UNORM_BLOCK,
+        VK_FORMAT_BC1_RGBA_SRGB_BLOCK, VK_FORMAT_BC2_UNORM_BLOCK,    VK_FORMAT_BC2_SRGB_BLOCK,
+        VK_FORMAT_BC3_UNORM_BLOCK,     VK_FORMAT_BC3_SRGB_BLOCK,     VK_FORMAT_BC4_UNORM_BLOCK,
+        VK_FORMAT_BC4_SNORM_BLOCK,     VK_FORMAT_BC5_UNORM_BLOCK,    VK_FORMAT_BC5_SNORM_BLOCK,
+        VK_FORMAT_BC6H_UFLOAT_BLOCK,   VK_FORMAT_BC6H_SFLOAT_BLOCK,  VK_FORMAT_BC7_UNORM_BLOCK,
         VK_FORMAT_BC7_SRGB_BLOCK,
     };
 
@@ -150,38 +132,29 @@ TEST(FilterTest, AcceptsMipmappedDynamicStreamingTextures) {
 }
 
 TEST(FilterTest, RejectsNon2DImageTypes) {
-    const auto info_1d = make_default_create_info(
-        2048, 1,
-        VK_IMAGE_USAGE_SAMPLED_BIT,
-        VK_IMAGE_TYPE_1D
-    );
+    const auto info_1d =
+        make_default_create_info(2048, 1, VK_IMAGE_USAGE_SAMPLED_BIT, VK_IMAGE_TYPE_1D);
     EXPECT_FALSE(is_candidate_texture(info_1d));
     EXPECT_FALSE(get_filter_rejection_reason(info_1d).empty());
 
-    const auto info_3d = make_default_create_info(
-        2048, 2048,
-        VK_IMAGE_USAGE_SAMPLED_BIT,
-        VK_IMAGE_TYPE_3D
-    );
+    const auto info_3d =
+        make_default_create_info(2048, 2048, VK_IMAGE_USAGE_SAMPLED_BIT, VK_IMAGE_TYPE_3D);
     EXPECT_FALSE(is_candidate_texture(info_3d));
     EXPECT_FALSE(get_filter_rejection_reason(info_3d).empty());
 }
 
 TEST(FilterTest, RejectsUncompressedFormats) {
     const std::vector<VkFormat> uncompressed_formats = {
-        VK_FORMAT_R8G8B8A8_UNORM,
-        VK_FORMAT_R8G8B8A8_SRGB,
-        VK_FORMAT_B8G8R8A8_UNORM,
-        VK_FORMAT_R16G16B16A16_SFLOAT,
-        VK_FORMAT_R32G32B32A32_SFLOAT,
-        VK_FORMAT_R8_UNORM,
+        VK_FORMAT_R8G8B8A8_UNORM,      VK_FORMAT_R8G8B8A8_SRGB,       VK_FORMAT_B8G8R8A8_UNORM,
+        VK_FORMAT_R16G16B16A16_SFLOAT, VK_FORMAT_R32G32B32A32_SFLOAT, VK_FORMAT_R8_UNORM,
         VK_FORMAT_R8G8_UNORM,
     };
 
     for (const auto format : uncompressed_formats) {
         auto info = make_default_create_info(2048, 2048);
         info.format = format;
-        EXPECT_FALSE(is_candidate_texture(info)) << "Should reject format " << static_cast<int>(format);
+        EXPECT_FALSE(is_candidate_texture(info))
+            << "Should reject format " << static_cast<int>(format);
         EXPECT_FALSE(get_filter_rejection_reason(info).empty());
     }
 }
@@ -203,4 +176,3 @@ TEST(FilterTest, LatencyGuardrailBudgetCheck) {
     EXPECT_TRUE(guard.within_budget());
     EXPECT_GE(guard.elapsed_ms(), 0.0);
 }
-

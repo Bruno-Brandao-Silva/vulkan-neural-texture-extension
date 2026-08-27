@@ -1,4 +1,5 @@
 #include "vntx/filter.hpp"
+
 #include <format>
 
 namespace vntx {
@@ -6,11 +7,9 @@ namespace vntx {
 namespace {
 
 constexpr VkImageUsageFlags EXCLUDED_ATTACHMENT_FLAGS =
-    VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT |
-    VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT;
+    VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT;
 
-} // namespace
-
+}  // namespace
 
 bool is_candidate_texture(const VkImageCreateInfo& create_info) noexcept {
     if (create_info.imageType != VK_IMAGE_TYPE_2D) {
@@ -56,13 +55,9 @@ std::string get_filter_rejection_reason(const VkImageCreateInfo& create_info) {
 
     if (create_info.extent.width < MIN_CANDIDATE_DIMENSION ||
         create_info.extent.height < MIN_CANDIDATE_DIMENSION) {
-        return std::format(
-            "Dimensions {}x{} smaller than threshold {}x{}",
-            create_info.extent.width,
-            create_info.extent.height,
-            MIN_CANDIDATE_DIMENSION,
-            MIN_CANDIDATE_DIMENSION
-        );
+        return std::format("Dimensions {}x{} smaller than threshold {}x{}",
+                           create_info.extent.width, create_info.extent.height,
+                           MIN_CANDIDATE_DIMENSION, MIN_CANDIDATE_DIMENSION);
     }
 
     if (create_info.mipLevels < 1) {
@@ -76,4 +71,4 @@ std::string get_filter_rejection_reason(const VkImageCreateInfo& create_info) {
     return "";
 }
 
-} // namespace vntx
+}  // namespace vntx

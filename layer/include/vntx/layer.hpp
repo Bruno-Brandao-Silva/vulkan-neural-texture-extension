@@ -1,7 +1,7 @@
 #pragma once
 
-#include <vulkan/vulkan.h>
 #include <vulkan/vk_layer.h>
+#include <vulkan/vulkan.h>
 
 #include <atomic>
 #include <memory>
@@ -56,7 +56,8 @@ public:
     void register_device(VkDevice device, std::unique_ptr<DeviceData> data);
     void unregister_device(VkDevice device);
     [[nodiscard]] DeviceData* get_device_data(VkDevice device) const;
-    [[nodiscard]] DeviceData* get_device_data_from_command_buffer(VkCommandBuffer commandBuffer) const;
+    [[nodiscard]] DeviceData* get_device_data_from_command_buffer(
+        VkCommandBuffer commandBuffer) const;
 
 private:
     LayerContext() = default;
@@ -79,124 +80,78 @@ inline void* get_dispatch_key(const void* handle) noexcept {
     return const_cast<void*>(*reinterpret_cast<void* const*>(handle));
 }
 
-} // namespace vntx
+}  // namespace vntx
 
 // C-ABI layer entrypoints
 extern "C" {
 
-VKAPI_ATTR PFN_vkVoidFunction VKAPI_CALL vntx_GetInstanceProcAddr(
-    VkInstance instance,
-    const char* pName
-);
+VKAPI_ATTR PFN_vkVoidFunction VKAPI_CALL vntx_GetInstanceProcAddr(VkInstance instance,
+                                                                  const char* pName);
 
-VKAPI_ATTR PFN_vkVoidFunction VKAPI_CALL vntx_GetDeviceProcAddr(
-    VkDevice device,
-    const char* pName
-);
+VKAPI_ATTR PFN_vkVoidFunction VKAPI_CALL vntx_GetDeviceProcAddr(VkDevice device, const char* pName);
 
-VKAPI_ATTR VkResult VKAPI_CALL vntx_NegotiateLoaderLayerInterfaceVersion(
-    VkNegotiateLayerInterface* pVersionStruct
-);
+VKAPI_ATTR VkResult VKAPI_CALL
+vntx_NegotiateLoaderLayerInterfaceVersion(VkNegotiateLayerInterface* pVersionStruct);
 
-VKAPI_ATTR VkResult VKAPI_CALL vntx_EnumerateInstanceLayerProperties(
-    uint32_t* pPropertyCount,
-    VkLayerProperties* pProperties
-);
+VKAPI_ATTR VkResult VKAPI_CALL
+vntx_EnumerateInstanceLayerProperties(uint32_t* pPropertyCount, VkLayerProperties* pProperties);
 
 VKAPI_ATTR VkResult VKAPI_CALL vntx_EnumerateInstanceExtensionProperties(
-    const char* pLayerName,
-    uint32_t* pPropertyCount,
-    VkExtensionProperties* pProperties
-);
+    const char* pLayerName, uint32_t* pPropertyCount, VkExtensionProperties* pProperties);
 
 // Core Vulkan function hooks
-VKAPI_ATTR VkResult VKAPI_CALL vntx_CreateInstance(
-    const VkInstanceCreateInfo* pCreateInfo,
-    const VkAllocationCallbacks* pAllocator,
-    VkInstance* pInstance
-);
+VKAPI_ATTR VkResult VKAPI_CALL vntx_CreateInstance(const VkInstanceCreateInfo* pCreateInfo,
+                                                   const VkAllocationCallbacks* pAllocator,
+                                                   VkInstance* pInstance);
 
-VKAPI_ATTR void VKAPI_CALL vntx_DestroyInstance(
-    VkInstance instance,
-    const VkAllocationCallbacks* pAllocator
-);
+VKAPI_ATTR void VKAPI_CALL vntx_DestroyInstance(VkInstance instance,
+                                                const VkAllocationCallbacks* pAllocator);
 
-VKAPI_ATTR VkResult VKAPI_CALL vntx_CreateDevice(
-    VkPhysicalDevice physicalDevice,
-    const VkDeviceCreateInfo* pCreateInfo,
-    const VkAllocationCallbacks* pAllocator,
-    VkDevice* pDevice
-);
+VKAPI_ATTR VkResult VKAPI_CALL vntx_CreateDevice(VkPhysicalDevice physicalDevice,
+                                                 const VkDeviceCreateInfo* pCreateInfo,
+                                                 const VkAllocationCallbacks* pAllocator,
+                                                 VkDevice* pDevice);
 
-VKAPI_ATTR void VKAPI_CALL vntx_DestroyDevice(
-    VkDevice device,
-    const VkAllocationCallbacks* pAllocator
-);
+VKAPI_ATTR void VKAPI_CALL vntx_DestroyDevice(VkDevice device,
+                                              const VkAllocationCallbacks* pAllocator);
 
-VKAPI_ATTR VkResult VKAPI_CALL vntx_CreateImage(
-    VkDevice device,
-    const VkImageCreateInfo* pCreateInfo,
-    const VkAllocationCallbacks* pAllocator,
-    VkImage* pImage
-);
+VKAPI_ATTR VkResult VKAPI_CALL vntx_CreateImage(VkDevice device,
+                                                const VkImageCreateInfo* pCreateInfo,
+                                                const VkAllocationCallbacks* pAllocator,
+                                                VkImage* pImage);
 
-VKAPI_ATTR void VKAPI_CALL vntx_DestroyImage(
-    VkDevice device,
-    VkImage image,
-    const VkAllocationCallbacks* pAllocator
-);
+VKAPI_ATTR void VKAPI_CALL vntx_DestroyImage(VkDevice device, VkImage image,
+                                             const VkAllocationCallbacks* pAllocator);
 
 VKAPI_ATTR void VKAPI_CALL vntx_GetImageMemoryRequirements(
-    VkDevice device,
-    VkImage image,
-    VkMemoryRequirements* pMemoryRequirements
-);
+    VkDevice device, VkImage image, VkMemoryRequirements* pMemoryRequirements);
 
-VKAPI_ATTR void VKAPI_CALL vntx_GetImageMemoryRequirements2(
-    VkDevice device,
-    const VkImageMemoryRequirementsInfo2* pInfo,
-    VkMemoryRequirements2* pMemoryRequirements
-);
+VKAPI_ATTR void VKAPI_CALL
+vntx_GetImageMemoryRequirements2(VkDevice device, const VkImageMemoryRequirementsInfo2* pInfo,
+                                 VkMemoryRequirements2* pMemoryRequirements);
 
-VKAPI_ATTR VkResult VKAPI_CALL vntx_BindImageMemory(
-    VkDevice device,
-    VkImage image,
-    VkDeviceMemory memory,
-    VkDeviceSize memoryOffset
-);
+VKAPI_ATTR VkResult VKAPI_CALL vntx_BindImageMemory(VkDevice device, VkImage image,
+                                                    VkDeviceMemory memory,
+                                                    VkDeviceSize memoryOffset);
 
-VKAPI_ATTR VkResult VKAPI_CALL vntx_BindImageMemory2(
-    VkDevice device,
-    uint32_t bindInfoCount,
-    const VkBindImageMemoryInfo* pBindInfos
-);
+VKAPI_ATTR VkResult VKAPI_CALL vntx_BindImageMemory2(VkDevice device, uint32_t bindInfoCount,
+                                                     const VkBindImageMemoryInfo* pBindInfos);
 
-VKAPI_ATTR void VKAPI_CALL vntx_CmdCopyBufferToImage(
-    VkCommandBuffer commandBuffer,
-    VkBuffer srcBuffer,
-    VkImage dstImage,
-    VkImageLayout dstImageLayout,
-    uint32_t regionCount,
-    const VkBufferImageCopy* pRegions
-);
+VKAPI_ATTR void VKAPI_CALL vntx_CmdCopyBufferToImage(VkCommandBuffer commandBuffer,
+                                                     VkBuffer srcBuffer, VkImage dstImage,
+                                                     VkImageLayout dstImageLayout,
+                                                     uint32_t regionCount,
+                                                     const VkBufferImageCopy* pRegions);
 
 VKAPI_ATTR void VKAPI_CALL vntx_CmdCopyBufferToImage2(
-    VkCommandBuffer commandBuffer,
-    const VkCopyBufferToImageInfo2* pCopyBufferToImageInfo
-);
+    VkCommandBuffer commandBuffer, const VkCopyBufferToImageInfo2* pCopyBufferToImageInfo);
 
-VKAPI_ATTR VkResult VKAPI_CALL vntx_CreateShaderModule(
-    VkDevice device,
-    const VkShaderModuleCreateInfo* pCreateInfo,
-    const VkAllocationCallbacks* pAllocator,
-    VkShaderModule* pShaderModule
-);
+VKAPI_ATTR VkResult VKAPI_CALL vntx_CreateShaderModule(VkDevice device,
+                                                       const VkShaderModuleCreateInfo* pCreateInfo,
+                                                       const VkAllocationCallbacks* pAllocator,
+                                                       VkShaderModule* pShaderModule);
 
-VKAPI_ATTR void VKAPI_CALL vntx_DestroyShaderModule(
-    VkDevice device,
-    VkShaderModule shaderModule,
-    const VkAllocationCallbacks* pAllocator
-);
+VKAPI_ATTR void VKAPI_CALL vntx_DestroyShaderModule(VkDevice device, VkShaderModule shaderModule,
+                                                    const VkAllocationCallbacks* pAllocator);
 
-} // extern "C"
-
+}  // extern "C"
