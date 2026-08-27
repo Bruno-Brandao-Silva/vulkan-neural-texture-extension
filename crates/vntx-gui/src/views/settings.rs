@@ -2,17 +2,12 @@
 
 use crate::app::VntxGuiApp;
 use crate::theme::{
-    card_frame, page_header, pill_badge, ACCENT_BLUE, ACCENT_GREEN, ROUNDING_MD, TEXT_MUTED,
-    TEXT_PRIMARY,
+    btn_primary, card_frame, help_tooltip, page_header, pill_badge, ACCENT_BLUE, ACCENT_GREEN,
+    ICON_LIGHTBULB, ICON_SAVE, ICON_SEARCH, ICON_SETTINGS, ICON_SHIELD, ICON_STAR, ICON_VNTX,
+    TEXT_MUTED, TEXT_PRIMARY,
 };
 use eframe::egui::{self, Color32, RichText, Ui};
 use vntx_core::{get_recommended_settings, VntxConfig};
-
-/// Helper to render an inline help question mark icon with a detailed hover tooltip.
-fn help_tooltip(ui: &mut Ui, text: &str) {
-    ui.label(RichText::new("ℹ").color(ACCENT_BLUE).size(13.0_f32))
-        .on_hover_text(text);
-}
 
 /// Renders the settings view.
 pub fn render(app: &mut VntxGuiApp, ui: &mut Ui) {
@@ -54,7 +49,7 @@ fn render_left_column(app: &mut VntxGuiApp, ui: &mut Ui) {
     card_frame().show(ui, |ui| {
         ui.set_width(available_w);
         ui.heading(
-            RichText::new("🔍 System Capabilities & Diagnostics")
+            RichText::new(format!("{} System Capabilities & Diagnostics", ICON_SEARCH))
                 .size(15.0_f32)
                 .strong()
                 .color(TEXT_PRIMARY),
@@ -133,7 +128,7 @@ fn render_left_column(app: &mut VntxGuiApp, ui: &mut Ui) {
             ui.set_width(ui.available_width());
             ui.vertical(|ui| {
                 ui.horizontal(|ui| {
-                    ui.label(RichText::new("💡").size(16.0_f32));
+                    ui.label(RichText::new(ICON_LIGHTBULB).size(16.0_f32));
                     ui.label(
                         RichText::new("Ideal Engine Recommendation")
                             .strong()
@@ -158,7 +153,7 @@ fn render_left_column(app: &mut VntxGuiApp, ui: &mut Ui) {
     card_frame().show(ui, |ui| {
         ui.set_width(available_w);
         ui.heading(
-            RichText::new("🛠 General Settings")
+            RichText::new(format!("{} General Settings", ICON_SETTINGS))
                 .size(15.0_f32)
                 .strong()
                 .color(TEXT_PRIMARY),
@@ -233,7 +228,7 @@ fn render_right_column(app: &mut VntxGuiApp, ui: &mut Ui) {
     card_frame().show(ui, |ui| {
         ui.set_width(available_w);
         ui.heading(
-            RichText::new("⚡ Training & Compression Defaults")
+            RichText::new(format!("{} Training & Compression Defaults", ICON_VNTX))
                 .size(15.0_f32)
                 .strong()
                 .color(TEXT_PRIMARY),
@@ -246,20 +241,32 @@ fn render_right_column(app: &mut VntxGuiApp, ui: &mut Ui) {
                 ui,
                 "Preset padrão para treinamento de texturas:\n• Fast: 1 camada MLP (máxima velocidade).\n• Balanced: 3 camadas MLP (ótimo para texturas 2K/4K).\n• Max Savings: Quantização INT8 densa.",
             );
-            let fast_label = if rec.recommended_quality == "fast" { "Fast (1 Layer MLP) ⭐ (Recomendado)" } else { "Fast (1 Layer MLP)" };
-            let balanced_label = if rec.recommended_quality == "balanced" { "Balanced (3 Layers MLP) ⭐ (Recomendado)" } else { "Balanced (3 Layers MLP)" };
-            let max_label = if rec.recommended_quality == "max-savings" { "Max Savings (INT8 Quantized) ⭐ (Recomendado)" } else { "Max Savings (INT8 Quantized)" };
+            let fast_label = if rec.recommended_quality == "fast" {
+                format!("Fast (1 Layer MLP) {} (Recomendado)", ICON_STAR)
+            } else {
+                "Fast (1 Layer MLP)".to_string()
+            };
+            let balanced_label = if rec.recommended_quality == "balanced" {
+                format!("Balanced (3 Layers MLP) {} (Recomendado)", ICON_STAR)
+            } else {
+                "Balanced (3 Layers MLP)".to_string()
+            };
+            let max_label = if rec.recommended_quality == "max-savings" {
+                format!("Max Savings (INT8 Quantized) {} (Recomendado)", ICON_STAR)
+            } else {
+                "Max Savings (INT8 Quantized)".to_string()
+            };
 
             egui::ComboBox::from_id_source("settings_default_quality_cb")
                 .selected_text(match app.config.training.default_quality.as_str() {
-                    "fast" => fast_label,
-                    "max-savings" => max_label,
-                    _ => balanced_label,
+                    "fast" => &fast_label,
+                    "max-savings" => &max_label,
+                    _ => &balanced_label,
                 })
                 .show_ui(ui, |ui| {
-                    ui.selectable_value(&mut app.config.training.default_quality, "fast".to_string(), fast_label);
-                    ui.selectable_value(&mut app.config.training.default_quality, "balanced".to_string(), balanced_label);
-                    ui.selectable_value(&mut app.config.training.default_quality, "max-savings".to_string(), max_label);
+                    ui.selectable_value(&mut app.config.training.default_quality, "fast".to_string(), &fast_label);
+                    ui.selectable_value(&mut app.config.training.default_quality, "balanced".to_string(), &balanced_label);
+                    ui.selectable_value(&mut app.config.training.default_quality, "max-savings".to_string(), &max_label);
                 });
         });
 
@@ -269,18 +276,26 @@ fn render_right_column(app: &mut VntxGuiApp, ui: &mut Ui) {
                 ui,
                 "Precisão dos pesos neurais:\n• FP16: Qualidade visual máxima (padrão).\n• INT8: Reduz o tamanho de VRAM pela metade usando aceleração por Tensor Cores sem perda perceptível de qualidade.",
             );
-            let fp16_label = if rec.recommended_precision == "fp16" { "FP16 Standard ⭐ (Recomendado)" } else { "FP16 Standard" };
-            let int8_label = if rec.recommended_precision == "int8" { "INT8 Quantized ⭐ (Recomendado)" } else { "INT8 Quantized" };
+            let fp16_label = if rec.recommended_precision == "fp16" {
+                format!("FP16 Standard {} (Recomendado)", ICON_STAR)
+            } else {
+                "FP16 Standard".to_string()
+            };
+            let int8_label = if rec.recommended_precision == "int8" {
+                format!("INT8 Quantized {} (Recomendado)", ICON_STAR)
+            } else {
+                "INT8 Quantized".to_string()
+            };
 
             egui::ComboBox::from_id_source("settings_target_precision_cb")
                 .selected_text(match app.config.training.target_precision.as_str() {
-                    "int8" => int8_label,
+                    "int8" => &int8_label,
                     "fp32" => "FP32 High Precision",
-                    _ => fp16_label,
+                    _ => &fp16_label,
                 })
                 .show_ui(ui, |ui| {
-                    ui.selectable_value(&mut app.config.training.target_precision, "fp16".to_string(), fp16_label);
-                    ui.selectable_value(&mut app.config.training.target_precision, "int8".to_string(), int8_label);
+                    ui.selectable_value(&mut app.config.training.target_precision, "fp16".to_string(), &fp16_label);
+                    ui.selectable_value(&mut app.config.training.target_precision, "int8".to_string(), &int8_label);
                     ui.selectable_value(&mut app.config.training.target_precision, "fp32".to_string(), "FP32 High Precision");
                 });
         });
@@ -304,7 +319,7 @@ fn render_right_column(app: &mut VntxGuiApp, ui: &mut Ui) {
     card_frame().show(ui, |ui| {
         ui.set_width(available_w);
         ui.heading(
-            RichText::new("🛡 Anti-Stutter Guardrails")
+            RichText::new(format!("{} Anti-Stutter Guardrails", ICON_SHIELD))
                 .size(15.0_f32)
                 .strong()
                 .color(ACCENT_GREEN),
@@ -370,16 +385,10 @@ fn render_right_column(app: &mut VntxGuiApp, ui: &mut Ui) {
     ui.add_space(14.0_f32);
 
     // 6. Save Button Card
-    let save_btn = egui::Button::new(
-        RichText::new("💾 Save All Changes")
-            .size(15.0_f32)
-            .strong()
-            .color(Color32::WHITE),
-    )
-    .fill(ACCENT_GREEN)
-    .rounding(ROUNDING_MD);
-
-    if ui.add(save_btn).clicked() {
+    if ui
+        .add(btn_primary(format!("{} Save All Changes", ICON_SAVE)))
+        .clicked()
+    {
         app.latency_budget_ms = app.config.guardrails.max_latency_ms;
         app.min_resolution_threshold = app.config.guardrails.min_resolution_threshold;
         app.preserve_special_maps = app.config.guardrails.preserve_special_maps;

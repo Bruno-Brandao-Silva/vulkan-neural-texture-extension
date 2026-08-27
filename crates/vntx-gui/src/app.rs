@@ -289,15 +289,24 @@ impl eframe::App for VntxGuiApp {
                     ui.add_space(24.0_f32);
 
                     let tabs = [
-                        (Tab::Dashboard, "📊 Dashboard"),
-                        (Tab::Games, "🎮 Games"),
-                        (Tab::Compressor, "⚡ Compressor"),
-                        (Tab::Cache, "🗄️ Cache"),
-                        (Tab::Settings, "⚙️ Settings"),
+                        (
+                            Tab::Dashboard,
+                            format!("{} Dashboard", crate::theme::ICON_DASHBOARD),
+                        ),
+                        (Tab::Games, format!("{} Games", crate::theme::ICON_GAMES)),
+                        (
+                            Tab::Compressor,
+                            format!("{} Compressor", crate::theme::ICON_COMPRESSOR),
+                        ),
+                        (Tab::Cache, format!("{} Cache", crate::theme::ICON_CACHE)),
+                        (
+                            Tab::Settings,
+                            format!("{} Settings", crate::theme::ICON_SETTINGS),
+                        ),
                     ];
 
-                    for (tab, label) in tabs {
-                        let is_active = self.selected_tab == tab;
+                    for (tab, label) in &tabs {
+                        let is_active = self.selected_tab == *tab;
                         let text = if is_active {
                             RichText::new(label)
                                 .size(14.0_f32)
@@ -318,7 +327,7 @@ impl eframe::App for VntxGuiApp {
                             .rounding(crate::theme::ROUNDING_MD);
 
                         if ui.add(btn).clicked() {
-                            self.selected_tab = tab;
+                            self.selected_tab = *tab;
                         }
                     }
                 });

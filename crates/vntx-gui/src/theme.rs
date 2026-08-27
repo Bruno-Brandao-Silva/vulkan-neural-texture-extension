@@ -1,11 +1,17 @@
 //! Modern Design System & Theme Engine for `vntx-gui`.
 //!
 //! Provides standardized color palettes, typography styling, elevated card frames,
-//! pill status badges, and expressive hero empty states.
+//! pill status badges, universal icon constants, and expressive hero empty states.
 
-use eframe::egui::{self, Color32, Frame, Margin, RichText, Rounding, Stroke, Ui, Vec2, Visuals};
+use eframe::egui::{
+    self, Button, Color32, Frame, Margin, RichText, Rounding, Stroke, Ui, Vec2, Visuals,
+};
 
-/// App background (Slate 900).
+// ==============================================================================
+// 1. Color Palette Constants (Slate & Neon Green Design System)
+// ==============================================================================
+
+/// App surface background (Slate 900).
 pub const BG_APP: Color32 = Color32::from_rgb(15, 23, 42);
 /// Elevated card background (Slate 800).
 pub const CARD_BG: Color32 = Color32::from_rgb(30, 41, 59);
@@ -14,15 +20,15 @@ pub const CARD_HOVER_BG: Color32 = Color32::from_rgb(51, 65, 85);
 /// Subtle border stroke color (Slate 700).
 pub const CARD_STROKE: Color32 = Color32::from_rgb(51, 65, 85);
 
-/// Primary accent color (Emerald / Neon Green 500).
+/// Primary accent color (Emerald / Neon Green 500: #10B981).
 pub const ACCENT_GREEN: Color32 = Color32::from_rgb(16, 185, 129);
-/// Secondary accent color (Sky Blue 400).
+/// Secondary accent color (Sky Blue 400: #38BDF8).
 pub const ACCENT_BLUE: Color32 = Color32::from_rgb(56, 189, 248);
-/// Warning / Notice accent color (Amber 500).
+/// Warning / Notice accent color (Amber 500: #F59E0B).
 pub const ACCENT_AMBER: Color32 = Color32::from_rgb(245, 158, 11);
-/// Danger / Destructive accent color (Coral Red 500).
+/// Danger / Destructive accent color (Coral Red 500: #EF4444).
 pub const ACCENT_RED: Color32 = Color32::from_rgb(239, 68, 68);
-/// Purple accent color (Purple 500).
+/// Purple accent color (Purple 500: #A855F7).
 pub const ACCENT_PURPLE: Color32 = Color32::from_rgb(168, 85, 247);
 
 /// Primary high-contrast text color (Slate 50).
@@ -30,12 +36,67 @@ pub const TEXT_PRIMARY: Color32 = Color32::from_rgb(248, 250, 252);
 /// Secondary muted text color (Slate 400).
 pub const TEXT_MUTED: Color32 = Color32::from_rgb(148, 163, 184);
 
+// ==============================================================================
+// 2. Corner Roundings
+// ==============================================================================
+
 /// Standard corner rounding for containers and cards (10px).
 pub const ROUNDING_LG: Rounding = Rounding::same(10.0_f32);
 /// Standard corner rounding for buttons and inputs (8px).
 pub const ROUNDING_MD: Rounding = Rounding::same(8.0_f32);
 /// Pill badge corner rounding (16px).
 pub const ROUNDING_PILL: Rounding = Rounding::same(16.0_f32);
+
+// ==============================================================================
+// 3. Universal Icon Glyph Constants (Crisp UTF-8 compatible)
+// ==============================================================================
+
+/// Brand Logo / Neural Icon
+pub const ICON_VNTX: &str = "⚡";
+/// Dashboard Tab Icon
+pub const ICON_DASHBOARD: &str = "📊";
+/// Steam Games Tab Icon
+pub const ICON_GAMES: &str = "🎮";
+/// Neural Compressor Tab Icon
+pub const ICON_COMPRESSOR: &str = "⚡";
+/// Cache Manager Tab Icon
+pub const ICON_CACHE: &str = "🗄";
+/// Settings Tab Icon
+pub const ICON_SETTINGS: &str = "⚙";
+
+/// Refresh Action Icon
+pub const ICON_REFRESH: &str = "↻";
+/// Search Input Icon
+pub const ICON_SEARCH: &str = "⌕";
+/// Clear / Cancel Icon
+pub const ICON_CLEAR: &str = "✕";
+/// Delete / Purge Icon
+pub const ICON_DELETE: &str = "✕";
+/// Copy to Clipboard Icon
+pub const ICON_COPY: &str = "📋";
+/// Help / Info Tooltip Icon
+pub const ICON_INFO: &str = "ℹ";
+/// Check / Success Status Icon
+pub const ICON_CHECK: &str = "✓";
+/// Error / Fail Status Icon
+pub const ICON_ERROR: &str = "✗";
+/// Recommendation Star Icon
+pub const ICON_STAR: &str = "★";
+
+/// Hardware GPU Icon
+pub const ICON_GPU: &str = "🖥";
+/// Anti-Stutter Shield Icon
+pub const ICON_SHIELD: &str = "🛡";
+/// Rocket Launch Action Icon
+pub const ICON_ROCKET: &str = "🚀";
+/// Lightbulb Recommendation Icon
+pub const ICON_LIGHTBULB: &str = "💡";
+/// Save Changes Icon
+pub const ICON_SAVE: &str = "💾";
+
+// ==============================================================================
+// 4. Custom Theme Application
+// ==============================================================================
 
 /// Applies the modern dark design system to the `egui` context.
 pub fn apply_custom_theme(ctx: &egui::Context) {
@@ -83,6 +144,10 @@ pub fn apply_custom_theme(ctx: &egui::Context) {
     ctx.set_style(style);
 }
 
+// ==============================================================================
+// 5. Layout & Component Helpers
+// ==============================================================================
+
 /// Returns a standardized elevated card frame with custom styling.
 pub fn card_frame() -> Frame {
     Frame::none()
@@ -90,6 +155,38 @@ pub fn card_frame() -> Frame {
         .stroke(Stroke::new(1.0_f32, CARD_STROKE))
         .rounding(ROUNDING_LG)
         .inner_margin(Margin::same(14.0_f32))
+}
+
+/// Builds a styled primary action button with Neon Green accent.
+pub fn btn_primary(label: impl Into<String>) -> Button<'static> {
+    Button::new(
+        RichText::new(label.into())
+            .size(14.0_f32)
+            .strong()
+            .color(Color32::WHITE),
+    )
+    .fill(ACCENT_GREEN)
+    .rounding(ROUNDING_MD)
+}
+
+/// Builds a styled secondary button with card background and Slate stroke.
+pub fn btn_secondary(label: impl Into<String>) -> Button<'static> {
+    Button::new(
+        RichText::new(label.into())
+            .size(13.0_f32)
+            .color(TEXT_PRIMARY),
+    )
+    .fill(CARD_BG)
+    .stroke(Stroke::new(1.0_f32, CARD_STROKE))
+    .rounding(ROUNDING_MD)
+}
+
+/// Builds a styled destructive action button with dark red stroke.
+pub fn btn_danger(label: impl Into<String>) -> Button<'static> {
+    Button::new(RichText::new(label.into()).size(13.0_f32).color(ACCENT_RED))
+        .fill(CARD_BG)
+        .stroke(Stroke::new(1.0_f32, Color32::from_rgb(120, 30, 30)))
+        .rounding(ROUNDING_MD)
 }
 
 /// Renders a modern pill status badge with solid background and high contrast text.
@@ -108,9 +205,15 @@ pub fn pill_badge(ui: &mut Ui, text: &str, bg_color: Color32, text_color: Color3
         });
 }
 
+/// Helper to render an inline help question mark icon with a detailed hover tooltip.
+pub fn help_tooltip(ui: &mut Ui, text: &str) {
+    ui.label(RichText::new(ICON_INFO).color(ACCENT_BLUE).size(13.0_f32))
+        .on_hover_text(text);
+}
+
 /// Renders a standardized page header with title and subtitle.
 pub fn page_header(ui: &mut Ui, title: &str, subtitle: &str) {
-    ui.add_space(6.0_f32);
+    ui.add_space(4.0_f32);
     ui.heading(
         RichText::new(title)
             .size(24.0_f32)
@@ -119,7 +222,7 @@ pub fn page_header(ui: &mut Ui, title: &str, subtitle: &str) {
     );
     ui.add_space(2.0_f32);
     ui.label(RichText::new(subtitle).size(13.0_f32).color(TEXT_MUTED));
-    ui.add_space(10.0_f32);
+    ui.add_space(8.0_f32);
 }
 
 /// Renders an expressive hero empty state widget with icon, title, description, and optional primary action.
@@ -138,33 +241,24 @@ pub fn hero_empty_state(
     card_frame().show(ui, |ui| {
         ui.set_width(available_w);
         ui.vertical_centered(|ui| {
-            ui.add_space(18.0_f32);
-            ui.label(RichText::new(icon).size(48.0_f32));
-            ui.add_space(8.0_f32);
+            ui.add_space(20.0_f32);
+            ui.label(RichText::new(icon).size(52.0_f32));
+            ui.add_space(10.0_f32);
             ui.label(
                 RichText::new(title)
-                    .size(18.0_f32)
+                    .size(19.0_f32)
                     .strong()
                     .color(TEXT_PRIMARY),
             );
             ui.add_space(6.0_f32);
-            ui.label(RichText::new(description).size(13.0_f32).color(TEXT_MUTED));
-            ui.add_space(14.0_f32);
+            ui.label(RichText::new(description).size(13.5_f32).color(TEXT_MUTED));
+            ui.add_space(16.0_f32);
 
             if let Some(lbl) = button_label {
-                let btn = egui::Button::new(
-                    RichText::new(lbl)
-                        .size(14.0_f32)
-                        .strong()
-                        .color(Color32::WHITE),
-                )
-                .fill(ACCENT_GREEN)
-                .rounding(ROUNDING_MD);
-
-                if ui.add(btn).clicked() {
+                if ui.add(btn_primary(lbl)).clicked() {
                     clicked = true;
                 }
-                ui.add_space(12.0_f32);
+                ui.add_space(14.0_f32);
             }
         });
     });

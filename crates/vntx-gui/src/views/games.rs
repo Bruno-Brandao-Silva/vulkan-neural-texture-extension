@@ -2,8 +2,9 @@
 
 use crate::app::{Tab, VntxGuiApp};
 use crate::theme::{
-    card_frame, hero_empty_state, page_header, pill_badge, ACCENT_BLUE, ACCENT_GREEN, CARD_BG,
-    CARD_STROKE, ROUNDING_MD, TEXT_MUTED, TEXT_PRIMARY,
+    btn_primary, btn_secondary, card_frame, hero_empty_state, page_header, pill_badge, ACCENT_BLUE,
+    ACCENT_GREEN, CARD_BG, CARD_STROKE, ICON_CLEAR, ICON_COPY, ICON_GAMES, ICON_REFRESH,
+    ICON_SEARCH, ICON_SETTINGS, ICON_VNTX, ROUNDING_MD, TEXT_MUTED, TEXT_PRIMARY,
 };
 use eframe::egui::{self, Color32, RichText, Stroke, Ui};
 
@@ -16,17 +17,10 @@ pub fn render(app: &mut VntxGuiApp, ui: &mut Ui) {
             "Manage and compress neural textures for games installed in your Steam libraries.",
         );
         ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-            let refresh_btn = egui::Button::new(
-                RichText::new("🔄 Refresh Libraries")
-                    .size(13.0_f32)
-                    .strong()
-                    .color(TEXT_PRIMARY),
-            )
-            .fill(CARD_BG)
-            .stroke(Stroke::new(1.0_f32, CARD_STROKE))
-            .rounding(ROUNDING_MD);
-
-            if ui.add(refresh_btn).clicked() {
+            if ui
+                .add(btn_secondary(format!("{} Refresh Libraries", ICON_REFRESH)))
+                .clicked()
+            {
                 app.refresh_games();
                 app.set_toast("Scanned Steam libraries.");
             }
@@ -35,9 +29,14 @@ pub fn render(app: &mut VntxGuiApp, ui: &mut Ui) {
 
     // Search bar
     ui.horizontal(|ui| {
-        ui.label(RichText::new("🔍 Search:").size(13.0_f32).color(TEXT_MUTED));
+        ui.label(
+            RichText::new(format!("{} Search:", ICON_SEARCH))
+                .size(13.0_f32)
+                .color(TEXT_MUTED),
+        );
         ui.text_edit_singleline(&mut app.game_search_query);
-        if !app.game_search_query.is_empty() && ui.button("✖ Clear").clicked() {
+        if !app.game_search_query.is_empty() && ui.button(format!("{} Clear", ICON_CLEAR)).clicked()
+        {
             app.game_search_query.clear();
         }
     });
@@ -63,10 +62,10 @@ pub fn render(app: &mut VntxGuiApp, ui: &mut Ui) {
     if filtered_games.is_empty() {
         if hero_empty_state(
             ui,
-            "🎮",
+            ICON_GAMES,
             "No Steam Games Discovered",
-            "No compatible games were found in your configured Steam libraries. Check your paths in Settings or click below to rescan.",
-            Some("⚙️ Configure Library Paths"),
+            "No compatible games were found in your configured Steam libraries. Check your paths in Settings or click below to configure.",
+            Some(&format!("{} Configure Library Paths", ICON_SETTINGS)),
         ) {
             app.selected_tab = Tab::Settings;
         }
@@ -99,14 +98,14 @@ pub fn render(app: &mut VntxGuiApp, ui: &mut Ui) {
                             if cached_count > 0 {
                                 pill_badge(
                                     ui,
-                                    &format!("⚡ VNTX Active ({cached_count} cached)"),
+                                    &format!("{} VNTX Active ({cached_count} cached)", ICON_VNTX),
                                     Color32::from_rgb(6, 78, 59),
                                     ACCENT_GREEN,
                                 );
                             } else {
                                 pill_badge(
                                     ui,
-                                    "⚪ Not compressed",
+                                    "○ Not compressed",
                                     Color32::from_rgb(45, 55, 72),
                                     TEXT_MUTED,
                                 );
@@ -131,23 +130,17 @@ pub fn render(app: &mut VntxGuiApp, ui: &mut Ui) {
 
                     ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
                         // Optimize button
-                        let btn_opt = egui::Button::new(
-                            RichText::new("⚡ Compress Textures")
-                                .size(13.0_f32)
-                                .strong()
-                                .color(Color32::WHITE),
-                        )
-                        .fill(ACCENT_GREEN)
-                        .rounding(ROUNDING_MD);
-
-                        if ui.add(btn_opt).clicked() {
+                        if ui
+                            .add(btn_primary(format!("{} Compress Textures", ICON_VNTX)))
+                            .clicked()
+                        {
                             app.selected_game_id = Some(game.app_id);
                             app.selected_tab = Tab::Compressor;
                         }
 
                         // Launch options button
                         let btn_launch = egui::Button::new(
-                            RichText::new("📋 Copy Launch Option")
+                            RichText::new(format!("{} Copy Launch Option", ICON_COPY))
                                 .size(13.0_f32)
                                 .color(ACCENT_BLUE),
                         )

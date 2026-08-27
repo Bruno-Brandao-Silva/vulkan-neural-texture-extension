@@ -2,8 +2,9 @@
 
 use crate::app::{Tab, VntxGuiApp};
 use crate::theme::{
-    card_frame, hero_empty_state, page_header, pill_badge, ACCENT_BLUE, ACCENT_GREEN, ACCENT_RED,
-    CARD_BG, CARD_STROKE, ROUNDING_MD, TEXT_MUTED, TEXT_PRIMARY,
+    btn_danger, btn_secondary, card_frame, hero_empty_state, page_header, pill_badge, ACCENT_BLUE,
+    ACCENT_GREEN, CARD_BG, CARD_STROKE, ICON_CACHE, ICON_COMPRESSOR, ICON_DELETE, ICON_REFRESH,
+    ICON_VNTX, ROUNDING_MD, TEXT_MUTED, TEXT_PRIMARY,
 };
 use eframe::egui::{self, Color32, RichText, Stroke, Ui};
 
@@ -17,34 +18,20 @@ pub fn render(app: &mut VntxGuiApp, ui: &mut Ui) {
             &format!("Local cache root: {}", app.cache_mgr.root_dir().display()),
         );
         ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-            let purge_btn = egui::Button::new(
-                RichText::new("🗑️ Purge All Cache")
-                    .size(13.0_f32)
-                    .strong()
-                    .color(ACCENT_RED),
-            )
-            .fill(CARD_BG)
-            .stroke(Stroke::new(1.0_f32, Color32::from_rgb(120, 30, 30)))
-            .rounding(ROUNDING_MD);
-
-            if ui.add(purge_btn).clicked() {
+            if ui
+                .add(btn_danger(format!("{} Purge All Cache", ICON_DELETE)))
+                .clicked()
+            {
                 if let Ok(count) = app.cache_mgr.clean_cache(None, true) {
                     app.refresh_cache();
                     app.set_toast(format!("Purged all cache ({count} files deleted)."));
                 }
             }
 
-            let refresh_btn = egui::Button::new(
-                RichText::new("🔄 Refresh Cache")
-                    .size(13.0_f32)
-                    .strong()
-                    .color(TEXT_PRIMARY),
-            )
-            .fill(CARD_BG)
-            .stroke(Stroke::new(1.0_f32, CARD_STROKE))
-            .rounding(ROUNDING_MD);
-
-            if ui.add(refresh_btn).clicked() {
+            if ui
+                .add(btn_secondary(format!("{} Refresh Cache", ICON_REFRESH)))
+                .clicked()
+            {
                 app.refresh_cache();
                 app.set_toast("Cache statistics refreshed.");
             }
@@ -92,10 +79,10 @@ pub fn render(app: &mut VntxGuiApp, ui: &mut Ui) {
     if app.cached_files.is_empty() {
         if hero_empty_state(
             ui,
-            "🗄️",
+            ICON_CACHE,
             "No Cached Neural Textures",
             "There are currently no compiled neural texture (.ntc) files on disk. Select a game and run the Compressor to train neural textures.",
-            Some("⚡ Open Compressor"),
+            Some(&format!("{} Open Compressor", ICON_COMPRESSOR)),
         ) {
             app.selected_tab = Tab::Compressor;
         }
@@ -159,21 +146,15 @@ pub fn render(app: &mut VntxGuiApp, ui: &mut Ui) {
                     });
 
                     ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                        let btn_del = egui::Button::new(
-                            RichText::new("🗑️ Delete")
-                                .size(13.0_f32)
-                                .color(ACCENT_RED),
-                        )
-                        .fill(CARD_BG)
-                        .stroke(Stroke::new(1.0_f32, Color32::from_rgb(120, 30, 30)))
-                        .rounding(ROUNDING_MD);
-
-                        if ui.add(btn_del).clicked() {
+                        if ui
+                            .add(btn_danger(format!("{} Delete", ICON_DELETE)))
+                            .clicked()
+                        {
                             file_to_delete = Some(file.path.clone());
                         }
 
                         let btn_reexp = egui::Button::new(
-                            RichText::new("⚡ Re-export")
+                            RichText::new(format!("{} Re-export", ICON_VNTX))
                                 .size(13.0_f32)
                                 .color(ACCENT_GREEN),
                         )

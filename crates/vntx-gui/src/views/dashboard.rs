@@ -2,10 +2,11 @@
 
 use crate::app::{Tab, VntxGuiApp};
 use crate::theme::{
-    card_frame, page_header, pill_badge, ACCENT_AMBER, ACCENT_BLUE, ACCENT_GREEN, ACCENT_PURPLE,
-    ACCENT_RED, CARD_BG, CARD_STROKE, ROUNDING_MD, TEXT_MUTED, TEXT_PRIMARY,
+    btn_secondary, card_frame, page_header, pill_badge, ACCENT_AMBER, ACCENT_BLUE, ACCENT_GREEN,
+    ACCENT_PURPLE, ACCENT_RED, ICON_CACHE, ICON_COMPRESSOR, ICON_GAMES, ICON_GPU, ICON_INFO,
+    ICON_REFRESH, ICON_VNTX, TEXT_MUTED, TEXT_PRIMARY,
 };
-use eframe::egui::{self, Color32, ProgressBar, RichText, Stroke, Ui};
+use eframe::egui::{self, Color32, ProgressBar, RichText, Ui};
 use vntx_core::{expand_home_path, VntxConfig};
 
 /// Renders the dashboard view.
@@ -18,17 +19,10 @@ pub fn render(app: &mut VntxGuiApp, ui: &mut Ui) {
             "Real-time GPU telemetry, VRAM consumption, and anti-stutter layer status.",
         );
         ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-            let refresh_btn = egui::Button::new(
-                RichText::new("🔄 Refresh Telemetry")
-                    .size(13.0_f32)
-                    .strong()
-                    .color(TEXT_PRIMARY),
-            )
-            .fill(CARD_BG)
-            .stroke(Stroke::new(1.0_f32, CARD_STROKE))
-            .rounding(ROUNDING_MD);
-
-            if ui.add(refresh_btn).clicked() {
+            if ui
+                .add(btn_secondary(format!("{} Refresh Telemetry", ICON_REFRESH)))
+                .clicked()
+            {
                 app.refresh_all();
                 app.set_toast("Telemetry and cache metrics refreshed.");
             }
@@ -41,7 +35,7 @@ pub fn render(app: &mut VntxGuiApp, ui: &mut Ui) {
         ui.set_width(available_w);
         ui.horizontal(|ui| {
             ui.label(
-                RichText::new("🖥️ Host GPU:")
+                RichText::new(format!("{} Host GPU:", ICON_GPU))
                     .size(15.0_f32)
                     .strong()
                     .color(ACCENT_BLUE),
@@ -116,7 +110,7 @@ pub fn render(app: &mut VntxGuiApp, ui: &mut Ui) {
         ui.set_width(available_w);
         ui.horizontal(|ui| {
             ui.label(
-                RichText::new("⚡ Vulkan Implicit Layer Status:")
+                RichText::new(format!("{} Vulkan Implicit Layer Status:", ICON_VNTX))
                     .size(14.0_f32)
                     .strong()
                     .color(TEXT_PRIMARY),
@@ -249,45 +243,27 @@ pub fn render(app: &mut VntxGuiApp, ui: &mut Ui) {
     ui.add_space(8.0_f32);
 
     ui.horizontal(|ui| {
-        let btn_games = egui::Button::new(
-            RichText::new("🎮 Browse Steam Games")
-                .size(14.0_f32)
-                .strong()
-                .color(TEXT_PRIMARY),
-        )
-        .fill(CARD_BG)
-        .stroke(Stroke::new(1.0_f32, CARD_STROKE))
-        .rounding(ROUNDING_MD);
-
-        if ui.add(btn_games).clicked() {
+        if ui
+            .add(btn_secondary(format!("{} Browse Steam Games", ICON_GAMES)))
+            .clicked()
+        {
             app.selected_tab = Tab::Games;
         }
 
-        let btn_comp = egui::Button::new(
-            RichText::new("⚡ Open Compressor")
-                .size(14.0_f32)
-                .strong()
-                .color(TEXT_PRIMARY),
-        )
-        .fill(CARD_BG)
-        .stroke(Stroke::new(1.0_f32, CARD_STROKE))
-        .rounding(ROUNDING_MD);
-
-        if ui.add(btn_comp).clicked() {
+        if ui
+            .add(btn_secondary(format!(
+                "{} Open Compressor",
+                ICON_COMPRESSOR
+            )))
+            .clicked()
+        {
             app.selected_tab = Tab::Compressor;
         }
 
-        let btn_cache = egui::Button::new(
-            RichText::new("🗄️ Manage Cache")
-                .size(14.0_f32)
-                .strong()
-                .color(TEXT_PRIMARY),
-        )
-        .fill(CARD_BG)
-        .stroke(Stroke::new(1.0_f32, CARD_STROKE))
-        .rounding(ROUNDING_MD);
-
-        if ui.add(btn_cache).clicked() {
+        if ui
+            .add(btn_secondary(format!("{} Manage Cache", ICON_CACHE)))
+            .clicked()
+        {
             app.selected_tab = Tab::Cache;
         }
     });
@@ -296,7 +272,7 @@ pub fn render(app: &mut VntxGuiApp, ui: &mut Ui) {
     card_frame().show(ui, |ui| {
         ui.set_width(ui.available_width());
         ui.label(
-            RichText::new("ℹ️ Dynamic Neural Texture Extension Architecture")
+            RichText::new(format!("{} Dynamic Neural Texture Extension Architecture", ICON_INFO))
                 .strong()
                 .color(ACCENT_BLUE),
         );

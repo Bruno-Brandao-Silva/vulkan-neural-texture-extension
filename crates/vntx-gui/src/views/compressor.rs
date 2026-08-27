@@ -2,8 +2,9 @@
 
 use crate::app::{CompressionStatus, Tab, VntxGuiApp, WorkerMessage};
 use crate::theme::{
-    card_frame, hero_empty_state, page_header, ACCENT_BLUE, ACCENT_GREEN, ACCENT_RED, ROUNDING_MD,
-    TEXT_MUTED, TEXT_PRIMARY,
+    btn_primary, card_frame, help_tooltip, hero_empty_state, page_header, ACCENT_BLUE,
+    ACCENT_GREEN, ACCENT_RED, ICON_CHECK, ICON_COMPRESSOR, ICON_ERROR, ICON_ROCKET, ICON_SEARCH,
+    ICON_SETTINGS, ICON_SHIELD, ICON_STAR, ICON_VNTX, TEXT_MUTED, TEXT_PRIMARY,
 };
 use eframe::egui::{self, Color32, ProgressBar, RichText, Ui};
 use std::sync::mpsc::channel;
@@ -29,10 +30,10 @@ pub fn render(app: &mut VntxGuiApp, ui: &mut Ui) {
     if game_names.is_empty() {
         if hero_empty_state(
             ui,
-            "⚡",
+            ICON_COMPRESSOR,
             "No Target Games Found",
             "There are currently no Steam games detected to optimize. Make sure your Steam library paths are correctly set in the Settings tab.",
-            Some("⚙️ Configure Library Paths"),
+            Some(&format!("{} Configure Library Paths", ICON_SETTINGS)),
         ) {
             app.selected_tab = Tab::Settings;
         }
@@ -87,21 +88,29 @@ pub fn render(app: &mut VntxGuiApp, ui: &mut Ui) {
                     .size(14.0_f32)
                     .color(TEXT_PRIMARY),
             );
-            ui.label(
-                RichText::new("ℹ")
-                    .color(ACCENT_BLUE)
-                    .size(13.0_f32),
-            )
-            .on_hover_text(
+            help_tooltip(
+                ui,
                 "Presets pré-configurados de densidade e fidelidade:\n• Fast: 1 camada MLP ultra-leve.\n• Balanced: 3 camadas MLP (0.99 SSIM, fidelidade perfeita).\n• Max Savings: Quantização INT8 de alta compressão.",
             );
         });
 
         ui.add_space(6.0_f32);
         ui.horizontal(|ui| {
-            let fast_text = if rec.recommended_quality == "fast" { "Fast (1-layer MLP) ⭐ (Recomendado)" } else { "Fast (1-layer MLP)" };
-            let balanced_text = if rec.recommended_quality == "balanced" { "Balanced (3-layer MLP) ⭐ (Recomendado)" } else { "Balanced (3-layer MLP)" };
-            let max_text = if rec.recommended_quality == "max-savings" { "Max Savings (INT8 Quantized) ⭐ (Recomendado)" } else { "Max Savings (INT8 Quantized)" };
+            let fast_text = if rec.recommended_quality == "fast" {
+                format!("Fast (1-layer MLP) {} (Recomendado)", ICON_STAR)
+            } else {
+                "Fast (1-layer MLP)".to_string()
+            };
+            let balanced_text = if rec.recommended_quality == "balanced" {
+                format!("Balanced (3-layer MLP) {} (Recomendado)", ICON_STAR)
+            } else {
+                "Balanced (3-layer MLP)".to_string()
+            };
+            let max_text = if rec.recommended_quality == "max-savings" {
+                format!("Max Savings (INT8 Quantized) {} (Recomendado)", ICON_STAR)
+            } else {
+                "Max Savings (INT8 Quantized)".to_string()
+            };
 
             ui.radio_value(&mut app.selected_quality, "fast".to_string(), fast_text);
             ui.radio_value(&mut app.selected_quality, "balanced".to_string(), balanced_text);
@@ -115,12 +124,10 @@ pub fn render(app: &mut VntxGuiApp, ui: &mut Ui) {
                     .color(TEXT_MUTED)
                     .size(13.0_f32),
             );
-            ui.label(
-                RichText::new("ℹ")
-                    .color(ACCENT_BLUE)
-                    .size(13.0_f32),
-            )
-            .on_hover_text("Threads paralelas alocadas para treinar e compilar as texturas em segundo plano.");
+            help_tooltip(
+                ui,
+                "Threads paralelas alocadas para treinar e compilar as texturas em segundo plano.",
+            );
             ui.add(egui::Slider::new(&mut app.worker_jobs, 1..=16));
         });
     });
@@ -132,33 +139,29 @@ pub fn render(app: &mut VntxGuiApp, ui: &mut Ui) {
         ui.set_width(available_w);
         ui.horizontal(|ui| {
             ui.label(
-                RichText::new("🛡️ Anti-Stutter Guardrails & Filter Thresholds:")
+                RichText::new(format!("{} Anti-Stutter Guardrails & Filter Thresholds:", ICON_SHIELD))
                     .strong()
                     .size(14.0_f32)
                     .color(ACCENT_GREEN),
             );
-            ui.label(
-                RichText::new("ℹ")
-                    .color(ACCENT_BLUE)
-                    .size(13.0_f32),
-            )
-            .on_hover_text("Mecanismos anti-engasgo (anti-stutter) que garantem taxa de quadros estável em tempo de execução.");
+            help_tooltip(
+                ui,
+                "Mecanismos anti-engasgo (anti-stutter) que garantem taxa de quadros estável em tempo de execução.",
+            );
         });
 
         ui.add_space(6.0_f32);
 
         ui.horizontal(|ui| {
             ui.label(
-                RichText::new("⏱️ Latency Budget Threshold:")
+                RichText::new("⏱ Latency Budget Threshold:")
                     .color(TEXT_MUTED)
                     .size(13.0_f32),
             );
-            ui.label(
-                RichText::new("ℹ")
-                    .color(ACCENT_BLUE)
-                    .size(13.0_f32),
-            )
-            .on_hover_text("Limite máximo de tempo (em ms) para a descompressão neural no staging buffer. Se exceder, ativa pass-through automático.");
+            help_tooltip(
+                ui,
+                "Limite máximo de tempo (em ms) para a descompressão neural no staging buffer. Se exceder, ativa pass-through automático.",
+            );
             ui.add(
                 egui::Slider::new(&mut app.latency_budget_ms, 0.5..=10.0)
                     .step_by(0.1)
@@ -179,12 +182,10 @@ pub fn render(app: &mut VntxGuiApp, ui: &mut Ui) {
                     .color(TEXT_MUTED)
                     .size(13.0_f32),
             );
-            ui.label(
-                RichText::new("ℹ")
-                    .color(ACCENT_BLUE)
-                    .size(13.0_f32),
-            )
-            .on_hover_text("Substitui apenas texturas de alta resolução (>= 1024px), que respondem pela maior parte da VRAM do jogo.");
+            help_tooltip(
+                ui,
+                "Substitui apenas texturas de alta resolução (>= 1024px), que respondem pela maior parte da VRAM do jogo.",
+            );
             egui::ComboBox::from_id_source("min_res_combobox")
                 .selected_text(match app.min_resolution_threshold {
                     512 => "512 x 512 (Agressivo)",
@@ -212,12 +213,10 @@ pub fn render(app: &mut VntxGuiApp, ui: &mut Ui) {
                 &mut app.preserve_special_maps,
                 "Preserve Normal & Roughness Maps (Passthrough)",
             );
-            ui.label(
-                RichText::new("ℹ")
-                    .color(ACCENT_BLUE)
-                    .size(13.0_f32),
-            )
-            .on_hover_text("Preserva mapas de Normal e Roughness no formato original do driver para evitar distorções de iluminação.");
+            help_tooltip(
+                ui,
+                "Preserva mapas de Normal e Roughness no formato original do driver para evitar distorções de iluminação.",
+            );
         });
     });
 
@@ -229,20 +228,13 @@ pub fn render(app: &mut VntxGuiApp, ui: &mut Ui) {
     );
     let can_compress = app.selected_game_id.is_some() && !is_compressing;
 
-    let comp_btn = egui::Button::new(
-        RichText::new("🚀 Start Neural Compression")
-            .size(15.0_f32)
-            .strong()
-            .color(Color32::WHITE),
-    )
-    .fill(if can_compress {
-        ACCENT_GREEN
-    } else {
-        Color32::from_rgb(45, 55, 72)
-    })
-    .rounding(ROUNDING_MD);
-
-    if ui.add_enabled(can_compress, comp_btn).clicked() {
+    if ui
+        .add_enabled(
+            can_compress,
+            btn_primary(format!("{} Start Neural Compression", ICON_ROCKET)),
+        )
+        .clicked()
+    {
         if let Some(target_id) = app.selected_game_id {
             if let Some(game) = app
                 .discovered_games
@@ -342,7 +334,7 @@ pub fn render(app: &mut VntxGuiApp, ui: &mut Ui) {
             }
             CompressionStatus::Scanning => {
                 ui.label(
-                    RichText::new("🔍 Scanning game directories for texture assets...")
+                    RichText::new(format!("{} Scanning game directories for texture assets...", ICON_SEARCH))
                         .color(ACCENT_BLUE),
                 );
                 ui.add_space(4.0_f32);
@@ -357,7 +349,8 @@ pub fn render(app: &mut VntxGuiApp, ui: &mut Ui) {
                 };
                 ui.label(
                     RichText::new(format!(
-                        "⚡ Compressing textures ({processed}/{total})..."
+                        "{} Compressing textures ({processed}/{total})...",
+                        ICON_VNTX
                     ))
                     .color(Color32::from_rgb(255, 152, 0)),
                 );
@@ -371,7 +364,8 @@ pub fn render(app: &mut VntxGuiApp, ui: &mut Ui) {
             } => {
                 ui.label(
                     RichText::new(format!(
-                        "✓ Finished! Compressed {processed} of {total} textures. Saved {saved_mb:.2} MB VRAM."
+                        "{} Finished! Compressed {processed} of {total} textures. Saved {saved_mb:.2} MB VRAM.",
+                        ICON_CHECK
                     ))
                     .color(ACCENT_GREEN)
                     .strong(),
@@ -381,7 +375,7 @@ pub fn render(app: &mut VntxGuiApp, ui: &mut Ui) {
             }
             CompressionStatus::Failed(reason) => {
                 ui.label(
-                    RichText::new(format!("✗ Compression failed: {reason}"))
+                    RichText::new(format!("{} Compression failed: {reason}", ICON_ERROR))
                         .color(ACCENT_RED)
                         .strong(),
                 );
