@@ -165,7 +165,7 @@ fn render_left_column(app: &mut VntxGuiApp, ui: &mut Ui) {
                 );
                 ui.add_space(6.0_f32);
                 ui.label(
-                    RichText::new("• Motor Quantizado INT8 Hardware (Requer NVIDIA RTX Tensor Cores ou AMD RDNA4 Matrix Accelerators): Execução direta em núcleos de IA dedicados para máxima redução de VRAM sem custo de FPS.\n• Motor FP16 Standard (Compatível com qualquer GPU Vulkan/LavaPipe/WSL2): Execução via Compute Shaders padrão.")
+                    RichText::new("- Motor Quantizado INT8 Hardware (Requer NVIDIA RTX Tensor Cores ou AMD RDNA4 Matrix Accelerators): Execução direta em núcleos de IA dedicados para máxima redução de VRAM sem custo de FPS.\n- Motor FP16 Standard (Compatível com qualquer GPU Vulkan/LavaPipe/WSL2): Execução via Compute Shaders padrão.")
                         .color(TEXT_MUTED)
                         .size(12.0_f32),
                 );
@@ -267,7 +267,7 @@ fn render_right_column(app: &mut VntxGuiApp, ui: &mut Ui) {
             ui.label(RichText::new("Default Quality:").color(TEXT_PRIMARY));
             help_tooltip(
                 ui,
-                "Preset padrão para treinamento de texturas:\n• Fast: 1 camada MLP (máxima velocidade).\n• Balanced: 3 camadas MLP (ótimo para texturas 2K/4K).\n• Max Savings: Quantização INT8 densa.",
+                "Preset padrão para treinamento de texturas:\n- Fast: 1 camada MLP (máxima velocidade).\n- Balanced: 3 camadas MLP (ótimo para texturas 2K/4K).\n- Max Savings: Quantização INT8 densa.",
             );
             let fast_label = if rec.recommended_quality == "fast" {
                 "Fast (1 Layer MLP) (Recommended)".to_string()
@@ -302,7 +302,7 @@ fn render_right_column(app: &mut VntxGuiApp, ui: &mut Ui) {
             ui.label(RichText::new("Target Precision:").color(TEXT_PRIMARY));
             help_tooltip(
                 ui,
-                "Precisão dos pesos neurais:\n• FP16: Qualidade visual máxima (padrão).\n• INT8: Reduz o tamanho de VRAM pela metade usando aceleração por Tensor Cores sem perda perceptível de qualidade.",
+                "Precisão dos pesos neurais:\n- FP16: Qualidade visual máxima (padrão).\n- INT8: Reduz o tamanho de VRAM pela metade usando aceleração por Tensor Cores sem perda perceptível de qualidade.",
             );
             let fp16_label = if rec.recommended_precision == "fp16" {
                 "FP16 Standard (Recommended)".to_string()

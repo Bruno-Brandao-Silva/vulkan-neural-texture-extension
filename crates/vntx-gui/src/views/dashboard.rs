@@ -3,9 +3,7 @@
 use crate::app::{Tab, VntxGuiApp};
 use crate::theme::{
     btn_secondary, card_frame, page_header, pill_badge, ACCENT_AMBER, ACCENT_BLUE, ACCENT_GREEN,
-    ACCENT_PURPLE, ACCENT_RED, ICON_CACHE, ICON_COMPRESSOR, ICON_GAMES, ICON_GPU, ICON_INFO,
-    ICON_REFRESH, ICON_STATUS_ACTIVE, ICON_STATUS_INACTIVE, ICON_STATUS_STANDBY, ICON_VNTX,
-    TEXT_MUTED, TEXT_PRIMARY,
+    ACCENT_PURPLE, ACCENT_RED, TEXT_MUTED, TEXT_PRIMARY,
 };
 use eframe::egui::{self, Color32, ProgressBar, RichText, Ui};
 use vntx_core::{expand_home_path, VntxConfig};
@@ -13,40 +11,49 @@ use vntx_core::{expand_home_path, VntxConfig};
 /// Renders the dashboard view.
 #[allow(clippy::too_many_lines)]
 pub fn render(app: &mut VntxGuiApp, ui: &mut Ui) {
+    ui.set_min_size(ui.available_size());
+    ui.set_width(ui.available_width());
+    ui.set_height(ui.available_height());
+
     ui.horizontal(|ui| {
+        ui.set_width(ui.available_width());
         page_header(
             ui,
             "System & Optimization Overview",
             "Real-time GPU telemetry, VRAM consumption, and anti-stutter layer status.",
         );
         ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-            if ui
-                .add(btn_secondary(format!("{} Refresh Telemetry", ICON_REFRESH)))
-                .clicked()
-            {
+            if ui.add(btn_secondary("Refresh Telemetry")).clicked() {
                 app.refresh_all();
                 app.set_toast("Telemetry and cache metrics refreshed.");
             }
         });
     });
 
-    // 1. Real-Time Hardware Telemetry Card
-    let available_w = ui.available_width();
-    card_frame().show(ui, |ui| {
-        ui.set_width(available_w);
-        ui.horizontal(|ui| {
-            ui.label(
-                RichText::new(format!("{} Host GPU:", ICON_GPU))
-                    .size(15.0_f32)
-                    .strong()
-                    .color(ACCENT_BLUE),
-            );
-            ui.label(
-                RichText::new(&app.gpu_telemetry.device_name)
-                    .size(15.0_f32)
-                    .strong()
-                    .color(TEXT_PRIMARY),
-            );
+    egui::ScrollArea::vertical()
+        .auto_shrink([false, false])
+        .show(ui, |ui| {
+            ui.set_min_size(ui.available_size());
+            ui.set_width(ui.available_width());
+            ui.set_height(ui.available_height());
+
+            // 1. Real-Time Hardware Telemetry Card
+            let available_w = ui.available_width();
+            card_frame().show(ui, |ui| {
+                ui.set_width(available_w);
+                ui.horizontal(|ui| {
+                    ui.label(
+                        RichText::new("Host GPU:")
+                            .size(15.0_f32)
+                            .strong()
+                            .color(ACCENT_BLUE),
+                    );
+                    ui.label(
+                        RichText::new(&app.gpu_telemetry.device_name)
+                            .size(15.0_f32)
+                            .strong()
+                            .color(TEXT_PRIMARY),
+                    );
 
             if app.gpu_telemetry.is_available {
                 ui.add_space(8.0_f32);
@@ -111,7 +118,7 @@ pub fn render(app: &mut VntxGuiApp, ui: &mut Ui) {
         ui.set_width(available_w);
         ui.horizontal(|ui| {
             ui.label(
-                RichText::new(format!("{} Vulkan Implicit Layer Status:", ICON_VNTX))
+                RichText::new("Vulkan Implicit Layer Status:")
                     .size(14.0_f32)
                     .strong()
                     .color(TEXT_PRIMARY),
@@ -120,27 +127,21 @@ pub fn render(app: &mut VntxGuiApp, ui: &mut Ui) {
             if is_layer_enabled {
                 pill_badge(
                     ui,
-                    &format!(
-                        "{} ACTIVE (Anti-Stutter Guardrails Enabled)",
-                        ICON_STATUS_ACTIVE
-                    ),
+                    "ACTIVE (Anti-Stutter Guardrails Enabled)",
                     Color32::from_rgb(6, 78, 59),
                     ACCENT_GREEN,
                 );
             } else if is_layer_installed {
                 pill_badge(
                     ui,
-                    &format!("{} STANDBY (Disabled in ntc.toml)", ICON_STATUS_STANDBY),
+                    "STANDBY (Disabled in ntc.toml)",
                     Color32::from_rgb(69, 50, 10),
                     ACCENT_AMBER,
                 );
             } else {
                 pill_badge(
                     ui,
-                    &format!(
-                        "{} NOT REGISTERED (Manifest not found in ~/.local/share/vulkan/)",
-                        ICON_STATUS_INACTIVE
-                    ),
+                    "NOT REGISTERED (Manifest not found in ~/.local/share/vulkan/)",
                     Color32::from_rgb(45, 55, 72),
                     TEXT_MUTED,
                 );
@@ -250,27 +251,15 @@ pub fn render(app: &mut VntxGuiApp, ui: &mut Ui) {
     ui.add_space(8.0_f32);
 
     ui.horizontal(|ui| {
-        if ui
-            .add(btn_secondary(format!("{} Browse Steam Games", ICON_GAMES)))
-            .clicked()
-        {
+        if ui.add(btn_secondary("Browse Steam Games")).clicked() {
             app.selected_tab = Tab::Games;
         }
 
-        if ui
-            .add(btn_secondary(format!(
-                "{} Open Compressor",
-                ICON_COMPRESSOR
-            )))
-            .clicked()
-        {
+        if ui.add(btn_secondary("Open Compressor")).clicked() {
             app.selected_tab = Tab::Compressor;
         }
 
-        if ui
-            .add(btn_secondary(format!("{} Manage Cache", ICON_CACHE)))
-            .clicked()
-        {
+        if ui.add(btn_secondary("Manage Cache")).clicked() {
             app.selected_tab = Tab::Cache;
         }
     });
@@ -279,26 +268,27 @@ pub fn render(app: &mut VntxGuiApp, ui: &mut Ui) {
     card_frame().show(ui, |ui| {
         ui.set_width(ui.available_width());
         ui.label(
-            RichText::new(format!("{} Dynamic Neural Texture Extension Architecture", ICON_INFO))
+            RichText::new("Dynamic Neural Texture Extension Architecture")
                 .strong()
                 .color(ACCENT_BLUE),
         );
         ui.add_space(4.0_f32);
         ui.label(
-            RichText::new("• Staging Buffer Transcoding: Neural textures are decompressed in host staging memory on copy commands.")
+            RichText::new("- Staging Buffer Transcoding: Neural textures are decompressed in host staging memory on copy commands.")
                 .color(TEXT_MUTED)
                 .size(12.0_f32),
         );
         ui.label(
-            RichText::new("• Anti-Stutter Guardrail: Any transcoding taking > 2.5ms falls back to pass-through, eliminating stutter.")
+            RichText::new("- Anti-Stutter Guardrail: Any transcoding taking > 2.5ms falls back to pass-through, eliminating stutter.")
                 .color(TEXT_MUTED)
                 .size(12.0_f32),
         );
         ui.label(
-            RichText::new("• Driver Memory Protection: Preserves native VRAM heap requirements and alignment for DX12/VKD3D.")
+            RichText::new("- Driver Memory Protection: Preserves native VRAM heap requirements and alignment for DX12/VKD3D.")
                 .color(TEXT_MUTED)
                 .size(12.0_f32),
         );
+    });
     });
 }
 

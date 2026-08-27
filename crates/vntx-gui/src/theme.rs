@@ -86,11 +86,11 @@ pub const ICON_ERROR: &str = "";
 pub const ICON_STAR: &str = "";
 
 /// Status Bullet (Active / Enabled)
-pub const ICON_STATUS_ACTIVE: &str = "●";
+pub const ICON_STATUS_ACTIVE: &str = "";
 /// Status Bullet (Inactive / Disabled)
-pub const ICON_STATUS_INACTIVE: &str = "○";
+pub const ICON_STATUS_INACTIVE: &str = "";
 /// Status Bullet (Standby / Warning)
-pub const ICON_STATUS_STANDBY: &str = "○";
+pub const ICON_STATUS_STANDBY: &str = "";
 
 /// Hardware GPU Icon
 pub const ICON_GPU: &str = "";

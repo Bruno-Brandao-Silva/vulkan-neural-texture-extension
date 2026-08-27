@@ -12,9 +12,26 @@ while [ $ITERATION -le $MAX_ITERATIONS ] && [ "$APPROVED" = false ]; do
   echo "🔄 Iteração $ITERATION de $MAX_ITERATIONS"
   echo "--------------------------------------------------------"
 
-  # STEP 1: Agente Coder aplica ajustes no código
+  # STEP 1: Agente Coder aplica ajustes no código com Timeout e Retry
   echo "🤖 [Coder Agent] Aplicando alterações de código e layout no vntx-gui..."
-  agy -p "Ajuste o layout do vntx-gui. Garanta containers width(Fill) e height(Fill) no app.rs e settings.rs. Remova max_width fixo. Se houver ícones quebrados ou caixas vazias '□', substitua por textos de rótulo limpos ou fontes nativas."
+  
+  # Aumenta o timeout padrão do agy e tenta até 2 vezes se der timeout na API
+  CODER_SUCCESS=false
+  for attempt in 1 2; do
+    if AGY_TIMEOUT=300 agy -p "Ajuste o layout do vntx-gui. Remova o max_width fixo no app.rs e settings.rs usando width(Fill) e height(Fill). Se houver caixas vazias '□', troque por textos/labels limpos."; then
+      CODER_SUCCESS=true
+      break
+    else
+      echo "⚠️ Timeout ou erro no agy (Tentativa $attempt/2). Aguardando 5s..."
+      sleep 5
+    fi
+  done
+
+  if [ "$CODER_SUCCESS" = false ]; then
+    echo "❌ Falha contínua de Timeout na API do agy. Pulando para a próxima iteração..."
+    ITERATION=$((ITERATION + 1))
+    continue
+  fi
 
   # STEP 2: Agente Auditor de Código (Build + Formatação + Testes)
   echo "🧪 [Code Auditor] Validando testes e formatação..."

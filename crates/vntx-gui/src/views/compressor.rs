@@ -3,8 +3,7 @@
 use crate::app::{CompressionStatus, Tab, VntxGuiApp, WorkerMessage};
 use crate::theme::{
     btn_primary, card_frame, help_tooltip, hero_empty_state, page_header, ACCENT_BLUE,
-    ACCENT_GREEN, ACCENT_RED, ICON_CHECK, ICON_COMPRESSOR, ICON_ERROR, ICON_ROCKET, ICON_SEARCH,
-    ICON_SETTINGS, ICON_SHIELD, ICON_STAR, ICON_VNTX, TEXT_MUTED, TEXT_PRIMARY,
+    ACCENT_GREEN, ACCENT_RED, TEXT_MUTED, TEXT_PRIMARY,
 };
 use eframe::egui::{self, Color32, ProgressBar, RichText, Ui};
 use std::sync::mpsc::channel;
@@ -15,6 +14,10 @@ use vntx_trainer::TrainingOrchestrator;
 /// Renders the compression panel.
 #[allow(clippy::too_many_lines)]
 pub fn render(app: &mut VntxGuiApp, ui: &mut Ui) {
+    ui.set_min_size(ui.available_size());
+    ui.set_width(ui.available_width());
+    ui.set_height(ui.available_height());
+
     page_header(
         ui,
         "Neural Texture Compressor",
@@ -30,120 +33,127 @@ pub fn render(app: &mut VntxGuiApp, ui: &mut Ui) {
     if game_names.is_empty() {
         if hero_empty_state(
             ui,
-            ICON_COMPRESSOR,
+            "",
             "No Target Games Found",
             "There are currently no Steam games detected to optimize. Make sure your Steam library paths are correctly set in the Settings tab.",
-            Some(&format!("{} Configure Library Paths", ICON_SETTINGS)),
+            Some("Configure Library Paths"),
         ) {
             app.selected_tab = Tab::Settings;
         }
         return;
     }
 
-    let available_w = ui.available_width();
+    egui::ScrollArea::vertical()
+        .auto_shrink([false, false])
+        .show(ui, |ui| {
+            ui.set_min_size(ui.available_size());
+            ui.set_width(ui.available_width());
+            ui.set_height(ui.available_height());
 
-    // 1. Target Game Selector Card
-    card_frame().show(ui, |ui| {
-        ui.set_width(available_w);
-        ui.label(
-            RichText::new("Target Game:")
-                .strong()
-                .size(14.0_f32)
-                .color(TEXT_PRIMARY),
-        );
-        ui.add_space(4.0_f32);
+            let available_w = ui.available_width();
 
-        let current_label = if let Some(selected_id) = app.selected_game_id {
-            game_names
-                .iter()
-                .find(|(id, _)| *id == selected_id)
-                .map_or("Select a game...", |(_, name)| name.as_str())
-        } else {
-            "Select a game..."
-        };
+            // 1. Target Game Selector Card
+            card_frame().show(ui, |ui| {
+                ui.set_width(available_w);
+                ui.label(
+                    RichText::new("Target Game:")
+                        .strong()
+                        .size(14.0_f32)
+                        .color(TEXT_PRIMARY),
+                );
+                ui.add_space(4.0_f32);
 
-        egui::ComboBox::from_label("")
-            .selected_text(current_label)
-            .show_ui(ui, |ui| {
-                for (id, name) in &game_names {
-                    let is_selected = app.selected_game_id == Some(*id);
-                    if ui.selectable_label(is_selected, name).clicked() {
-                        app.selected_game_id = Some(*id);
-                    }
-                }
+                let current_label = if let Some(selected_id) = app.selected_game_id {
+                    game_names
+                        .iter()
+                        .find(|(id, _)| *id == selected_id)
+                        .map_or("Select a game...", |(_, name)| name.as_str())
+                } else {
+                    "Select a game..."
+                };
+
+                egui::ComboBox::from_label("")
+                    .selected_text(current_label)
+                    .show_ui(ui, |ui| {
+                        for (id, name) in &game_names {
+                            let is_selected = app.selected_game_id == Some(*id);
+                            if ui.selectable_label(is_selected, name).clicked() {
+                                app.selected_game_id = Some(*id);
+                            }
+                        }
+                    });
             });
-    });
 
-    ui.add_space(10.0_f32);
+            ui.add_space(10.0_f32);
 
-    let rec = vntx_core::get_recommended_settings();
+            let rec = vntx_core::get_recommended_settings();
 
-    // 2. Quality Presets & Threads Card
-    card_frame().show(ui, |ui| {
-        ui.set_width(available_w);
-        ui.horizontal(|ui| {
-            ui.label(
-                RichText::new("Compression Presets:")
-                    .strong()
-                    .size(14.0_f32)
-                    .color(TEXT_PRIMARY),
-            );
-            help_tooltip(
-                ui,
-                "Presets pré-configurados de densidade e fidelidade:\n• Fast: 1 camada MLP ultra-leve.\n• Balanced: 3 camadas MLP (0.99 SSIM, fidelidade perfeita).\n• Max Savings: Quantização INT8 de alta compressão.",
-            );
-        });
+            // 2. Quality Presets & Threads Card
+            card_frame().show(ui, |ui| {
+                ui.set_width(available_w);
+                ui.horizontal(|ui| {
+                    ui.label(
+                        RichText::new("Compression Presets:")
+                            .strong()
+                            .size(14.0_f32)
+                            .color(TEXT_PRIMARY),
+                    );
+                    help_tooltip(
+                        ui,
+                        "Presets pré-configurados de densidade e fidelidade:\n- Fast: 1 camada MLP ultra-leve.\n- Balanced: 3 camadas MLP (0.99 SSIM, fidelidade perfeita).\n- Max Savings: Quantização INT8 de alta compressão.",
+                    );
+                });
 
-        ui.add_space(6.0_f32);
-        ui.horizontal(|ui| {
-            let fast_text = if rec.recommended_quality == "fast" {
-                format!("Fast (1-layer MLP) {} (Recomendado)", ICON_STAR)
-            } else {
-                "Fast (1-layer MLP)".to_string()
-            };
-            let balanced_text = if rec.recommended_quality == "balanced" {
-                format!("Balanced (3-layer MLP) {} (Recomendado)", ICON_STAR)
-            } else {
-                "Balanced (3-layer MLP)".to_string()
-            };
-            let max_text = if rec.recommended_quality == "max-savings" {
-                format!("Max Savings (INT8 Quantized) {} (Recomendado)", ICON_STAR)
-            } else {
-                "Max Savings (INT8 Quantized)".to_string()
-            };
+                ui.add_space(6.0_f32);
+                ui.horizontal(|ui| {
+                    let fast_text = if rec.recommended_quality == "fast" {
+                        "Fast (1 Layer MLP) (Recommended)".to_string()
+                    } else {
+                        "Fast (1 Layer MLP)".to_string()
+                    };
+                    let balanced_text = if rec.recommended_quality == "balanced" {
+                        "Balanced (3 Layers MLP) (Recommended)".to_string()
+                    } else {
+                        "Balanced (3 Layers MLP)".to_string()
+                    };
+                    let max_text = if rec.recommended_quality == "max-savings" {
+                        "Max Savings (INT8 Quantized) (Recommended)".to_string()
+                    } else {
+                        "Max Savings (INT8 Quantized)".to_string()
+                    };
 
-            ui.radio_value(&mut app.selected_quality, "fast".to_string(), fast_text);
-            ui.radio_value(&mut app.selected_quality, "balanced".to_string(), balanced_text);
-            ui.radio_value(&mut app.selected_quality, "max-savings".to_string(), max_text);
-        });
+                    ui.radio_value(&mut app.selected_quality, "fast".to_string(), fast_text);
+                    ui.radio_value(&mut app.selected_quality, "balanced".to_string(), balanced_text);
+                    ui.radio_value(&mut app.selected_quality, "max-savings".to_string(), max_text);
+                });
 
-        ui.add_space(8.0_f32);
-        ui.horizontal(|ui| {
-            ui.label(
-                RichText::new("Parallel Worker Threads:")
-                    .color(TEXT_MUTED)
-                    .size(13.0_f32),
-            );
-            help_tooltip(
-                ui,
-                "Threads paralelas alocadas para treinar e compilar as texturas em segundo plano.",
-            );
-            ui.add(egui::Slider::new(&mut app.worker_jobs, 1..=16));
-        });
-    });
+                ui.add_space(8.0_f32);
+                ui.horizontal(|ui| {
+                    ui.label(
+                        RichText::new("Parallel Worker Threads:")
+                            .color(TEXT_MUTED)
+                            .size(13.0_f32),
+                    );
+                    help_tooltip(
+                        ui,
+                        "Threads paralelas alocadas para treinar e compilar as texturas em segundo plano.",
+                    );
+                    ui.add(egui::Slider::new(&mut app.worker_jobs, 1..=16));
+                });
+            });
 
-    ui.add_space(10.0_f32);
+            ui.add_space(10.0_f32);
 
-    // 3. Anti-Stutter Guardrails Card
-    card_frame().show(ui, |ui| {
-        ui.set_width(available_w);
-        ui.horizontal(|ui| {
-            ui.label(
-                RichText::new(format!("{} Anti-Stutter Guardrails & Filter Thresholds:", ICON_SHIELD))
-                    .strong()
-                    .size(14.0_f32)
-                    .color(ACCENT_GREEN),
-            );
+            // 3. Anti-Stutter Guardrails Card
+            card_frame().show(ui, |ui| {
+                ui.set_width(available_w);
+                ui.horizontal(|ui| {
+                    ui.label(
+                        RichText::new("Anti-Stutter Guardrails & Filter Thresholds:")
+                            .strong()
+                            .size(14.0_f32)
+                            .color(ACCENT_GREEN),
+                    );
             help_tooltip(
                 ui,
                 "Mecanismos anti-engasgo (anti-stutter) que garantem taxa de quadros estável em tempo de execução.",
@@ -231,7 +241,7 @@ pub fn render(app: &mut VntxGuiApp, ui: &mut Ui) {
     if ui
         .add_enabled(
             can_compress,
-            btn_primary(format!("{} Start Neural Compression", ICON_ROCKET)),
+            btn_primary("Start Neural Compression"),
         )
         .clicked()
     {
@@ -334,7 +344,7 @@ pub fn render(app: &mut VntxGuiApp, ui: &mut Ui) {
             }
             CompressionStatus::Scanning => {
                 ui.label(
-                    RichText::new(format!("{} Scanning game directories for texture assets...", ICON_SEARCH))
+                    RichText::new("Scanning game directories for texture assets...")
                         .color(ACCENT_BLUE),
                 );
                 ui.add_space(4.0_f32);
@@ -349,8 +359,7 @@ pub fn render(app: &mut VntxGuiApp, ui: &mut Ui) {
                 };
                 ui.label(
                     RichText::new(format!(
-                        "{} Compressing textures ({processed}/{total})...",
-                        ICON_VNTX
+                        "Compressing textures ({processed}/{total})..."
                     ))
                     .color(Color32::from_rgb(255, 152, 0)),
                 );
@@ -364,8 +373,7 @@ pub fn render(app: &mut VntxGuiApp, ui: &mut Ui) {
             } => {
                 ui.label(
                     RichText::new(format!(
-                        "{} Finished! Compressed {processed} of {total} textures. Saved {saved_mb:.2} MB VRAM.",
-                        ICON_CHECK
+                        "Finished! Compressed {processed} of {total} textures. Saved {saved_mb:.2} MB VRAM."
                     ))
                     .color(ACCENT_GREEN)
                     .strong(),
@@ -375,11 +383,12 @@ pub fn render(app: &mut VntxGuiApp, ui: &mut Ui) {
             }
             CompressionStatus::Failed(reason) => {
                 ui.label(
-                    RichText::new(format!("{} Compression failed: {reason}", ICON_ERROR))
+                    RichText::new(format!("Compression failed: {reason}"))
                         .color(ACCENT_RED)
                         .strong(),
                 );
             }
         }
+    });
     });
 }
