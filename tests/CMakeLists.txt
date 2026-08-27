@@ -7,6 +7,7 @@ add_executable(ntc_headless_test
     headless/test_vulkan_interception.cpp
     headless/test_visual_quality.cpp
     headless/test_fallback.cpp
+    headless/test_stress_boundary.cpp
 )
 
 target_include_directories(ntc_headless_test
