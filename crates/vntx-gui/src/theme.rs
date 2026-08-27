@@ -1,7 +1,7 @@
 //! Modern Design System & Theme Engine for `vntx-gui`.
 //!
 //! Provides standardized color palettes, typography styling, elevated card frames,
-//! pill status badges, universal icon constants, and expressive hero empty states.
+//! pill status badges, universal basic Unicode icon constants, and expressive hero empty states.
 
 use eframe::egui::{
     self, Button, Color32, Frame, Margin, RichText, Rounding, Stroke, Ui, Vec2, Visuals,
@@ -48,21 +48,23 @@ pub const ROUNDING_MD: Rounding = Rounding::same(8.0_f32);
 pub const ROUNDING_PILL: Rounding = Rounding::same(16.0_f32);
 
 // ==============================================================================
-// 3. Universal Icon Glyph Constants (Crisp UTF-8 compatible)
+// 3. Universal Basic Unicode Icon Constants (100% Tofu-Free across all Linux distros)
 // ==============================================================================
 
 /// Brand Logo / Neural Icon
 pub const ICON_VNTX: &str = "⚡";
 /// Dashboard Tab Icon
-pub const ICON_DASHBOARD: &str = "📊";
+pub const ICON_DASHBOARD: &str = "◈";
 /// Steam Games Tab Icon
-pub const ICON_GAMES: &str = "🎮";
+pub const ICON_GAMES: &str = "▶";
 /// Neural Compressor Tab Icon
 pub const ICON_COMPRESSOR: &str = "⚡";
 /// Cache Manager Tab Icon
-pub const ICON_CACHE: &str = "🗄";
+pub const ICON_CACHE: &str = "▣";
 /// Settings Tab Icon
 pub const ICON_SETTINGS: &str = "⚙";
+/// Library Paths Icon
+pub const ICON_PATHS: &str = "◈";
 
 /// Refresh Action Icon
 pub const ICON_REFRESH: &str = "↻";
@@ -73,7 +75,7 @@ pub const ICON_CLEAR: &str = "✕";
 /// Delete / Purge Icon
 pub const ICON_DELETE: &str = "✕";
 /// Copy to Clipboard Icon
-pub const ICON_COPY: &str = "📋";
+pub const ICON_COPY: &str = "❐";
 /// Help / Info Tooltip Icon
 pub const ICON_INFO: &str = "ℹ";
 /// Check / Success Status Icon
@@ -83,16 +85,23 @@ pub const ICON_ERROR: &str = "✗";
 /// Recommendation Star Icon
 pub const ICON_STAR: &str = "★";
 
+/// Status Bullet (Active / Enabled)
+pub const ICON_STATUS_ACTIVE: &str = "●";
+/// Status Bullet (Inactive / Disabled)
+pub const ICON_STATUS_INACTIVE: &str = "○";
+/// Status Bullet (Standby / Warning)
+pub const ICON_STATUS_STANDBY: &str = "◐";
+
 /// Hardware GPU Icon
-pub const ICON_GPU: &str = "🖥";
+pub const ICON_GPU: &str = "◈";
 /// Anti-Stutter Shield Icon
-pub const ICON_SHIELD: &str = "🛡";
+pub const ICON_SHIELD: &str = "◆";
 /// Rocket Launch Action Icon
-pub const ICON_ROCKET: &str = "🚀";
+pub const ICON_ROCKET: &str = "⚡";
 /// Lightbulb Recommendation Icon
-pub const ICON_LIGHTBULB: &str = "💡";
+pub const ICON_LIGHTBULB: &str = "★";
 /// Save Changes Icon
-pub const ICON_SAVE: &str = "💾";
+pub const ICON_SAVE: &str = "✓";
 
 // ==============================================================================
 // 4. Custom Theme Application

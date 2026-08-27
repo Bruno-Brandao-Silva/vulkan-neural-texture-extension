@@ -3,41 +3,53 @@
 use crate::app::VntxGuiApp;
 use crate::theme::{
     btn_primary, card_frame, help_tooltip, page_header, pill_badge, ACCENT_BLUE, ACCENT_GREEN,
-    ICON_LIGHTBULB, ICON_SAVE, ICON_SEARCH, ICON_SETTINGS, ICON_SHIELD, ICON_STAR, ICON_VNTX,
-    TEXT_MUTED, TEXT_PRIMARY,
+    ICON_LIGHTBULB, ICON_PATHS, ICON_SAVE, ICON_SEARCH, ICON_SETTINGS, ICON_SHIELD, ICON_STAR,
+    ICON_STATUS_ACTIVE, ICON_STATUS_INACTIVE, ICON_VNTX, TEXT_MUTED, TEXT_PRIMARY,
 };
 use eframe::egui::{self, Color32, RichText, Ui};
 use vntx_core::{get_recommended_settings, VntxConfig};
 
 /// Renders the settings view.
 pub fn render(app: &mut VntxGuiApp, ui: &mut Ui) {
-    page_header(
-        ui,
-        "Preferences & Configuration",
-        &format!(
-            "Configuration file: {}",
-            VntxConfig::default_config_path().display()
-        ),
-    );
-
-    egui::ScrollArea::vertical().show(ui, |ui| {
-        let available_width = ui.available_width();
-        let use_two_columns = available_width >= 680.0_f32;
-
-        if use_two_columns {
-            ui.columns(2, |columns| {
-                // Left Column: Diagnostics + General + Paths
-                render_left_column(app, &mut columns[0]);
-                // Right Column: Compression Defaults + Guardrails + Save Action
-                render_right_column(app, &mut columns[1]);
-            });
-        } else {
-            // Single fluid column
-            render_left_column(app, ui);
-            ui.add_space(12.0_f32);
-            render_right_column(app, ui);
-        }
+    ui.horizontal(|ui| {
+        page_header(
+            ui,
+            "Preferences & Configuration",
+            &format!(
+                "Configuration file: {}",
+                VntxConfig::default_config_path().display()
+            ),
+        );
+        ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+            if ui
+                .add(btn_primary(format!("{} Save Settings", ICON_SAVE)))
+                .clicked()
+            {
+                save_settings(app);
+            }
+        });
     });
+
+    egui::ScrollArea::vertical()
+        .auto_shrink([false, false])
+        .show(ui, |ui| {
+            let available_width = ui.available_width();
+            let use_two_columns = available_width >= 680.0_f32;
+
+            if use_two_columns {
+                ui.columns(2, |columns| {
+                    // Left Column (50%): Diagnostics + General + Paths
+                    render_left_column(app, &mut columns[0]);
+                    // Right Column (50%): Compression Defaults + Guardrails + Save Action
+                    render_right_column(app, &mut columns[1]);
+                });
+            } else {
+                // Single fluid column
+                render_left_column(app, ui);
+                ui.add_space(12.0_f32);
+                render_right_column(app, ui);
+            }
+        });
 }
 
 fn render_left_column(app: &mut VntxGuiApp, ui: &mut Ui) {
@@ -50,7 +62,7 @@ fn render_left_column(app: &mut VntxGuiApp, ui: &mut Ui) {
         ui.set_width(available_w);
         ui.heading(
             RichText::new(format!("{} System Capabilities & Diagnostics", ICON_SEARCH))
-                .size(15.0_f32)
+                .size(15.5_f32)
                 .strong()
                 .color(TEXT_PRIMARY),
         );
@@ -66,14 +78,14 @@ fn render_left_column(app: &mut VntxGuiApp, ui: &mut Ui) {
             if gpu_caps.has_tensor_cores {
                 pill_badge(
                     ui,
-                    "🟢 Active (Hardware INT8 Matrix Acceleration)",
+                    &format!("{} Active (Hardware INT8 Matrix Acceleration)", ICON_STATUS_ACTIVE),
                     Color32::from_rgb(6, 78, 59),
                     ACCENT_GREEN,
                 );
             } else {
                 pill_badge(
                     ui,
-                    "🔴 Não Detectado (Standard Vulkan Compute)",
+                    &format!("{} Não Detectado (Standard Vulkan Compute)", ICON_STATUS_INACTIVE),
                     Color32::from_rgb(60, 45, 20),
                     Color32::from_rgb(255, 193, 7),
                 );
@@ -85,14 +97,14 @@ fn render_left_column(app: &mut VntxGuiApp, ui: &mut Ui) {
             if gpu_caps.has_tensor_cores {
                 pill_badge(
                     ui,
-                    "FP16: 🟢 | INT8 Quantized: 🟢 (Hardware)",
+                    &format!("FP16: {} | INT8 Quantized: {} (Hardware)", ICON_STATUS_ACTIVE, ICON_STATUS_ACTIVE),
                     Color32::from_rgb(6, 78, 59),
                     ACCENT_GREEN,
                 );
             } else {
                 pill_badge(
                     ui,
-                    "FP16: 🟢 (Shader) | INT8: ⚪ (Emulado)",
+                    &format!("FP16: {} (Shader) | INT8: {} (Emulado)", ICON_STATUS_ACTIVE, ICON_STATUS_INACTIVE),
                     Color32::from_rgb(45, 55, 72),
                     TEXT_MUTED,
                 );
@@ -118,7 +130,10 @@ fn render_left_column(app: &mut VntxGuiApp, ui: &mut Ui) {
 
         ui.horizontal(|ui| {
             ui.label(RichText::new("Driver Engine:").strong().color(TEXT_PRIMARY));
-            ui.label(RichText::new("🟢 Vulkan Neural Extension Engine Ready").color(ACCENT_GREEN));
+            ui.label(
+                RichText::new(format!("{} Vulkan Neural Extension Engine Ready", ICON_STATUS_ACTIVE))
+                    .color(ACCENT_GREEN),
+            );
         });
 
         ui.add_space(8.0_f32);
@@ -128,20 +143,25 @@ fn render_left_column(app: &mut VntxGuiApp, ui: &mut Ui) {
             ui.set_width(ui.available_width());
             ui.vertical(|ui| {
                 ui.horizontal(|ui| {
-                    ui.label(RichText::new(ICON_LIGHTBULB).size(16.0_f32));
+                    ui.label(RichText::new(ICON_LIGHTBULB).size(16.0_f32).color(ACCENT_BLUE));
                     ui.label(
                         RichText::new("Ideal Engine Recommendation")
+                            .size(14.0_f32)
                             .strong()
                             .color(ACCENT_BLUE),
                     );
                 });
                 ui.add_space(4.0_f32);
-                ui.label(RichText::new(&rec.guidance_box).size(12.0_f32).color(TEXT_PRIMARY));
+                ui.label(
+                    RichText::new(&rec.guidance_box)
+                        .size(13.5_f32)
+                        .color(TEXT_PRIMARY),
+                );
                 ui.add_space(6.0_f32);
                 ui.label(
-                    RichText::new("• Motor Quantizado INT8 Hardware (Requer NVIDIA RTX Tensor Cores ou AMD RDNA4 Matrix Accelerators): Execução direta em núcleos de IA dedicated para máxima redução de VRAM sem custo de FPS.\n• Motor FP16 Standard (Compatível com qualquer GPU Vulkan/LavaPipe/WSL2): Execução via Compute Shaders padrão.")
+                    RichText::new("• Motor Quantizado INT8 Hardware (Requer NVIDIA RTX Tensor Cores ou AMD RDNA4 Matrix Accelerators): Execução direta em núcleos de IA dedicados para máxima redução de VRAM sem custo de FPS.\n• Motor FP16 Standard (Compatível com qualquer GPU Vulkan/LavaPipe/WSL2): Execução via Compute Shaders padrão.")
                         .color(TEXT_MUTED)
-                        .size(11.0_f32),
+                        .size(12.0_f32),
                 );
             });
         });
@@ -154,7 +174,7 @@ fn render_left_column(app: &mut VntxGuiApp, ui: &mut Ui) {
         ui.set_width(available_w);
         ui.heading(
             RichText::new(format!("{} General Settings", ICON_SETTINGS))
-                .size(15.0_f32)
+                .size(15.5_f32)
                 .strong()
                 .color(TEXT_PRIMARY),
         );
@@ -204,8 +224,8 @@ fn render_left_column(app: &mut VntxGuiApp, ui: &mut Ui) {
     card_frame().show(ui, |ui| {
         ui.set_width(available_w);
         ui.heading(
-            RichText::new("📁 Steam Library Search Paths")
-                .size(15.0_f32)
+            RichText::new(format!("{} Steam Library Search Paths", ICON_PATHS))
+                .size(15.5_f32)
                 .strong()
                 .color(TEXT_PRIMARY),
         );
@@ -229,7 +249,7 @@ fn render_right_column(app: &mut VntxGuiApp, ui: &mut Ui) {
         ui.set_width(available_w);
         ui.heading(
             RichText::new(format!("{} Training & Compression Defaults", ICON_VNTX))
-                .size(15.0_f32)
+                .size(15.5_f32)
                 .strong()
                 .color(TEXT_PRIMARY),
         );
@@ -320,7 +340,7 @@ fn render_right_column(app: &mut VntxGuiApp, ui: &mut Ui) {
         ui.set_width(available_w);
         ui.heading(
             RichText::new(format!("{} Anti-Stutter Guardrails", ICON_SHIELD))
-                .size(15.0_f32)
+                .size(15.5_f32)
                 .strong()
                 .color(ACCENT_GREEN),
         );
@@ -384,24 +404,32 @@ fn render_right_column(app: &mut VntxGuiApp, ui: &mut Ui) {
 
     ui.add_space(14.0_f32);
 
-    // 6. Save Button Card
-    if ui
-        .add(btn_primary(format!("{} Save All Changes", ICON_SAVE)))
-        .clicked()
-    {
-        app.latency_budget_ms = app.config.guardrails.max_latency_ms;
-        app.min_resolution_threshold = app.config.guardrails.min_resolution_threshold;
-        app.preserve_special_maps = app.config.guardrails.preserve_special_maps;
+    // 6. Save Action Button Container (Right-aligned auto-width button)
+    ui.horizontal(|ui| {
+        ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+            if ui
+                .add(btn_primary(format!("{} Save All Changes", ICON_SAVE)))
+                .clicked()
+            {
+                save_settings(app);
+            }
+        });
+    });
+}
 
-        let default_path = VntxConfig::default_config_path();
-        match app.config.save_to_path(&default_path) {
-            Ok(()) => {
-                app.set_toast("Configuration saved successfully!");
-                app.refresh_all();
-            }
-            Err(err) => {
-                app.set_toast(format!("Failed to save config: {err}"));
-            }
+fn save_settings(app: &mut VntxGuiApp) {
+    app.latency_budget_ms = app.config.guardrails.max_latency_ms;
+    app.min_resolution_threshold = app.config.guardrails.min_resolution_threshold;
+    app.preserve_special_maps = app.config.guardrails.preserve_special_maps;
+
+    let default_path = VntxConfig::default_config_path();
+    match app.config.save_to_path(&default_path) {
+        Ok(()) => {
+            app.set_toast("Configuration saved successfully!");
+            app.refresh_all();
+        }
+        Err(err) => {
+            app.set_toast(format!("Failed to save config: {err}"));
         }
     }
 }

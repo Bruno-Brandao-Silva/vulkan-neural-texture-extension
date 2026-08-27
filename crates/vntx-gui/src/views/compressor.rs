@@ -154,7 +154,7 @@ pub fn render(app: &mut VntxGuiApp, ui: &mut Ui) {
 
         ui.horizontal(|ui| {
             ui.label(
-                RichText::new("⏱ Latency Budget Threshold:")
+                RichText::new("Latency Budget Threshold:")
                     .color(TEXT_MUTED)
                     .size(13.0_f32),
             );
@@ -178,7 +178,7 @@ pub fn render(app: &mut VntxGuiApp, ui: &mut Ui) {
 
         ui.horizontal(|ui| {
             ui.label(
-                RichText::new("📐 Minimum Resolution Threshold:")
+                RichText::new("Minimum Resolution Threshold:")
                     .color(TEXT_MUTED)
                     .size(13.0_f32),
             );

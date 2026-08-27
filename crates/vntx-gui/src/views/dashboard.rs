@@ -4,7 +4,8 @@ use crate::app::{Tab, VntxGuiApp};
 use crate::theme::{
     btn_secondary, card_frame, page_header, pill_badge, ACCENT_AMBER, ACCENT_BLUE, ACCENT_GREEN,
     ACCENT_PURPLE, ACCENT_RED, ICON_CACHE, ICON_COMPRESSOR, ICON_GAMES, ICON_GPU, ICON_INFO,
-    ICON_REFRESH, ICON_VNTX, TEXT_MUTED, TEXT_PRIMARY,
+    ICON_REFRESH, ICON_STATUS_ACTIVE, ICON_STATUS_INACTIVE, ICON_STATUS_STANDBY, ICON_VNTX,
+    TEXT_MUTED, TEXT_PRIMARY,
 };
 use eframe::egui::{self, Color32, ProgressBar, RichText, Ui};
 use vntx_core::{expand_home_path, VntxConfig};
@@ -119,21 +120,27 @@ pub fn render(app: &mut VntxGuiApp, ui: &mut Ui) {
             if is_layer_enabled {
                 pill_badge(
                     ui,
-                    "🟢 ACTIVE (Anti-Stutter Guardrails Enabled)",
+                    &format!(
+                        "{} ACTIVE (Anti-Stutter Guardrails Enabled)",
+                        ICON_STATUS_ACTIVE
+                    ),
                     Color32::from_rgb(6, 78, 59),
                     ACCENT_GREEN,
                 );
             } else if is_layer_installed {
                 pill_badge(
                     ui,
-                    "🟡 STANDBY (Disabled in ntc.toml)",
+                    &format!("{} STANDBY (Disabled in ntc.toml)", ICON_STATUS_STANDBY),
                     Color32::from_rgb(69, 50, 10),
                     ACCENT_AMBER,
                 );
             } else {
                 pill_badge(
                     ui,
-                    "⚪ NOT REGISTERED (Manifest not found in ~/.local/share/vulkan/)",
+                    &format!(
+                        "{} NOT REGISTERED (Manifest not found in ~/.local/share/vulkan/)",
+                        ICON_STATUS_INACTIVE
+                    ),
                     Color32::from_rgb(45, 55, 72),
                     TEXT_MUTED,
                 );
