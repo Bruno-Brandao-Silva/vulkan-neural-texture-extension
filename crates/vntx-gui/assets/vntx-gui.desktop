@@ -3,9 +3,11 @@ Name=VNTX Control Panel
 GenericName=Vulkan Neural Texture Extension GUI
 Comment=Manage neural texture compression, game optimization, and cache for Vulkan
 Exec=vntx-gui
-Icon=vntx-icon
+Icon=vntx-gui
 Terminal=false
 Type=Application
 Categories=Utility;Game;Graphics;
 Keywords=vulkan;neural;texture;compression;gaming;steam;vram;
 StartupNotify=true
+StartupWMClass=vntx-gui
+

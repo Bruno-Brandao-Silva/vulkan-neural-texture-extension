@@ -147,3 +147,45 @@ pub fn query_gpu_telemetry() -> GpuTelemetry {
     }
 }
 
+/// Recommended hardware settings and engine guidance based on detected GPU capabilities.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct RecommendedSettings {
+    /// Recommended quality preset identifier ("fast", "balanced", "max-savings").
+    pub recommended_quality: &'static str,
+    /// Recommended target precision identifier ("fp16", "int8", "fp32").
+    pub recommended_precision: &'static str,
+    /// Technical explanation of why this configuration is recommended for the detected hardware.
+    pub reason: String,
+    /// User-friendly guidance summary for display in GUI system capabilities diagnostics.
+    pub guidance_box: String,
+}
+
+/// Computes recommended preset and engine guidance based on host GPU architecture.
+#[must_use]
+pub fn get_recommended_settings() -> RecommendedSettings {
+    let caps = detect_gpu_hardware();
+    if caps.has_tensor_cores {
+        RecommendedSettings {
+            recommended_quality: "max-savings",
+            recommended_precision: "int8",
+            reason: "NVIDIA Tensor Cores detected: hardware INT8 matrix multiplication enables 4x VRAM reduction at maximum throughput.".to_string(),
+            guidance_box: "Modo Ideal: INT8 Quantized (Max Savings) com aceleração por Tensor Cores. Máxima economia de VRAM com alta fidelidade visual.".to_string(),
+        }
+    } else if caps.is_nvidia {
+        RecommendedSettings {
+            recommended_quality: "balanced",
+            recommended_precision: "fp16",
+            reason: "NVIDIA GPU detected: FP16 Standard delivers high fidelity and solid VRAM savings.".to_string(),
+            guidance_box: "Modo Ideal: FP16 Standard (Balanced) com 3 camadas MLP. Equilíbrio perfeito entre compressão e fidelidade visual em texturas 2K/4K.".to_string(),
+        }
+    } else {
+        RecommendedSettings {
+            recommended_quality: "balanced",
+            recommended_precision: "fp16",
+            reason: "Vulkan GPU detected: FP16 provides optimal compatibility and decompression speed.".to_string(),
+            guidance_box: "Modo Ideal: FP16 Standard com Guardrails Anti-Stutter (2.5ms). Compatibilidade total e transcodificação suave no buffer de staging.".to_string(),
+        }
+    }
+}
+
+

@@ -26,13 +26,23 @@ fn main() -> eframe::Result<()> {
         .with_target(false)
         .init();
 
+    let icon = eframe::icon_data::from_png_bytes(include_bytes!("../assets/icon.png")).ok();
+
+    let mut viewport = egui::ViewportBuilder::default()
+        .with_title("VNTX - Vulkan Neural Texture Extension")
+        .with_inner_size([960.0, 640.0])
+        .with_min_inner_size([720.0, 480.0])
+        .with_app_id("vntx-gui");
+
+    if let Some(ic) = icon {
+        viewport = viewport.with_icon(ic);
+    }
+
     let native_options = eframe::NativeOptions {
-        viewport: egui::ViewportBuilder::default()
-            .with_title("VNTX - Vulkan Neural Texture Extension")
-            .with_inner_size([960.0, 640.0])
-            .with_min_inner_size([720.0, 480.0]),
+        viewport,
         ..Default::default()
     };
+
 
     eframe::run_native(
         "VNTX Control Panel",

@@ -85,8 +85,11 @@ package() {
     # Install Desktop launcher and scalable SVG icon
     install -Dm644 crates/vntx-gui/assets/vntx-gui.desktop \
         "${pkgdir}/usr/share/applications/vntx-gui.desktop"
+    install -Dm644 crates/vntx-gui/assets/vntx-gui.svg \
+        "${pkgdir}/usr/share/icons/hicolor/scalable/apps/vntx-gui.svg"
     install -Dm644 crates/vntx-gui/assets/vntx-icon.svg \
         "${pkgdir}/usr/share/icons/hicolor/scalable/apps/vntx-icon.svg"
+
 
     # Install documentation and license
     install -Dm644 README.md "${pkgdir}/usr/share/doc/${_pkgname}/README.md"

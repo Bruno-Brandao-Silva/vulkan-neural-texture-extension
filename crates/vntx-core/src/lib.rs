@@ -36,8 +36,12 @@ pub use guardrail::{
     is_within_budget, is_within_budget_us, LatencyGuard, MAX_TRANSCODING_BUDGET_US,
     MAX_TRANSCODING_LATENCY_MS,
 };
-pub use hardware::{detect_gpu_hardware, query_gpu_telemetry, GpuCapabilities, GpuTelemetry};
+pub use hardware::{
+    detect_gpu_hardware, get_recommended_settings, query_gpu_telemetry, GpuCapabilities,
+    GpuTelemetry, RecommendedSettings,
+};
 pub use hash::{compute_texture_hash, format_texture_hash};
+
 pub use scanner::{
     discover_steam_games, find_game_by_query, is_texture_file, parse_acf_manifest,
     parse_vdf_library_folders, scan_game_textures, AssetScanResult, InstalledGame, ScannedTexture,

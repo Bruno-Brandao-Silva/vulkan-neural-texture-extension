@@ -60,30 +60,41 @@ pub fn render(app: &mut VntxGuiApp, ui: &mut Ui) {
 
     ui.add_space(10.0_f32);
 
+    let rec = vntx_core::get_recommended_settings();
+
     // 2. Quality Presets & Threads
     ui.group(|ui| {
-        ui.label(RichText::new("Compression Presets:").strong());
         ui.horizontal(|ui| {
-            ui.radio_value(
-                &mut app.selected_quality,
-                "fast".to_string(),
-                "Fast (1-layer MLP, rapid export)",
+            ui.label(RichText::new("Compression Presets:").strong());
+            ui.label(
+                RichText::new("ℹ")
+                    .color(Color32::from_rgb(100, 181, 246))
+                    .size(13.0_f32),
+            )
+            .on_hover_text(
+                "Presets pré-configurados de densidade e fidelidade:\n• Fast: 1 camada MLP ultra-leve.\n• Balanced: 3 camadas MLP (0.99 SSIM, fidelidade perfeita).\n• Max Savings: Quantização INT8 de alta compressão.",
             );
-            ui.radio_value(
-                &mut app.selected_quality,
-                "balanced".to_string(),
-                "Balanced (3-layer MLP, 0.99 SSIM)",
-            );
-            ui.radio_value(
-                &mut app.selected_quality,
-                "max-savings".to_string(),
-                "Max Savings (INT8 Quantized)",
-            );
+        });
+
+        ui.horizontal(|ui| {
+            let fast_text = if rec.recommended_quality == "fast" { "Fast (1-layer MLP) ⭐ (Recomendado)" } else { "Fast (1-layer MLP)" };
+            let balanced_text = if rec.recommended_quality == "balanced" { "Balanced (3-layer MLP) ⭐ (Recomendado)" } else { "Balanced (3-layer MLP)" };
+            let max_text = if rec.recommended_quality == "max-savings" { "Max Savings (INT8 Quantized) ⭐ (Recomendado)" } else { "Max Savings (INT8 Quantized)" };
+
+            ui.radio_value(&mut app.selected_quality, "fast".to_string(), fast_text);
+            ui.radio_value(&mut app.selected_quality, "balanced".to_string(), balanced_text);
+            ui.radio_value(&mut app.selected_quality, "max-savings".to_string(), max_text);
         });
 
         ui.add_space(8.0_f32);
         ui.horizontal(|ui| {
             ui.label("Parallel Worker Threads:");
+            ui.label(
+                RichText::new("ℹ")
+                    .color(Color32::from_rgb(100, 181, 246))
+                    .size(13.0_f32),
+            )
+            .on_hover_text("Threads paralelas alocadas para treinar e compilar as texturas em segundo plano.");
             ui.add(egui::Slider::new(&mut app.worker_jobs, 1..=16));
         });
     });
@@ -92,15 +103,29 @@ pub fn render(app: &mut VntxGuiApp, ui: &mut Ui) {
 
     // 3. Anti-Stutter Guardrails Panel
     ui.group(|ui| {
-        ui.label(
-            RichText::new("🛡️ Anti-Stutter Guardrails & Filter Thresholds:")
-                .strong()
-                .color(Color32::from_rgb(129, 199, 132)),
-        );
+        ui.horizontal(|ui| {
+            ui.label(
+                RichText::new("🛡️ Anti-Stutter Guardrails & Filter Thresholds:")
+                    .strong()
+                    .color(Color32::from_rgb(129, 199, 132)),
+            );
+            ui.label(
+                RichText::new("ℹ")
+                    .color(Color32::from_rgb(100, 181, 246))
+                    .size(13.0_f32),
+            )
+            .on_hover_text("Mecanismos anti-engasgo (anti-stutter) que garantem taxa de quadros estável em tempo de execução.");
+        });
         ui.add_space(4.0_f32);
 
         ui.horizontal(|ui| {
             ui.label("⏱️ Latency Budget Threshold:");
+            ui.label(
+                RichText::new("ℹ")
+                    .color(Color32::from_rgb(100, 181, 246))
+                    .size(13.0_f32),
+            )
+            .on_hover_text("Limite máximo de tempo (em ms) para a descompressão neural no staging buffer. Se exceder, ativa pass-through automático.");
             ui.add(
                 egui::Slider::new(&mut app.latency_budget_ms, 0.5..=10.0)
                     .step_by(0.1)
@@ -117,18 +142,24 @@ pub fn render(app: &mut VntxGuiApp, ui: &mut Ui) {
 
         ui.horizontal(|ui| {
             ui.label("📐 Minimum Resolution Threshold:");
+            ui.label(
+                RichText::new("ℹ")
+                    .color(Color32::from_rgb(100, 181, 246))
+                    .size(13.0_f32),
+            )
+            .on_hover_text("Substitui apenas texturas de alta resolução (>= 1024px), que respondem pela maior parte da VRAM do jogo.");
             egui::ComboBox::from_id_source("min_res_combobox")
                 .selected_text(match app.min_resolution_threshold {
-                    512 => "512 x 512 (Aggressive)",
+                    512 => "512 x 512 (Agressivo)",
                     2048 => "2048 x 2048 (4K Ultra Only)",
-                    _ => "1024 x 1024 (Standard Balanced)",
+                    _ => "1024 x 1024 (Padrão Balanceado)",
                 })
                 .show_ui(ui, |ui| {
-                    ui.selectable_value(&mut app.min_resolution_threshold, 512, "512 x 512 (Aggressive)");
+                    ui.selectable_value(&mut app.min_resolution_threshold, 512, "512 x 512 (Agressivo)");
                     ui.selectable_value(
                         &mut app.min_resolution_threshold,
                         1024,
-                        "1024 x 1024 (Standard Balanced)",
+                        "1024 x 1024 (Padrão Balanceado)",
                     );
                     ui.selectable_value(
                         &mut app.min_resolution_threshold,
@@ -140,11 +171,20 @@ pub fn render(app: &mut VntxGuiApp, ui: &mut Ui) {
 
 
         ui.add_space(6.0_f32);
-        ui.checkbox(
-            &mut app.preserve_special_maps,
-            "Preserve Normal & Roughness Maps (Passthrough)",
-        );
+        ui.horizontal(|ui| {
+            ui.checkbox(
+                &mut app.preserve_special_maps,
+                "Preserve Normal & Roughness Maps (Passthrough)",
+            );
+            ui.label(
+                RichText::new("ℹ")
+                    .color(Color32::from_rgb(100, 181, 246))
+                    .size(13.0_f32),
+            )
+            .on_hover_text("Preserva mapas de Normal e Roughness no formato original do driver para evitar distorções de iluminação.");
+        });
     });
+
 
     ui.add_space(14.0_f32);
 
