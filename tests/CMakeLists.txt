@@ -8,6 +8,8 @@ add_executable(ntc_headless_test
     headless/test_visual_quality.cpp
     headless/test_fallback.cpp
     headless/test_stress_boundary.cpp
+    headless/test_wsl2_lavapipe.cpp
+    headless/test_guardrail.cpp
 )
 
 target_include_directories(ntc_headless_test

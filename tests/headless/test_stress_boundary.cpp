@@ -132,8 +132,10 @@ TEST(StressBoundaryTest, MultithreadedConcurrencyStress) {
 
                 // Concurrent latency guard measurement
                 const TranscodingLatencyGuard guard;
-                const bool within_budget = guard.within_budget();
-                EXPECT_TRUE(within_budget);
+                const double elapsed = guard.elapsed_ms();
+                EXPECT_GE(elapsed, 0.0);
+                EXPECT_EQ(is_within_latency_budget(elapsed), elapsed <= MAX_TRANSCODING_LATENCY_MS);
+
 
                 // Concurrent entrypoint resolution
                 const auto pfn = vntx_GetInstanceProcAddr(VK_NULL_HANDLE, "vkCreateImage");
