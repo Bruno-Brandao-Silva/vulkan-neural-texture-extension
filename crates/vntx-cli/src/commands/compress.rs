@@ -14,8 +14,12 @@ pub struct CompressArgs {
     pub game: String,
 
     /// Compression quality preset (`fast`, `balanced`, `max-savings`).
-    #[arg(long = "quality", default_value = "balanced")]
+    #[arg(long = "quality", visible_alias = "preset", default_value = "balanced")]
     pub quality: String,
+
+    /// Force INT8 quantization for maximum VRAM savings.
+    #[arg(long = "int8")]
+    pub int8: bool,
 
     /// Number of parallel worker threads.
     #[arg(short = 'j', long = "jobs")]
@@ -64,8 +68,20 @@ pub fn execute(args: &CompressArgs, config: &VntxConfig) -> Result<(), VntxError
     let jobs = args.jobs.unwrap_or(config.training.max_parallel_jobs);
     let orchestrator = TrainingOrchestrator::new(config.clone(), cache_dir.clone());
 
-    println!("Starting parallel compression using {jobs} worker threads...");
-    let summary = orchestrator.compress_textures(game.app_id, &scan_res.textures, jobs)?;
+    let precision_override = if args.int8 || args.quality == "max-savings" {
+        Some(vntx_core::NtcPrecision::Int8)
+    } else {
+        None
+    };
+
+    println!("Starting parallel compression using {jobs} worker threads (preset: {})...", args.quality);
+    let summary = orchestrator.compress_textures_with_preset(
+        game.app_id,
+        &scan_res.textures,
+        jobs,
+        &args.quality,
+        precision_override,
+    )?;
 
     #[allow(clippy::cast_precision_loss)]
     let in_mb = summary.total_input_bytes as f64 / (1024.0 * 1024.0);

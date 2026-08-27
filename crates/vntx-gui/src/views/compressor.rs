@@ -132,10 +132,19 @@ pub fn render(app: &mut VntxGuiApp, ui: &mut Ui) {
                             let cache_dir = app.config.resolved_cache_dir();
                             let orchestrator =
                                 TrainingOrchestrator::new(app.config.clone(), cache_dir);
-                            match orchestrator.compress_textures(
+                            let preset = app.selected_quality.clone();
+                            let precision_override = if preset == "max-savings" {
+                                Some(vntx_core::NtcPrecision::Int8)
+                            } else {
+                                None
+                            };
+
+                            match orchestrator.compress_textures_with_preset(
                                 game.app_id,
                                 &scan_result.textures,
                                 app.worker_jobs,
+                                &preset,
+                                precision_override,
                             ) {
                                 Ok(summary) => {
                                     #[allow(clippy::cast_precision_loss)]
@@ -151,8 +160,10 @@ pub fn render(app: &mut VntxGuiApp, ui: &mut Ui) {
                                     };
                                     app.refresh_cache();
                                     app.set_toast(format!(
-                                        "Successfully compressed {} textures!",
-                                        summary.processed_count
+                                        "Successfully compressed {} textures (saved {:.2} MB)! [Preset: {}]",
+                                        summary.processed_count,
+                                        saved_mb,
+                                        preset
                                     ));
                                 }
                                 Err(err) => {

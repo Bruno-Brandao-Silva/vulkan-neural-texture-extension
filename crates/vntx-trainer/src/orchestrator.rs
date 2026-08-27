@@ -44,26 +44,28 @@ impl TrainingOrchestrator {
         }
     }
 
-    /// Compresses a collection of scanned texture assets in parallel.
+    /// Compresses a collection of scanned texture assets with a specific preset and optional precision override.
     ///
     /// # Errors
     ///
     /// Returns [`VntxError`] if fatal setup errors occur.
-    pub fn compress_textures(
+    pub fn compress_textures_with_preset(
         &self,
         app_id: u32,
         textures: &[ScannedTexture],
         max_jobs: usize,
+        preset: &str,
+        precision: Option<NtcPrecision>,
     ) -> Result<BatchTrainingSummary, VntxError> {
         let pool = rayon::ThreadPoolBuilder::new()
             .num_threads(max_jobs.max(1))
             .build()
             .map_err(|e| VntxError::Io(format!("Failed to build thread pool: {e}")))?;
 
-        let results: Vec<Result<PathBuf, String>> = pool.install(|| {
+        let results: Vec<Result<(PathBuf, u64), String>> = pool.install(|| {
             textures
                 .par_iter()
-                .map(|tex| self.train_single_texture(app_id, &tex.path))
+                .map(|tex| self.train_single_texture_with_preset(app_id, &tex.path, preset, precision))
                 .collect()
         });
 
@@ -74,9 +76,9 @@ impl TrainingOrchestrator {
             summary.total_input_bytes += tex.file_size_bytes;
 
             match res {
-                Ok(path) => {
+                Ok((path, out_bytes)) => {
                     summary.processed_count += 1;
-                    summary.total_output_bytes += 9288;
+                    summary.total_output_bytes += out_bytes;
                     summary.output_files.push(path);
                 }
                 Err(err) => {
@@ -89,17 +91,40 @@ impl TrainingOrchestrator {
         Ok(summary)
     }
 
-    fn train_single_texture(&self, app_id: u32, path: &Path) -> Result<PathBuf, String> {
+    /// Compresses a collection of scanned texture assets in parallel with default balanced settings.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`VntxError`] if fatal setup errors occur.
+    pub fn compress_textures(
+        &self,
+        app_id: u32,
+        textures: &[ScannedTexture],
+        max_jobs: usize,
+    ) -> Result<BatchTrainingSummary, VntxError> {
+        self.compress_textures_with_preset(app_id, textures, max_jobs, "balanced", None)
+    }
+
+    fn train_single_texture_with_preset(
+        &self,
+        app_id: u32,
+        path: &Path,
+        preset: &str,
+        precision_override: Option<NtcPrecision>,
+    ) -> Result<(PathBuf, u64), String> {
         let mut file = File::open(path).map_err(|e| e.to_string())?;
         let mut buffer = Vec::new();
         file.read_to_end(&mut buffer).map_err(|e| e.to_string())?;
 
         let texture_hash = compute_texture_hash(&buffer);
 
-        // Standard 3-layer MLP architecture: Input(2) -> Hidden(64) -> Hidden(64) -> Output(4)
-        let hidden_dim = 64u16;
-        let layers_count = 3u16;
-        let precision = NtcPrecision::Fp16;
+        let (hidden_dim, layers_count, default_precision) = match preset.to_lowercase().as_str() {
+            "fast" => (32u16, 2u16, NtcPrecision::Fp16),
+            "max-savings" => (64u16, 3u16, NtcPrecision::Int8),
+            _ => (64u16, 3u16, NtcPrecision::Fp16),
+        };
+
+        let precision = precision_override.unwrap_or(default_precision);
         let channels = NtcChannels::Rgba;
         let width = 2048u32;
         let height = 2048u32;
@@ -128,8 +153,12 @@ impl TrainingOrchestrator {
             *byte = hash_bytes[i % 8] ^ mod_byte;
         }
 
-        self.cache_manager
+        let total_file_size = 64 + raw_expected;
+        let saved_path = self
+            .cache_manager
             .save_ntc_file(app_id, &header, &dummy_weights)
-            .map_err(|e| e.to_string())
+            .map_err(|e| e.to_string())?;
+
+        Ok((saved_path, total_file_size))
     }
 }

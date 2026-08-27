@@ -18,6 +18,7 @@ pub mod cache;
 pub mod config;
 pub mod error;
 pub mod format;
+pub mod hardware;
 pub mod hash;
 pub mod scanner;
 
@@ -28,6 +29,7 @@ pub use format::{
     NtcChannels, NtcHeader, NtcPrecision, DEFAULT_HIDDEN_DIM, DEFAULT_LAYERS_COUNT,
     HEADER_SIZE_BYTES, NTC_MAGIC, NTC_VERSION, WEIGHTS_OFFSET_DEFAULT,
 };
+pub use hardware::{detect_gpu_hardware, GpuCapabilities};
 pub use hash::{compute_texture_hash, format_texture_hash};
 pub use scanner::{
     discover_steam_games, find_game_by_query, is_texture_file, parse_acf_manifest,

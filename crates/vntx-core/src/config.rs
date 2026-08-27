@@ -57,6 +57,23 @@ pub struct TrainingConfig {
     pub target_precision: String,
 }
 
+impl TrainingConfig {
+    /// Creates a default training config with hardware-detected optimal precision.
+    #[must_use]
+    pub fn auto_detected() -> Self {
+        let caps = crate::hardware::detect_gpu_hardware();
+        let target_precision = match caps.optimal_precision {
+            crate::format::NtcPrecision::Int8 => "int8".to_string(),
+            crate::format::NtcPrecision::Fp16 => "fp16".to_string(),
+        };
+        Self {
+            default_quality: "balanced".to_string(),
+            max_parallel_jobs: 4,
+            target_precision,
+        }
+    }
+}
+
 impl Default for TrainingConfig {
     fn default() -> Self {
         Self {
