@@ -217,6 +217,8 @@ impl Default for VntxGuiApp {
 
 impl eframe::App for VntxGuiApp {
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
+        crate::theme::apply_custom_theme(ctx);
+
         // Poll asynchronous background compression worker messages
         if let Some(ref rx) = self.worker_rx {
             while let Ok(msg) = rx.try_recv() {
@@ -262,44 +264,89 @@ impl eframe::App for VntxGuiApp {
         }
 
         // Top Navigation Bar
-        TopBottomPanel::top("top_header").show(ctx, |ui| {
-            ui.add_space(6.0_f32);
-            ui.horizontal(|ui| {
-                ui.heading(
-                    RichText::new("⚡ VNTX")
-                        .size(20.0_f32)
-                        .strong()
-                        .color(Color32::from_rgb(129, 199, 132)),
-                );
-                ui.label(
-                    RichText::new("Vulkan Neural Textures")
-                        .size(12.0_f32)
-                        .color(Color32::from_gray(160)),
-                );
+        TopBottomPanel::top("top_header")
+            .frame(
+                egui::Frame::none()
+                    .fill(crate::theme::CARD_BG)
+                    .stroke(egui::Stroke::new(1.0_f32, crate::theme::CARD_STROKE))
+                    .inner_margin(egui::Margin::symmetric(16.0_f32, 10.0_f32)),
+            )
+            .show(ctx, |ui| {
+                ui.horizontal(|ui| {
+                    ui.heading(
+                        RichText::new("⚡ VNTX")
+                            .size(20.0_f32)
+                            .strong()
+                            .color(crate::theme::ACCENT_GREEN),
+                    );
+                    ui.label(
+                        RichText::new("Control Panel")
+                            .size(13.0_f32)
+                            .color(crate::theme::TEXT_MUTED),
+                    );
 
-                ui.add_space(20.0_f32);
+                    ui.add_space(24.0_f32);
 
-                ui.selectable_value(&mut self.selected_tab, Tab::Dashboard, "📊 Dashboard");
-                ui.selectable_value(&mut self.selected_tab, Tab::Games, "🎮 Games");
-                ui.selectable_value(&mut self.selected_tab, Tab::Compressor, "⚡ Compressor");
-                ui.selectable_value(&mut self.selected_tab, Tab::Cache, "🗄️ Cache");
-                ui.selectable_value(&mut self.selected_tab, Tab::Settings, "⚙️ Settings");
+                    let tabs = [
+                        (Tab::Dashboard, "📊 Dashboard"),
+                        (Tab::Games, "🎮 Games"),
+                        (Tab::Compressor, "⚡ Compressor"),
+                        (Tab::Cache, "🗄️ Cache"),
+                        (Tab::Settings, "⚙️ Settings"),
+                    ];
+
+                    for (tab, label) in tabs {
+                        let is_active = self.selected_tab == tab;
+                        let text = if is_active {
+                            RichText::new(label)
+                                .size(14.0_f32)
+                                .strong()
+                                .color(Color32::WHITE)
+                        } else {
+                            RichText::new(label)
+                                .size(14.0_f32)
+                                .color(crate::theme::TEXT_MUTED)
+                        };
+
+                        let btn = egui::Button::new(text)
+                            .fill(if is_active {
+                                crate::theme::ACCENT_GREEN
+                            } else {
+                                Color32::TRANSPARENT
+                            })
+                            .rounding(crate::theme::ROUNDING_MD);
+
+                        if ui.add(btn).clicked() {
+                            self.selected_tab = tab;
+                        }
+                    }
+                });
             });
-            ui.add_space(6.0_f32);
-        });
 
         // Bottom Toast Panel
         if let Some((ref msg, timestamp)) = self.toast_message {
             if timestamp.elapsed() < Duration::from_secs(4) {
-                TopBottomPanel::bottom("bottom_toast").show(ctx, |ui| {
-                    ui.horizontal(|ui| {
-                        ui.label(
-                            RichText::new(msg)
-                                .color(Color32::from_rgb(255, 235, 59))
-                                .strong(),
-                        );
+                TopBottomPanel::bottom("bottom_toast")
+                    .frame(
+                        egui::Frame::none()
+                            .fill(crate::theme::CARD_BG)
+                            .stroke(egui::Stroke::new(1.0_f32, crate::theme::ACCENT_GREEN))
+                            .inner_margin(egui::Margin::symmetric(16.0_f32, 8.0_f32)),
+                    )
+                    .show(ctx, |ui| {
+                        ui.horizontal(|ui| {
+                            ui.label(
+                                RichText::new("ℹ")
+                                    .color(crate::theme::ACCENT_GREEN)
+                                    .size(14.0_f32),
+                            );
+                            ui.label(
+                                RichText::new(msg)
+                                    .color(crate::theme::TEXT_PRIMARY)
+                                    .strong(),
+                            );
+                        });
                     });
-                });
             } else {
                 self.toast_message = None;
             }
@@ -315,4 +362,5 @@ impl eframe::App for VntxGuiApp {
         });
     }
 }
+
 

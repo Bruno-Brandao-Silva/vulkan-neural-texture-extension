@@ -1,6 +1,10 @@
 //! Texture compressor panel with anti-stutter guardrail controls and async processing.
 
-use crate::app::{CompressionStatus, VntxGuiApp, WorkerMessage};
+use crate::app::{CompressionStatus, Tab, VntxGuiApp, WorkerMessage};
+use crate::theme::{
+    card_frame, hero_empty_state, page_header, ACCENT_BLUE, ACCENT_GREEN, ACCENT_RED,
+    ROUNDING_MD, TEXT_MUTED, TEXT_PRIMARY,
+};
 use eframe::egui::{self, Color32, ProgressBar, RichText, Ui};
 use std::sync::mpsc::channel;
 use std::thread;
@@ -10,16 +14,11 @@ use vntx_trainer::TrainingOrchestrator;
 /// Renders the compression panel.
 #[allow(clippy::too_many_lines)]
 pub fn render(app: &mut VntxGuiApp, ui: &mut Ui) {
-    ui.add_space(10.0_f32);
-
-    ui.heading(
-        RichText::new("Neural Texture Compressor")
-            .size(24.0_f32)
-            .strong(),
+    page_header(
+        ui,
+        "Neural Texture Compressor",
+        "Train and pack neural MLP models for eligible 2D textures with anti-stutter latency guardrails.",
     );
-    ui.add_space(4.0_f32);
-    ui.label("Train and pack neural MLP models for eligible 2D textures with anti-stutter latency guardrails.");
-    ui.add_space(14.0_f32);
 
     let game_names: Vec<(u32, String)> = app
         .discovered_games
@@ -28,16 +27,31 @@ pub fn render(app: &mut VntxGuiApp, ui: &mut Ui) {
         .collect();
 
     if game_names.is_empty() {
-        ui.group(|ui| {
-            ui.label("No Steam games available to compress. Check library paths in Settings.");
-        });
+        if hero_empty_state(
+            ui,
+            "⚡",
+            "No Target Games Found",
+            "There are currently no Steam games detected to optimize. Make sure your Steam library paths are correctly set in the Settings tab.",
+            Some("⚙️ Configure Library Paths"),
+        ) {
+            app.selected_tab = Tab::Settings;
+        }
         return;
     }
 
-    // 1. Target Game Selector
-    ui.group(|ui| {
-        ui.set_width(ui.available_width());
-        ui.label(RichText::new("Target Game:").strong());
+    let available_w = ui.available_width();
+
+    // 1. Target Game Selector Card
+    card_frame().show(ui, |ui| {
+        ui.set_width(available_w);
+        ui.label(
+            RichText::new("Target Game:")
+                .strong()
+                .size(14.0_f32)
+                .color(TEXT_PRIMARY),
+        );
+        ui.add_space(4.0_f32);
+
         let current_label = if let Some(selected_id) = app.selected_game_id {
             game_names
                 .iter()
@@ -63,14 +77,19 @@ pub fn render(app: &mut VntxGuiApp, ui: &mut Ui) {
 
     let rec = vntx_core::get_recommended_settings();
 
-    // 2. Quality Presets & Threads
-    ui.group(|ui| {
-        ui.set_width(ui.available_width());
+    // 2. Quality Presets & Threads Card
+    card_frame().show(ui, |ui| {
+        ui.set_width(available_w);
         ui.horizontal(|ui| {
-            ui.label(RichText::new("Compression Presets:").strong());
+            ui.label(
+                RichText::new("Compression Presets:")
+                    .strong()
+                    .size(14.0_f32)
+                    .color(TEXT_PRIMARY),
+            );
             ui.label(
                 RichText::new("ℹ")
-                    .color(Color32::from_rgb(100, 181, 246))
+                    .color(ACCENT_BLUE)
                     .size(13.0_f32),
             )
             .on_hover_text(
@@ -78,6 +97,7 @@ pub fn render(app: &mut VntxGuiApp, ui: &mut Ui) {
             );
         });
 
+        ui.add_space(6.0_f32);
         ui.horizontal(|ui| {
             let fast_text = if rec.recommended_quality == "fast" { "Fast (1-layer MLP) ⭐ (Recomendado)" } else { "Fast (1-layer MLP)" };
             let balanced_text = if rec.recommended_quality == "balanced" { "Balanced (3-layer MLP) ⭐ (Recomendado)" } else { "Balanced (3-layer MLP)" };
@@ -90,10 +110,14 @@ pub fn render(app: &mut VntxGuiApp, ui: &mut Ui) {
 
         ui.add_space(8.0_f32);
         ui.horizontal(|ui| {
-            ui.label("Parallel Worker Threads:");
+            ui.label(
+                RichText::new("Parallel Worker Threads:")
+                    .color(TEXT_MUTED)
+                    .size(13.0_f32),
+            );
             ui.label(
                 RichText::new("ℹ")
-                    .color(Color32::from_rgb(100, 181, 246))
+                    .color(ACCENT_BLUE)
                     .size(13.0_f32),
             )
             .on_hover_text("Threads paralelas alocadas para treinar e compilar as texturas em segundo plano.");
@@ -103,30 +127,35 @@ pub fn render(app: &mut VntxGuiApp, ui: &mut Ui) {
 
     ui.add_space(10.0_f32);
 
-    // 3. Anti-Stutter Guardrails Panel
-    ui.group(|ui| {
-        ui.set_width(ui.available_width());
+    // 3. Anti-Stutter Guardrails Card
+    card_frame().show(ui, |ui| {
+        ui.set_width(available_w);
         ui.horizontal(|ui| {
             ui.label(
                 RichText::new("🛡️ Anti-Stutter Guardrails & Filter Thresholds:")
                     .strong()
-                    .color(Color32::from_rgb(129, 199, 132)),
+                    .size(14.0_f32)
+                    .color(ACCENT_GREEN),
             );
             ui.label(
                 RichText::new("ℹ")
-                    .color(Color32::from_rgb(100, 181, 246))
+                    .color(ACCENT_BLUE)
                     .size(13.0_f32),
             )
             .on_hover_text("Mecanismos anti-engasgo (anti-stutter) que garantem taxa de quadros estável em tempo de execução.");
         });
 
-        ui.add_space(4.0_f32);
+        ui.add_space(6.0_f32);
 
         ui.horizontal(|ui| {
-            ui.label("⏱️ Latency Budget Threshold:");
+            ui.label(
+                RichText::new("⏱️ Latency Budget Threshold:")
+                    .color(TEXT_MUTED)
+                    .size(13.0_f32),
+            );
             ui.label(
                 RichText::new("ℹ")
-                    .color(Color32::from_rgb(100, 181, 246))
+                    .color(ACCENT_BLUE)
                     .size(13.0_f32),
             )
             .on_hover_text("Limite máximo de tempo (em ms) para a descompressão neural no staging buffer. Se exceder, ativa pass-through automático.");
@@ -145,10 +174,14 @@ pub fn render(app: &mut VntxGuiApp, ui: &mut Ui) {
         ui.add_space(6.0_f32);
 
         ui.horizontal(|ui| {
-            ui.label("📐 Minimum Resolution Threshold:");
+            ui.label(
+                RichText::new("📐 Minimum Resolution Threshold:")
+                    .color(TEXT_MUTED)
+                    .size(13.0_f32),
+            );
             ui.label(
                 RichText::new("ℹ")
-                    .color(Color32::from_rgb(100, 181, 246))
+                    .color(ACCENT_BLUE)
                     .size(13.0_f32),
             )
             .on_hover_text("Substitui apenas texturas de alta resolução (>= 1024px), que respondem pela maior parte da VRAM do jogo.");
@@ -173,7 +206,6 @@ pub fn render(app: &mut VntxGuiApp, ui: &mut Ui) {
                 });
         });
 
-
         ui.add_space(6.0_f32);
         ui.horizontal(|ui| {
             ui.checkbox(
@@ -182,15 +214,14 @@ pub fn render(app: &mut VntxGuiApp, ui: &mut Ui) {
             );
             ui.label(
                 RichText::new("ℹ")
-                    .color(Color32::from_rgb(100, 181, 246))
+                    .color(ACCENT_BLUE)
                     .size(13.0_f32),
             )
             .on_hover_text("Preserva mapas de Normal e Roughness no formato original do driver para evitar distorções de iluminação.");
         });
     });
 
-
-    ui.add_space(14.0_f32);
+    ui.add_space(12.0_f32);
 
     let is_compressing = matches!(
         app.compression_status,
@@ -198,17 +229,20 @@ pub fn render(app: &mut VntxGuiApp, ui: &mut Ui) {
     );
     let can_compress = app.selected_game_id.is_some() && !is_compressing;
 
-    if ui
-        .add_enabled(
-            can_compress,
-            egui::Button::new(
-                RichText::new("🚀 Start Neural Compression")
-                    .size(16.0_f32)
-                    .strong(),
-            ),
-        )
-        .clicked()
-    {
+    let comp_btn = egui::Button::new(
+        RichText::new("🚀 Start Neural Compression")
+            .size(15.0_f32)
+            .strong()
+            .color(Color32::WHITE),
+    )
+    .fill(if can_compress {
+        ACCENT_GREEN
+    } else {
+        Color32::from_rgb(45, 55, 72)
+    })
+    .rounding(ROUNDING_MD);
+
+    if ui.add_enabled(can_compress, comp_btn).clicked() {
         if let Some(target_id) = app.selected_game_id {
             if let Some(game) = app
                 .discovered_games
@@ -286,24 +320,32 @@ pub fn render(app: &mut VntxGuiApp, ui: &mut Ui) {
         }
     }
 
-    ui.add_space(16.0_f32);
+    ui.add_space(14.0_f32);
 
     // 4. Progress and Result Status Box
-    ui.group(|ui| {
-        ui.set_width(ui.available_width());
-        ui.heading(RichText::new("Task Status").size(16.0_f32));
+    card_frame().show(ui, |ui| {
+        ui.set_width(available_w);
+        ui.heading(
+            RichText::new("Task Status")
+                .size(16.0_f32)
+                .strong()
+                .color(TEXT_PRIMARY),
+        );
         ui.add_space(6.0_f32);
-
 
         match &app.compression_status {
             CompressionStatus::Idle => {
-                ui.label("Idle. Select a game above and click 'Start Neural Compression'.");
+                ui.label(
+                    RichText::new("Idle. Select a game above and click 'Start Neural Compression'.")
+                        .color(TEXT_MUTED),
+                );
             }
             CompressionStatus::Scanning => {
                 ui.label(
                     RichText::new("🔍 Scanning game directories for texture assets...")
-                        .color(Color32::from_rgb(33, 150, 243)),
+                        .color(ACCENT_BLUE),
                 );
+                ui.add_space(4.0_f32);
                 ui.add(ProgressBar::new(0.0_f32).animate(true));
             }
             CompressionStatus::Compressing { processed, total } => {
@@ -319,6 +361,7 @@ pub fn render(app: &mut VntxGuiApp, ui: &mut Ui) {
                     ))
                     .color(Color32::from_rgb(255, 152, 0)),
                 );
+                ui.add_space(4.0_f32);
                 ui.add(ProgressBar::new(fraction).show_percentage());
             }
             CompressionStatus::Done {
@@ -330,19 +373,21 @@ pub fn render(app: &mut VntxGuiApp, ui: &mut Ui) {
                     RichText::new(format!(
                         "✓ Finished! Compressed {processed} of {total} textures. Saved {saved_mb:.2} MB VRAM."
                     ))
-                    .color(Color32::from_rgb(76, 175, 80))
+                    .color(ACCENT_GREEN)
                     .strong(),
                 );
+                ui.add_space(4.0_f32);
                 ui.add(ProgressBar::new(1.0_f32));
             }
             CompressionStatus::Failed(reason) => {
                 ui.label(
                     RichText::new(format!("✗ Compression failed: {reason}"))
-                        .color(Color32::from_rgb(244, 67, 54))
+                        .color(ACCENT_RED)
                         .strong(),
                 );
             }
         }
     });
 }
+
 

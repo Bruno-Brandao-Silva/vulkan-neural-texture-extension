@@ -1,6 +1,10 @@
 //! Settings view for editing and saving ntc.toml configuration.
 
 use crate::app::VntxGuiApp;
+use crate::theme::{
+    card_frame, page_header, pill_badge, ACCENT_BLUE, ACCENT_GREEN, ROUNDING_MD, TEXT_MUTED,
+    TEXT_PRIMARY,
+};
 use eframe::egui::{self, Color32, RichText, Ui};
 use vntx_core::{get_recommended_settings, VntxConfig};
 
@@ -8,7 +12,7 @@ use vntx_core::{get_recommended_settings, VntxConfig};
 fn help_tooltip(ui: &mut Ui, text: &str) {
     ui.label(
         RichText::new("ℹ")
-            .color(Color32::from_rgb(100, 181, 246))
+            .color(ACCENT_BLUE)
             .size(13.0_f32),
     )
     .on_hover_text(text);
@@ -16,26 +20,11 @@ fn help_tooltip(ui: &mut Ui, text: &str) {
 
 /// Renders the settings view.
 pub fn render(app: &mut VntxGuiApp, ui: &mut Ui) {
-    ui.add_space(8.0_f32);
-
-    ui.horizontal(|ui| {
-        ui.heading(
-            RichText::new("⚙ Preferences & Configuration")
-                .size(24.0_f32)
-                .strong(),
-        );
-    });
-
-    ui.add_space(4.0_f32);
-    ui.label(
-        RichText::new(format!(
-            "Config Path: {}",
-            VntxConfig::default_config_path().display()
-        ))
-        .color(Color32::from_gray(160))
-        .size(12.0_f32),
+    page_header(
+        ui,
+        "Preferences & Configuration",
+        &format!("Configuration file: {}", VntxConfig::default_config_path().display()),
     );
-    ui.add_space(12.0_f32);
 
     egui::ScrollArea::vertical().show(ui, |ui| {
         let available_width = ui.available_width();
@@ -60,73 +49,104 @@ pub fn render(app: &mut VntxGuiApp, ui: &mut Ui) {
 fn render_left_column(app: &mut VntxGuiApp, ui: &mut Ui) {
     let gpu_caps = vntx_core::detect_gpu_hardware();
     let rec = get_recommended_settings();
+    let available_w = ui.available_width();
 
     // 1. System Capabilities & Hardware Diagnostics
-    ui.group(|ui| {
-        ui.set_width(ui.available_width());
-        ui.heading(RichText::new("🔍 System Capabilities & Diagnostics").size(15.0_f32));
-        ui.add_space(6.0_f32);
+    card_frame().show(ui, |ui| {
+        ui.set_width(available_w);
+        ui.heading(
+            RichText::new("🔍 System Capabilities & Diagnostics")
+                .size(15.0_f32)
+                .strong()
+                .color(TEXT_PRIMARY),
+        );
+        ui.add_space(8.0_f32);
 
         ui.horizontal(|ui| {
-            ui.label(RichText::new("GPU Device:").strong());
-            ui.label(&app.gpu_telemetry.device_name);
+            ui.label(RichText::new("GPU Device:").strong().color(TEXT_PRIMARY));
+            ui.label(RichText::new(&app.gpu_telemetry.device_name).color(ACCENT_BLUE));
         });
 
         ui.horizontal(|ui| {
-            ui.label(RichText::new("NVIDIA Tensor Cores / RDNA4 Matrix:").strong());
+            ui.label(RichText::new("NVIDIA Tensor Cores / RDNA4 Matrix:").strong().color(TEXT_PRIMARY));
+            if gpu_caps.has_tensor_cores {
+                pill_badge(
+                    ui,
+                    "🟢 Active (Hardware INT8 Matrix Acceleration)",
+                    Color32::from_rgb(6, 78, 59),
+                    ACCENT_GREEN,
+                );
+            } else {
+                pill_badge(
+                    ui,
+                    "🔴 Não Detectado (Standard Vulkan Compute)",
+                    Color32::from_rgb(60, 45, 20),
+                    Color32::from_rgb(255, 193, 7),
+                );
+            }
+        });
+
+        ui.horizontal(|ui| {
+            ui.label(RichText::new("Inference Precision:").strong().color(TEXT_PRIMARY));
+            if gpu_caps.has_tensor_cores {
+                pill_badge(
+                    ui,
+                    "FP16: 🟢 | INT8 Quantized: 🟢 (Hardware)",
+                    Color32::from_rgb(6, 78, 59),
+                    ACCENT_GREEN,
+                );
+            } else {
+                pill_badge(
+                    ui,
+                    "FP16: 🟢 (Shader) | INT8: ⚪ (Emulado)",
+                    Color32::from_rgb(45, 55, 72),
+                    TEXT_MUTED,
+                );
+            }
+        });
+
+        ui.horizontal(|ui| {
+            ui.label(RichText::new("Modo Recomendado:").strong().color(TEXT_PRIMARY));
             if gpu_caps.has_tensor_cores {
                 ui.label(
-                    RichText::new("🟢 Ativo (Hardware INT8 Matrix Acceleration)")
-                        .color(Color32::from_rgb(76, 175, 80))
+                    RichText::new("INT8 Quantized (Aceleração por Tensor Cores)")
+                        .color(ACCENT_GREEN)
                         .strong(),
                 );
             } else {
                 ui.label(
-                    RichText::new("🔴 Não Detectado (Rodando via Standard Vulkan Compute)")
-                        .color(Color32::from_rgb(255, 193, 7)),
+                    RichText::new("FP16 Standard (Aceleração por Shader)")
+                        .color(ACCENT_BLUE)
+                        .strong(),
                 );
             }
         });
 
         ui.horizontal(|ui| {
-            ui.label(RichText::new("Inference Precision:").strong());
-            if gpu_caps.has_tensor_cores {
-                ui.label(RichText::new("FP16 Standard: 🟢 | INT8 Quantized: 🟢 (Hardware)").color(Color32::from_rgb(76, 175, 80)));
-            } else {
-                ui.label(RichText::new("FP16 Standard: 🟢 (Shader) | INT8: ⚪ (Emulado)").color(Color32::from_rgb(255, 193, 7)));
-            }
+            ui.label(RichText::new("Driver Engine:").strong().color(TEXT_PRIMARY));
+            ui.label(RichText::new("🟢 Vulkan Neural Extension Engine Ready").color(ACCENT_GREEN));
         });
 
-        ui.horizontal(|ui| {
-            ui.label(RichText::new("Modo Recomendado:").strong());
-            if gpu_caps.has_tensor_cores {
-                ui.label(RichText::new("INT8 Quantized (Aceleração por Tensor Cores)").color(Color32::from_rgb(76, 175, 80)).strong());
-            } else {
-                ui.label(RichText::new("FP16 Standard (Aceleração por Shader)").color(Color32::from_rgb(100, 181, 246)).strong());
-            }
-        });
-
-        ui.horizontal(|ui| {
-            ui.label(RichText::new("Driver Engine:").strong());
-            ui.label(RichText::new("🟢 Vulkan Neural Extension Engine Ready").color(Color32::from_rgb(76, 175, 80)));
-        });
-
-        ui.add_space(6.0_f32);
+        ui.add_space(8.0_f32);
 
         // Ideal Engine Recommendation Box
-        ui.group(|ui| {
+        card_frame().show(ui, |ui| {
             ui.set_width(ui.available_width());
             ui.vertical(|ui| {
                 ui.horizontal(|ui| {
                     ui.label(RichText::new("💡").size(16.0_f32));
-                    ui.label(RichText::new("Ideal Engine Recommendation").strong().color(Color32::from_rgb(100, 181, 246)));
+                    ui.label(
+                        RichText::new("Ideal Engine Recommendation")
+                            .strong()
+                            .color(ACCENT_BLUE),
+                    );
                 });
-                ui.add_space(3.0_f32);
-                ui.label(RichText::new(&rec.guidance_box).size(12.0_f32));
                 ui.add_space(4.0_f32);
+                ui.label(RichText::new(&rec.guidance_box).size(12.0_f32).color(TEXT_PRIMARY));
+                ui.add_space(6.0_f32);
                 ui.label(
                     RichText::new("• Motor Quantizado INT8 Hardware (Requer NVIDIA RTX Tensor Cores ou AMD RDNA4 Matrix Accelerators): Execução direta em núcleos de IA dedicated para máxima redução de VRAM sem custo de FPS.\n• Motor FP16 Standard (Compatível com qualquer GPU Vulkan/LavaPipe/WSL2): Execução via Compute Shaders padrão.")
-                        .color(Color32::from_gray(160))
+                        .color(TEXT_MUTED)
                         .size(11.0_f32),
                 );
             });
@@ -136,13 +156,18 @@ fn render_left_column(app: &mut VntxGuiApp, ui: &mut Ui) {
     ui.add_space(10.0_f32);
 
     // 2. General Settings
-    ui.group(|ui| {
-        ui.set_width(ui.available_width());
-        ui.heading(RichText::new("🛠 General Settings").size(15.0_f32));
+    card_frame().show(ui, |ui| {
+        ui.set_width(available_w);
+        ui.heading(
+            RichText::new("🛠 General Settings")
+                .size(15.0_f32)
+                .strong()
+                .color(TEXT_PRIMARY),
+        );
         ui.add_space(6.0_f32);
 
         ui.horizontal(|ui| {
-            ui.label("Cache Directory:");
+            ui.label(RichText::new("Cache Directory:").color(TEXT_PRIMARY));
             help_tooltip(
                 ui,
                 "Caminho no disco onde as texturas comprimidas (.ntc) são armazenadas.\nPadrão: ~/.cache/ntc",
@@ -151,7 +176,7 @@ fn render_left_column(app: &mut VntxGuiApp, ui: &mut Ui) {
         });
 
         ui.horizontal(|ui| {
-            ui.label("Log Level:");
+            ui.label(RichText::new("Log Level:").color(TEXT_PRIMARY));
             help_tooltip(
                 ui,
                 "Nível de detalhamento dos logs de depuração do VNTX.\n'info' é o recomendado para uso diário.",
@@ -182,14 +207,19 @@ fn render_left_column(app: &mut VntxGuiApp, ui: &mut Ui) {
     ui.add_space(10.0_f32);
 
     // 3. Steam Libraries Section
-    ui.group(|ui| {
-        ui.set_width(ui.available_width());
-        ui.heading(RichText::new("📁 Steam Library Search Paths").size(15.0_f32));
+    card_frame().show(ui, |ui| {
+        ui.set_width(available_w);
+        ui.heading(
+            RichText::new("📁 Steam Library Search Paths")
+                .size(15.0_f32)
+                .strong()
+                .color(TEXT_PRIMARY),
+        );
         ui.add_space(6.0_f32);
 
         for (idx, path) in app.config.paths.steam_libraries.iter_mut().enumerate() {
             ui.horizontal(|ui| {
-                ui.label(format!("{}:", idx + 1));
+                ui.label(RichText::new(format!("{}:", idx + 1)).color(TEXT_MUTED));
                 ui.text_edit_singleline(path);
             });
         }
@@ -198,15 +228,21 @@ fn render_left_column(app: &mut VntxGuiApp, ui: &mut Ui) {
 
 fn render_right_column(app: &mut VntxGuiApp, ui: &mut Ui) {
     let rec = get_recommended_settings();
+    let available_w = ui.available_width();
 
     // 4. Training & Compression Defaults
-    ui.group(|ui| {
-        ui.set_width(ui.available_width());
-        ui.heading(RichText::new("⚡ Training & Compression Defaults").size(15.0_f32));
+    card_frame().show(ui, |ui| {
+        ui.set_width(available_w);
+        ui.heading(
+            RichText::new("⚡ Training & Compression Defaults")
+                .size(15.0_f32)
+                .strong()
+                .color(TEXT_PRIMARY),
+        );
         ui.add_space(6.0_f32);
 
         ui.horizontal(|ui| {
-            ui.label("Default Quality:");
+            ui.label(RichText::new("Default Quality:").color(TEXT_PRIMARY));
             help_tooltip(
                 ui,
                 "Preset padrão para treinamento de texturas:\n• Fast: 1 camada MLP (máxima velocidade).\n• Balanced: 3 camadas MLP (ótimo para texturas 2K/4K).\n• Max Savings: Quantização INT8 densa.",
@@ -229,7 +265,7 @@ fn render_right_column(app: &mut VntxGuiApp, ui: &mut Ui) {
         });
 
         ui.horizontal(|ui| {
-            ui.label("Target Precision:");
+            ui.label(RichText::new("Target Precision:").color(TEXT_PRIMARY));
             help_tooltip(
                 ui,
                 "Precisão dos pesos neurais:\n• FP16: Qualidade visual máxima (padrão).\n• INT8: Reduz o tamanho de VRAM pela metade usando aceleração por Tensor Cores sem perda perceptível de qualidade.",
@@ -251,7 +287,7 @@ fn render_right_column(app: &mut VntxGuiApp, ui: &mut Ui) {
         });
 
         ui.horizontal(|ui| {
-            ui.label("Max Parallel Jobs:");
+            ui.label(RichText::new("Max Parallel Jobs:").color(TEXT_PRIMARY));
             help_tooltip(
                 ui,
                 "Número de threads de CPU / GPU executadas em paralelo durante a compressão em lote.",
@@ -266,13 +302,18 @@ fn render_right_column(app: &mut VntxGuiApp, ui: &mut Ui) {
     ui.add_space(10.0_f32);
 
     // 5. Anti-Stutter Guardrails
-    ui.group(|ui| {
-        ui.set_width(ui.available_width());
-        ui.heading(RichText::new("🛡 Anti-Stutter Guardrails").size(15.0_f32));
+    card_frame().show(ui, |ui| {
+        ui.set_width(available_w);
+        ui.heading(
+            RichText::new("🛡 Anti-Stutter Guardrails")
+                .size(15.0_f32)
+                .strong()
+                .color(ACCENT_GREEN),
+        );
         ui.add_space(6.0_f32);
 
         ui.horizontal(|ui| {
-            ui.label("Max Latency Budget:");
+            ui.label(RichText::new("Max Latency Budget:").color(TEXT_PRIMARY));
             help_tooltip(
                 ui,
                 "Orçamento de latência máximo (em milissegundos) para descompressão no staging buffer.\nSe exceder 2.5ms, o pass-through gracioso é acionado imediatamente para evitar engasgos (stuttering) no jogo.",
@@ -285,7 +326,7 @@ fn render_right_column(app: &mut VntxGuiApp, ui: &mut Ui) {
         });
 
         ui.horizontal(|ui| {
-            ui.label("Min Resolution Filter:");
+            ui.label(RichText::new("Min Resolution Filter:").color(TEXT_PRIMARY));
             help_tooltip(
                 ui,
                 "Filtro de resolução mínima para substituição neural.\nTexturas >= 1024x1024 ocupam mais de 80% da memória de vídeo, proporcionando o melhor retorno de economia.",
@@ -327,17 +368,19 @@ fn render_right_column(app: &mut VntxGuiApp, ui: &mut Ui) {
         });
     });
 
-    ui.add_space(16.0_f32);
+    ui.add_space(14.0_f32);
 
     // 6. Save Button Card
-    if ui
-        .button(
-            RichText::new("💾 Save All Changes")
-                .size(16.0_f32)
-                .strong(),
-        )
-        .clicked()
-    {
+    let save_btn = egui::Button::new(
+        RichText::new("💾 Save All Changes")
+            .size(15.0_f32)
+            .strong()
+            .color(Color32::WHITE),
+    )
+    .fill(ACCENT_GREEN)
+    .rounding(ROUNDING_MD);
+
+    if ui.add(save_btn).clicked() {
         app.latency_budget_ms = app.config.guardrails.max_latency_ms;
         app.min_resolution_threshold = app.config.guardrails.min_resolution_threshold;
         app.preserve_special_maps = app.config.guardrails.preserve_special_maps;
@@ -354,6 +397,7 @@ fn render_right_column(app: &mut VntxGuiApp, ui: &mut Ui) {
         }
     }
 }
+
 
 
 

@@ -1,61 +1,88 @@
 //! Cache manager view for inspecting and purging local NTC files.
 
 use crate::app::{Tab, VntxGuiApp};
-use eframe::egui::{self, Color32, RichText, Ui};
+use crate::theme::{
+    card_frame, hero_empty_state, page_header, pill_badge, ACCENT_BLUE, ACCENT_GREEN, ACCENT_RED,
+    CARD_BG, CARD_STROKE, ROUNDING_MD, TEXT_MUTED, TEXT_PRIMARY,
+};
+use eframe::egui::{self, Color32, RichText, Stroke, Ui};
 
 /// Renders the cache manager view.
 #[allow(clippy::too_many_lines)]
 pub fn render(app: &mut VntxGuiApp, ui: &mut Ui) {
-    ui.add_space(10.0_f32);
-
     ui.horizontal(|ui| {
-        ui.heading(RichText::new("NTC Cache Manager").size(24.0_f32).strong());
+        page_header(
+            ui,
+            "NTC Cache Manager",
+            &format!("Local cache root: {}", app.cache_mgr.root_dir().display()),
+        );
         ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-            if ui
-                .button(RichText::new("🗑️ Purge All Cache").color(Color32::from_rgb(244, 67, 54)))
-                .clicked()
-            {
+            let purge_btn = egui::Button::new(
+                RichText::new("🗑️ Purge All Cache")
+                    .size(13.0_f32)
+                    .strong()
+                    .color(ACCENT_RED),
+            )
+            .fill(CARD_BG)
+            .stroke(Stroke::new(1.0_f32, Color32::from_rgb(120, 30, 30)))
+            .rounding(ROUNDING_MD);
+
+            if ui.add(purge_btn).clicked() {
                 if let Ok(count) = app.cache_mgr.clean_cache(None, true) {
                     app.refresh_cache();
                     app.set_toast(format!("Purged all cache ({count} files deleted)."));
                 }
             }
 
-            if ui.button("🔄 Refresh Cache").clicked() {
+            let refresh_btn = egui::Button::new(
+                RichText::new("🔄 Refresh Cache")
+                    .size(13.0_f32)
+                    .strong()
+                    .color(TEXT_PRIMARY),
+            )
+            .fill(CARD_BG)
+            .stroke(Stroke::new(1.0_f32, CARD_STROKE))
+            .rounding(ROUNDING_MD);
+
+            if ui.add(refresh_btn).clicked() {
                 app.refresh_cache();
                 app.set_toast("Cache statistics refreshed.");
             }
         });
     });
 
-    ui.add_space(4.0_f32);
-    ui.label(format!(
-        "Cache Directory: {}",
-        app.cache_mgr.root_dir().display()
-    ));
-    ui.add_space(12.0_f32);
-
     #[allow(clippy::cast_precision_loss)]
     let total_mb = app.cache_stats.total_size_bytes as f64 / (1024.0 * 1024.0);
     #[allow(clippy::cast_precision_loss)]
     let saved_mb = app.cache_stats.estimated_saved_bytes as f64 / (1024.0 * 1024.0);
 
-    // Summary banner
-    ui.group(|ui| {
-        ui.set_width(ui.available_width());
+    let available_w = ui.available_width();
+
+    // Summary banner Card
+    card_frame().show(ui, |ui| {
+        ui.set_width(available_w);
         ui.horizontal(|ui| {
             ui.label(
                 RichText::new(format!(
                     "Total Compiled: {} textures",
                     app.cache_stats.total_files
                 ))
-                .strong(),
+                .strong()
+                .size(14.0_f32)
+                .color(TEXT_PRIMARY),
             );
-            ui.label(format!("| Disk Footprint: {total_mb:.2} MB"));
-            ui.label(
-                RichText::new(format!("| VRAM Saved: {saved_mb:.2} MB"))
-                    .color(Color32::from_rgb(76, 175, 80))
-                    .strong(),
+            ui.add_space(8.0_f32);
+            pill_badge(
+                ui,
+                &format!("Disk Size: {total_mb:.2} MB"),
+                Color32::from_rgb(40, 50, 70),
+                ACCENT_BLUE,
+            );
+            pill_badge(
+                ui,
+                &format!("VRAM Saved: {saved_mb:.2} MB"),
+                Color32::from_rgb(6, 78, 59),
+                ACCENT_GREEN,
             );
         });
     });
@@ -63,11 +90,15 @@ pub fn render(app: &mut VntxGuiApp, ui: &mut Ui) {
     ui.add_space(12.0_f32);
 
     if app.cached_files.is_empty() {
-        ui.group(|ui| {
-            ui.set_width(ui.available_width());
-            ui.label("No cached neural textures found on disk.");
-            ui.label("Run the Compressor or 'vntx compress' from the command line to generate neural textures.");
-        });
+        if hero_empty_state(
+            ui,
+            "🗄️",
+            "No Cached Neural Textures",
+            "There are currently no compiled neural texture (.ntc) files on disk. Select a game and run the Compressor to train neural textures.",
+            Some("⚡ Open Compressor"),
+        ) {
+            app.selected_tab = Tab::Compressor;
+        }
         return;
     }
 
@@ -83,49 +114,82 @@ pub fn render(app: &mut VntxGuiApp, ui: &mut Ui) {
                 _ => "FP16 Standard",
             };
             let channels_str = match vntx_core::NtcChannels::from_u8(file.header.channels) {
-                Ok(vntx_core::NtcChannels::Rgba) => "RGBA (4ch)",
-                _ => "RGB (3ch)",
+                Ok(vntx_core::NtcChannels::Rgba) => "RGBA",
+                _ => "RGB",
             };
 
-            ui.group(|ui| {
-                ui.set_width(ui.available_width());
+            card_frame().show(ui, |ui| {
+                ui.set_width(available_w);
                 ui.horizontal(|ui| {
                     ui.vertical(|ui| {
-                        ui.label(RichText::new(&file.file_name).strong());
+                        ui.horizontal(|ui| {
+                            ui.label(
+                                RichText::new(&file.file_name)
+                                    .strong()
+                                    .size(15.0_f32)
+                                    .color(TEXT_PRIMARY),
+                            );
+                            pill_badge(
+                                ui,
+                                precision_str,
+                                Color32::from_rgb(40, 50, 70),
+                                ACCENT_BLUE,
+                            );
+                            pill_badge(
+                                ui,
+                                channels_str,
+                                Color32::from_rgb(50, 45, 60),
+                                TEXT_MUTED,
+                            );
+                        });
+
                         let hidden_dim = file.header.get_hidden_dim();
                         let layers_count = file.header.get_layers_count();
+                        ui.add_space(2.0_f32);
                         ui.label(
                             RichText::new(format!(
-                                "AppID: {} | Res: {}x{} | Size: {kb:.1} KB | Precision: {precision_str} | Format: {channels_str} | Hidden Dim: {hidden_dim} | Layers: {layers_count}",
+                                "AppID: {} | Resolution: {}x{} | Size: {kb:.1} KB | Architecture: {layers_count} layers × {hidden_dim} dim",
                                 file.app_id,
                                 file.header.get_original_width(),
                                 file.header.get_original_height(),
                             ))
-                            .color(Color32::from_gray(160))
+                            .color(TEXT_MUTED)
                             .size(12.0_f32),
                         );
                     });
 
-
-
                     ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                        if ui
-                            .button(RichText::new("🗑️ Delete").color(Color32::from_rgb(244, 67, 54)))
-                            .clicked()
-                        {
+                        let btn_del = egui::Button::new(
+                            RichText::new("🗑️ Delete")
+                                .size(13.0_f32)
+                                .color(ACCENT_RED),
+                        )
+                        .fill(CARD_BG)
+                        .stroke(Stroke::new(1.0_f32, Color32::from_rgb(120, 30, 30)))
+                        .rounding(ROUNDING_MD);
+
+                        if ui.add(btn_del).clicked() {
                             file_to_delete = Some(file.path.clone());
                         }
 
-                        if ui.button("⚡ Re-export").clicked() {
+                        let btn_reexp = egui::Button::new(
+                            RichText::new("⚡ Re-export")
+                                .size(13.0_f32)
+                                .color(ACCENT_GREEN),
+                        )
+                        .fill(CARD_BG)
+                        .stroke(Stroke::new(1.0_f32, CARD_STROKE))
+                        .rounding(ROUNDING_MD);
+
+                        if ui.add(btn_reexp).clicked() {
                             game_to_recompress = Some(file.app_id);
                         }
                     });
                 });
             });
-            ui.add_space(4.0_f32);
+            ui.add_space(6.0_f32);
         }
     });
-
 
     if let Some(del_path) = file_to_delete {
         if std::fs::remove_file(&del_path).is_ok() {
@@ -139,4 +203,5 @@ pub fn render(app: &mut VntxGuiApp, ui: &mut Ui) {
         app.selected_tab = Tab::Compressor;
     }
 }
+
 
