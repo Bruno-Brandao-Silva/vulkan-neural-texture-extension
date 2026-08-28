@@ -91,10 +91,10 @@ impl Default for TrainingConfig {
 /// Real-time guardrail options for runtime layer and offline compressor.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct GuardrailConfig {
-    /// Maximum allowable latency budget in milliseconds (default: 2.5 ms).
+    /// Maximum allowable latency budget in milliseconds (supports up to 25.0 ms, default: 2.5 ms).
     pub max_latency_ms: f64,
 
-    /// Minimum texture resolution threshold in pixels (512, 1024, 2048, default: 1024).
+    /// Minimum texture resolution threshold in pixels (128, 256, 512, 1024, 2048, 4096, default: 1024).
     pub min_resolution_threshold: u32,
 
     /// Whether to preserve normal and roughness maps from compression (pass-through).

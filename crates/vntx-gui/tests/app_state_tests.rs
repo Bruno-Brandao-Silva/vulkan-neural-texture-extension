@@ -59,12 +59,12 @@ fn test_gui_settings_picklist_and_preset_sync() {
     app.config.general.log_level = "debug".to_string();
     app.config.training.default_quality = "max-savings".to_string();
     app.config.training.target_precision = "int8".to_string();
-    app.config.guardrails.max_latency_ms = 3.2;
-    app.config.guardrails.min_resolution_threshold = 512;
+    app.config.guardrails.max_latency_ms = 25.0;
+    app.config.guardrails.min_resolution_threshold = 128;
 
     assert_eq!(app.config.general.log_level, "debug");
     assert_eq!(app.config.training.default_quality, "max-savings");
     assert_eq!(app.config.training.target_precision, "int8");
-    assert!((app.config.guardrails.max_latency_ms - 3.2).abs() < f64::EPSILON);
-    assert_eq!(app.config.guardrails.min_resolution_threshold, 512);
+    assert!((app.config.guardrails.max_latency_ms - 25.0).abs() < f64::EPSILON);
+    assert_eq!(app.config.guardrails.min_resolution_threshold, 128);
 }

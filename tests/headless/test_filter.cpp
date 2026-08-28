@@ -233,3 +233,43 @@ preserve_special_maps = true
     EXPECT_EQ(cfg.cache_dir, "~/.cache/ntc");
     EXPECT_EQ(cfg.log_level, log::Level::Debug);
 }
+
+TEST(FilterTest, DynamicMinResolutionThreshold128) {
+    LayerConfig cfg{};
+    cfg.min_resolution_threshold = 128;
+    cfg.max_latency_ms = 25.0;
+    set_layer_config(cfg);
+
+    const auto info_128 = make_default_create_info(128, 128);
+    EXPECT_TRUE(is_candidate_texture(info_128));
+    EXPECT_TRUE(get_filter_rejection_reason(info_128).empty());
+
+    const auto info_256 = make_default_create_info(256, 256);
+    EXPECT_TRUE(is_candidate_texture(info_256));
+    EXPECT_TRUE(get_filter_rejection_reason(info_256).empty());
+
+    const auto info_64 = make_default_create_info(64, 64);
+    EXPECT_FALSE(is_candidate_texture(info_64));
+    EXPECT_FALSE(get_filter_rejection_reason(info_64).empty());
+
+    // Reset back to default
+    set_layer_config(LayerConfig{});
+}
+
+TEST(FilterTest, DynamicLatencyBudget25ms) {
+    LayerConfig cfg{};
+    cfg.max_latency_ms = 25.0;
+    set_layer_config(cfg);
+
+    EXPECT_TRUE(is_within_latency_budget(2.5));
+    EXPECT_TRUE(is_within_latency_budget(10.0));
+    EXPECT_TRUE(is_within_latency_budget(24.99));
+    EXPECT_TRUE(is_within_latency_budget(25.0));
+    EXPECT_FALSE(is_within_latency_budget(25.01));
+
+    const TranscodingLatencyGuard guard;
+    EXPECT_TRUE(guard.within_budget(25.0));
+
+    // Reset back to default
+    set_layer_config(LayerConfig{});
+}

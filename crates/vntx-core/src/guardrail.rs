@@ -58,9 +58,22 @@ impl LatencyGuard {
         u64::try_from(self.start.elapsed().as_micros()).unwrap_or(u64::MAX)
     }
 
-    /// Checks if the elapsed time is currently within the 2.5ms budget.
+    /// Checks if the elapsed time is currently within the default 2.5ms budget.
     #[must_use]
     pub fn within_budget(&self) -> bool {
         is_within_budget(self.elapsed_ms())
     }
+
+    /// Checks if the elapsed time is currently within a custom latency budget (e.g. up to 25.0ms).
+    #[must_use]
+    pub fn within_custom_budget(&self, max_ms: f64) -> bool {
+        self.elapsed_ms() <= max_ms
+    }
+}
+
+/// Checks whether a measured latency duration in milliseconds is within a custom budget (e.g. up to 25.0ms).
+#[inline]
+#[must_use]
+pub const fn is_within_custom_budget(elapsed_ms: f64, max_ms: f64) -> bool {
+    elapsed_ms <= max_ms
 }

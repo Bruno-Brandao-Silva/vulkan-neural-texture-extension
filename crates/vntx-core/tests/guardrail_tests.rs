@@ -45,3 +45,18 @@ fn test_latency_guard_multithreaded_non_blocking() {
         handle.join().expect("Thread panicked");
     }
 }
+
+#[test]
+fn test_custom_latency_budget_up_to_25ms() {
+    use vntx_core::is_within_custom_budget;
+
+    assert!(is_within_custom_budget(2.5, 25.0));
+    assert!(is_within_custom_budget(10.0, 25.0));
+    assert!(is_within_custom_budget(24.99, 25.0));
+    assert!(is_within_custom_budget(25.0, 25.0));
+    assert!(!is_within_custom_budget(25.01, 25.0));
+    assert!(!is_within_custom_budget(30.0, 25.0));
+
+    let guard = LatencyGuard::new();
+    assert!(guard.within_custom_budget(25.0));
+}

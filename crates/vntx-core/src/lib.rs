@@ -33,8 +33,8 @@ pub use format::{
     HEADER_SIZE_BYTES, NTC_MAGIC, NTC_VERSION, WEIGHTS_OFFSET_DEFAULT,
 };
 pub use guardrail::{
-    is_within_budget, is_within_budget_us, LatencyGuard, MAX_TRANSCODING_BUDGET_US,
-    MAX_TRANSCODING_LATENCY_MS,
+    is_within_budget, is_within_budget_us, is_within_custom_budget, LatencyGuard,
+    MAX_TRANSCODING_BUDGET_US, MAX_TRANSCODING_LATENCY_MS,
 };
 pub use hardware::{
     detect_gpu_hardware, get_recommended_settings, query_gpu_telemetry, GpuCapabilities,

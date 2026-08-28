@@ -359,10 +359,10 @@ fn render_right_column(app: &mut VntxGuiApp, ui: &mut Ui) {
             ui.label(RichText::new("Max Latency Budget:").color(TEXT_PRIMARY));
             help_tooltip(
                 ui,
-                "Orçamento de latência máximo (em milissegundos) para descompressão no staging buffer.\nSe exceder 2.5ms, o pass-through gracioso é acionado imediatamente para evitar engasgos (stuttering) no jogo.",
+                "Orçamento de latência máximo (em milissegundos) para descompressão no staging buffer (0.5ms a 25.0ms).\nSe o tempo de processamento exceder este limite, o pass-through gracioso é acionado imediatamente para evitar engasgos (stuttering) no jogo.",
             );
             ui.add(
-                egui::Slider::new(&mut app.config.guardrails.max_latency_ms, 0.5..=10.0)
+                egui::Slider::new(&mut app.config.guardrails.max_latency_ms, 0.5..=25.0)
                     .step_by(0.1)
                     .suffix(" ms")
                     .trailing_fill(true),
@@ -373,15 +373,28 @@ fn render_right_column(app: &mut VntxGuiApp, ui: &mut Ui) {
             ui.label(RichText::new("Min Resolution Filter:").color(TEXT_PRIMARY));
             help_tooltip(
                 ui,
-                "Filtro de resolução mínima para substituição neural.\nTexturas >= 1024x1024 ocupam mais de 80% da memória de vídeo, proporcionando o melhor retorno de economia.",
+                "Filtro de resolução mínima para substituição neural (128x128 a 4096x4096).\nOpções como 128x128 ou 256x256 maximizam a compressão para GPUs com VRAM muito reduzida.",
             );
             egui::ComboBox::from_id_source("settings_min_res_cb")
                 .selected_text(match app.config.guardrails.min_resolution_threshold {
+                    128 => "128 x 128 (Ultra Agressivo / Baixa VRAM)",
+                    256 => "256 x 256 (Muito Agressivo)",
                     512 => "512 x 512 (Agressivo)",
                     2048 => "2048 x 2048 (4K Ultra Only)",
+                    4096 => "4096 x 4096 (Texturas Gigantes)",
                     _ => "1024 x 1024 (Padrão Balanceado)",
                 })
                 .show_ui(ui, |ui| {
+                    ui.selectable_value(
+                        &mut app.config.guardrails.min_resolution_threshold,
+                        128,
+                        "128 x 128 (Ultra Agressivo / Baixa VRAM)",
+                    );
+                    ui.selectable_value(
+                        &mut app.config.guardrails.min_resolution_threshold,
+                        256,
+                        "256 x 256 (Muito Agressivo)",
+                    );
                     ui.selectable_value(
                         &mut app.config.guardrails.min_resolution_threshold,
                         512,
@@ -396,6 +409,11 @@ fn render_right_column(app: &mut VntxGuiApp, ui: &mut Ui) {
                         &mut app.config.guardrails.min_resolution_threshold,
                         2048,
                         "2048 x 2048 (4K Ultra Only)",
+                    );
+                    ui.selectable_value(
+                        &mut app.config.guardrails.min_resolution_threshold,
+                        4096,
+                        "4096 x 4096 (Texturas Gigantes)",
                     );
                 });
         });
