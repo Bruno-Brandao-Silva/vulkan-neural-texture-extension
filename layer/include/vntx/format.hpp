@@ -1,12 +1,13 @@
 #pragma once
 
+#include <vulkan/vulkan.h>
+
 #include <algorithm>
 #include <bit>
 #include <cmath>
 #include <cstdint>
 #include <cstring>
 #include <vector>
-#include <vulkan/vulkan.h>
 
 namespace vntx {
 
@@ -140,12 +141,13 @@ enum class Channels : uint8_t {
     }
 }
 
-/// @brief Computes exact native uncompressed/BC texture size across all mip levels and array layers.
+/// @brief Computes exact native uncompressed/BC texture size across all mip levels and array
+/// layers.
 [[nodiscard]] constexpr uint64_t calculate_native_texture_size(
-    const VkExtent3D extent, const VkFormat format,
-    const uint32_t mip_levels = 1, const uint32_t array_layers = 1) noexcept {
-    if (extent.width == 0 || extent.height == 0 || extent.depth == 0 ||
-        mip_levels == 0 || array_layers == 0) {
+    const VkExtent3D extent, const VkFormat format, const uint32_t mip_levels = 1,
+    const uint32_t array_layers = 1) noexcept {
+    if (extent.width == 0 || extent.height == 0 || extent.depth == 0 || mip_levels == 0 ||
+        array_layers == 0) {
         return 0;
     }
 
@@ -167,8 +169,7 @@ enum class Channels : uint8_t {
         const uint32_t blocks_y = (mip_h + 3u) / 4u;
 
         const uint64_t mip_bytes = static_cast<uint64_t>(blocks_x) *
-                                   static_cast<uint64_t>(blocks_y) *
-                                   static_cast<uint64_t>(mip_d) *
+                                   static_cast<uint64_t>(blocks_y) * static_cast<uint64_t>(mip_d) *
                                    static_cast<uint64_t>(block_bytes);
         total_bytes += mip_bytes;
     }
@@ -266,15 +267,11 @@ enum class Channels : uint8_t {
 
 /// @brief Generates an analytical NTC binary payload (64-byte header + MLP weights) within budget.
 [[nodiscard]] inline std::vector<uint8_t> generate_analytical_ntc_payload(
-    const VkExtent3D extent,
-    const uint8_t channels = static_cast<uint8_t>(Channels::Rgba),
+    const VkExtent3D extent, const uint8_t channels = static_cast<uint8_t>(Channels::Rgba),
     const uint8_t precision = static_cast<uint8_t>(Precision::Fp16),
     const uint16_t layers_count = DEFAULT_LAYERS_COUNT,
-    const uint16_t hidden_dim = DEFAULT_HIDDEN_DIM,
-    const uint64_t texture_hash = 0,
-    const float mean_r = 0.5f,
-    const float mean_g = 0.5f,
-    const float mean_b = 0.5f,
+    const uint16_t hidden_dim = DEFAULT_HIDDEN_DIM, const uint64_t texture_hash = 0,
+    const float mean_r = 0.5f, const float mean_g = 0.5f, const float mean_b = 0.5f,
     const float mean_a = 1.0f) {
     const uint64_t weights_size =
         calculate_expected_weights_size(layers_count, hidden_dim, channels, precision);
@@ -325,7 +322,8 @@ enum class Channels : uint8_t {
         }
 
         // Hidden layers (layers_count - 2)
-        const uint16_t hidden_layers = (layers_count > 2) ? static_cast<uint16_t>(layers_count - 2) : 0;
+        const uint16_t hidden_layers =
+            (layers_count > 2) ? static_cast<uint16_t>(layers_count - 2) : 0;
         for (uint16_t h = 0; h < hidden_layers; ++h) {
             (void)h;
             // W2 (hidden_dim x hidden_dim)
@@ -367,11 +365,8 @@ enum class Channels : uint8_t {
 
 /// @brief Dynamically transcodes staging buffer data into compact NTC format.
 [[nodiscard]] inline std::vector<uint8_t> transcode_staging_to_ntc_payload(
-    const void* staging_data,
-    const size_t staging_size,
-    const VkExtent3D extent,
-    const VkFormat format,
-    uint64_t hash = 0) {
+    const void* staging_data, const size_t staging_size, const VkExtent3D extent,
+    const VkFormat format, uint64_t hash = 0) {
     const uint8_t channels = get_format_channels(format);
     const uint8_t precision = static_cast<uint8_t>(Precision::Fp16);
     const uint16_t layers_count = DEFAULT_LAYERS_COUNT;
@@ -414,7 +409,7 @@ enum class Channels : uint8_t {
     }
 
     return generate_analytical_ntc_payload(extent, channels, precision, layers_count, hidden_dim,
-                                          hash, mean_r, mean_g, mean_b, mean_a);
+                                           hash, mean_r, mean_g, mean_b, mean_a);
 }
 
 }  // namespace vntx

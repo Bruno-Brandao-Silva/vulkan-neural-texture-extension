@@ -21,20 +21,22 @@ struct CandidateTextureInfo {
     uint32_t mip_levels{1};
     uint32_t array_layers{1};
     VkImageUsageFlags usage{0};
-    uint64_t native_size_bytes{0};        ///< Exact native BC uncompressed size across all mips & layers
-    uint64_t ntc_size_bytes{0};           ///< Compact NTC size (64-byte header + MLP weights)
-    uint64_t downsized_memory_size{0};   ///< Driver-aligned memory requirement size in VRAM
-    VkDeviceMemory bound_memory{VK_NULL_HANDLE}; ///< Bound VkDeviceMemory handle
-    VkDeviceSize bound_offset{0};         ///< Bound memory offset
-    uint64_t texture_hash{0};             ///< xxHash3 64-bit identifier
-    VkDeviceSize alignment{0};            ///< Driver required memory alignment
-    uint32_t memory_type_bits{0};        ///< Driver supported memory type bits
-    uint32_t scale_factor{1};            ///< Physical dimension compression scale factor (e.g. 2 = 75% VRAM saved)
+    uint64_t native_size_bytes{0};  ///< Exact native BC uncompressed size across all mips & layers
+    uint64_t ntc_size_bytes{0};     ///< Compact NTC size (64-byte header + MLP weights)
+    uint64_t downsized_memory_size{0};  ///< Driver-aligned memory requirement size in VRAM
+    VkDeviceMemory bound_memory{VK_NULL_HANDLE};  ///< Bound VkDeviceMemory handle
+    VkDeviceSize bound_offset{0};                 ///< Bound memory offset
+    uint64_t texture_hash{0};                     ///< xxHash3 64-bit identifier
+    VkDeviceSize alignment{0};                    ///< Driver required memory alignment
+    uint32_t memory_type_bits{0};                 ///< Driver supported memory type bits
+    uint32_t scale_factor{
+        1};  ///< Physical dimension compression scale factor (e.g. 2 = 75% VRAM saved)
     VkExtent3D created_extent{0, 0, 0};  ///< Actual physical image extent created on GPU
-    bool is_bound{false};                 ///< True after vkBindImageMemory[2]
+    bool is_bound{false};                ///< True after vkBindImageMemory[2]
 };
 
-/// @brief Thread-safe instance-wide and device-wide telemetry counters for VRAM reduction statistics.
+/// @brief Thread-safe instance-wide and device-wide telemetry counters for VRAM reduction
+/// statistics.
 struct SessionTelemetry {
     std::atomic<uint64_t> total_candidate_textures{0};
     std::atomic<uint64_t> total_native_vram_bytes{0};
@@ -105,9 +107,8 @@ struct SessionTelemetry {
         const double comp_mb = static_cast<double>(comp_bytes) / (1024.0 * 1024.0);
         const double saved_mb = static_cast<double>(saved_bytes) / (1024.0 * 1024.0);
         const double ratio =
-            (comp_bytes > 0)
-                ? (static_cast<double>(native_bytes) / static_cast<double>(comp_bytes))
-                : 1.0;
+            (comp_bytes > 0) ? (static_cast<double>(native_bytes) / static_cast<double>(comp_bytes))
+                             : 1.0;
         const double saved_pct =
             (native_bytes > 0)
                 ? ((static_cast<double>(saved_bytes) / static_cast<double>(native_bytes)) * 100.0)

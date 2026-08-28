@@ -122,13 +122,24 @@ TEST(FallbackTest, SpirvRewriterHandlesPrematureEndOfStream) {
 TEST(FallbackTest, SpirvRewriterZeroSamplingShaderPassthrough) {
     // Shader with only arithmetic and memory ops (no sampling instructions)
     std::vector<uint32_t> spirv_in = {
-        spv::SPIRV_MAGIC_NUMBER, spv::SPIRV_VERSION_1_3, 0x00140000u, 10u, 0u,
-        (3u << 16u) | static_cast<uint32_t>(spv::OpCode::OpMemoryModel), 0u, 1u,
-        (4u << 16u) | static_cast<uint32_t>(spv::OpCode::OpVariable), 1u, 2u, 0u,
-        (4u << 16u) | static_cast<uint32_t>(spv::OpCode::OpLoad), 1u, 3u, 2u,
+        spv::SPIRV_MAGIC_NUMBER,
+        spv::SPIRV_VERSION_1_3,
+        0x00140000u,
+        10u,
+        0u,
+        (3u << 16u) | static_cast<uint32_t>(spv::OpCode::OpMemoryModel),
+        0u,
+        1u,
+        (4u << 16u) | static_cast<uint32_t>(spv::OpCode::OpVariable),
+        1u,
+        2u,
+        0u,
+        (4u << 16u) | static_cast<uint32_t>(spv::OpCode::OpLoad),
+        1u,
+        3u,
+        2u,
         (1u << 16u) | static_cast<uint32_t>(spv::OpCode::OpReturn),
-        (1u << 16u) | static_cast<uint32_t>(spv::OpCode::OpFunctionEnd)
-    };
+        (1u << 16u) | static_cast<uint32_t>(spv::OpCode::OpFunctionEnd)};
 
     const auto result = spv::rewrite_shader_bytecode(spirv_in.data(), spirv_in.size());
     EXPECT_FALSE(result.modified);
@@ -141,7 +152,11 @@ TEST(FallbackTest, SpirvRewriterZeroSamplingShaderPassthrough) {
 TEST(FallbackTest, SpirvRewriterZeroWordCountInfiniteLoopPrevention) {
     // Bytecode with opcode claiming word count 0
     std::vector<uint32_t> zero_wc_spv = {
-        spv::SPIRV_MAGIC_NUMBER, spv::SPIRV_VERSION_1_3, 0u, 10u, 0u,
+        spv::SPIRV_MAGIC_NUMBER,
+        spv::SPIRV_VERSION_1_3,
+        0u,
+        10u,
+        0u,
         0x00000057u  // word_count = 0, opcode = 87
     };
     const auto result = spv::rewrite_shader_bytecode(zero_wc_spv.data(), zero_wc_spv.size());
@@ -153,9 +168,12 @@ TEST(FallbackTest, SpirvRewriterZeroWordCountInfiniteLoopPrevention) {
 TEST(FallbackTest, SpirvRewriterTruncatedInstructionBoundary) {
     // Instruction declares 100 words, but buffer ends after 1 word
     std::vector<uint32_t> trunc_inst_spv = {
-        spv::SPIRV_MAGIC_NUMBER, spv::SPIRV_VERSION_1_3, 0u, 10u, 0u,
-        (100u << 16u) | static_cast<uint32_t>(spv::OpCode::OpImageSampleImplicitLod)
-    };
+        spv::SPIRV_MAGIC_NUMBER,
+        spv::SPIRV_VERSION_1_3,
+        0u,
+        10u,
+        0u,
+        (100u << 16u) | static_cast<uint32_t>(spv::OpCode::OpImageSampleImplicitLod)};
     const auto result = spv::rewrite_shader_bytecode(trunc_inst_spv.data(), trunc_inst_spv.size());
     EXPECT_FALSE(result.modified);
     EXPECT_EQ(result.sample_instructions_found, 0u);

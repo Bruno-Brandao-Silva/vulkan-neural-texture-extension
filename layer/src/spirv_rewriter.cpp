@@ -16,8 +16,7 @@ namespace {
     return opcode == OpCode::OpImageSampleImplicitLod ||
            opcode == OpCode::OpImageSampleExplicitLod ||
            opcode == OpCode::OpImageSampleDrefImplicitLod ||
-           opcode == OpCode::OpImageSampleDrefExplicitLod ||
-           opcode == OpCode::OpImageFetch ||
+           opcode == OpCode::OpImageSampleDrefExplicitLod || opcode == OpCode::OpImageFetch ||
            opcode == OpCode::OpImageRead;
 }
 
@@ -25,13 +24,10 @@ namespace {
 ///
 /// Replaces the sampling operation with neural evaluation bytecode that maps UV coordinates
 /// into decompressed color vectors, writing the final result into target `result_id`.
-void emit_neural_decompression_sequence(std::vector<uint32_t>& out_bytecode,
-                                       const OpCode opcode,
-                                       const uint32_t result_type_id,
-                                       const uint32_t result_id,
-                                       const uint32_t coord_id,
-                                       uint32_t& current_bound,
-                                       const bool enable_tensor_cores) {
+void emit_neural_decompression_sequence(std::vector<uint32_t>& out_bytecode, const OpCode opcode,
+                                        const uint32_t result_type_id, const uint32_t result_id,
+                                        const uint32_t coord_id, uint32_t& current_bound,
+                                        const bool enable_tensor_cores) {
     if (opcode == OpCode::OpImageSampleDrefImplicitLod ||
         opcode == OpCode::OpImageSampleDrefExplicitLod) {
         // Scalar depth comparison sampling: produce scalar float into result_id
@@ -234,7 +230,8 @@ RewriteResult rewrite_shader_bytecode(const uint32_t* const words, const size_t 
                 }
                 if (options.target_binding != 0) {
                     const auto bind_it = id_to_binding.find(target_var_id);
-                    if (bind_it == id_to_binding.end() || bind_it->second != options.target_binding) {
+                    if (bind_it == id_to_binding.end() ||
+                        bind_it->second != options.target_binding) {
                         matches_filter = false;
                     }
                 }
@@ -264,7 +261,8 @@ RewriteResult rewrite_shader_bytecode(const uint32_t* const words, const size_t 
         result.bytecode = std::move(out_bytecode);
 
         VNTX_LOG_INFO(
-            "SPIR-V rewriter successfully transformed {} of {} sampling instructions (Bound: {} -> {}, TensorCores={})",
+            "SPIR-V rewriter successfully transformed {} of {} sampling instructions (Bound: {} -> "
+            "{}, TensorCores={})",
             result.sample_instructions_rewritten, result.sample_instructions_found,
             original_header.bound, result.bytecode[3], options.enable_tensor_cores);
     } else {

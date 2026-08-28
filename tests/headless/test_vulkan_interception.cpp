@@ -27,14 +27,14 @@ static void mock_destroy_image_noop(VkDevice, VkImage, const VkAllocationCallbac
 
 static void mock_get_image_memory_requirements_driver(VkDevice, VkImage,
                                                       VkMemoryRequirements* pMemoryRequirements) {
-    pMemoryRequirements->size = 5592448u;  // Full native 2048x2048 BC7 footprint
+    pMemoryRequirements->size = 5592448u;     // Full native 2048x2048 BC7 footprint
     pMemoryRequirements->alignment = 65536u;  // Standard 64KB D3D12/Vulkan alignment
     pMemoryRequirements->memoryTypeBits = 0x7u;
 }
 
-static void mock_get_image_memory_requirements2_driver(
-    VkDevice, const VkImageMemoryRequirementsInfo2*,
-    VkMemoryRequirements2* pMemoryRequirements) {
+static void mock_get_image_memory_requirements2_driver(VkDevice,
+                                                       const VkImageMemoryRequirementsInfo2*,
+                                                       VkMemoryRequirements2* pMemoryRequirements) {
     pMemoryRequirements->memoryRequirements.size = 5592448u;
     pMemoryRequirements->memoryRequirements.alignment = 65536u;
     pMemoryRequirements->memoryRequirements.memoryTypeBits = 0x7u;
@@ -68,10 +68,10 @@ static void mock_reset_copy_records() {
     g_mock_copy_calls.clear();
 }
 
-static void mock_record_cmd_copy_buffer_to_image(
-    VkCommandBuffer commandBuffer, VkBuffer srcBuffer, VkImage dstImage,
-    VkImageLayout dstImageLayout, uint32_t regionCount,
-    const VkBufferImageCopy* pRegions) {
+static void mock_record_cmd_copy_buffer_to_image(VkCommandBuffer commandBuffer, VkBuffer srcBuffer,
+                                                 VkImage dstImage, VkImageLayout dstImageLayout,
+                                                 uint32_t regionCount,
+                                                 const VkBufferImageCopy* pRegions) {
     std::lock_guard<std::mutex> lock(g_mock_copy_mutex);
     MockCopyRecord rec{};
     rec.cmd_buffer = commandBuffer;
@@ -87,8 +87,7 @@ static void mock_record_cmd_copy_buffer_to_image(
 }
 
 static void mock_record_cmd_copy_buffer_to_image2(
-    VkCommandBuffer commandBuffer,
-    const VkCopyBufferToImageInfo2* pCopyBufferToImageInfo) {
+    VkCommandBuffer commandBuffer, const VkCopyBufferToImageInfo2* pCopyBufferToImageInfo) {
     std::lock_guard<std::mutex> lock(g_mock_copy_mutex);
     MockCopyRecord rec{};
     rec.cmd_buffer = commandBuffer;
@@ -99,8 +98,9 @@ static void mock_record_cmd_copy_buffer_to_image2(
         rec.dst_layout = pCopyBufferToImageInfo->dstImageLayout;
         rec.region_count = pCopyBufferToImageInfo->regionCount;
         if (pCopyBufferToImageInfo->pRegions && pCopyBufferToImageInfo->regionCount > 0) {
-            rec.regions2.assign(pCopyBufferToImageInfo->pRegions,
-                                pCopyBufferToImageInfo->pRegions + pCopyBufferToImageInfo->regionCount);
+            rec.regions2.assign(
+                pCopyBufferToImageInfo->pRegions,
+                pCopyBufferToImageInfo->pRegions + pCopyBufferToImageInfo->regionCount);
         }
     }
     g_mock_copy_calls.push_back(rec);
@@ -122,9 +122,10 @@ static void mock_reset_shader_module_records() {
     g_mock_shader_module_calls.clear();
 }
 
-static VkResult mock_create_shader_module_success(
-    VkDevice device, const VkShaderModuleCreateInfo* pCreateInfo,
-    const VkAllocationCallbacks*, VkShaderModule* pShaderModule) {
+static VkResult mock_create_shader_module_success(VkDevice device,
+                                                  const VkShaderModuleCreateInfo* pCreateInfo,
+                                                  const VkAllocationCallbacks*,
+                                                  VkShaderModule* pShaderModule) {
     static std::atomic<uint64_t> handle_gen{0x6000};
     *pShaderModule = reinterpret_cast<VkShaderModule>(handle_gen.fetch_add(1));
 
@@ -143,8 +144,8 @@ static VkResult mock_create_shader_module_success(
     return VK_SUCCESS;
 }
 
-static void mock_destroy_shader_module_noop(
-    VkDevice, VkShaderModule, const VkAllocationCallbacks*) {}
+static void mock_destroy_shader_module_noop(VkDevice, VkShaderModule,
+                                            const VkAllocationCallbacks*) {}
 
 // Helper to create and register mock device with linked command buffer
 struct MockDeviceFixture {
@@ -159,7 +160,8 @@ struct MockDeviceFixture {
         device_data->next_create_image = mock_create_image_success;
         device_data->next_destroy_image = mock_destroy_image_noop;
         device_data->next_get_image_memory_requirements = mock_get_image_memory_requirements_driver;
-        device_data->next_get_image_memory_requirements2 = mock_get_image_memory_requirements2_driver;
+        device_data->next_get_image_memory_requirements2 =
+            mock_get_image_memory_requirements2_driver;
         device_data->next_bind_image_memory = mock_bind_image_memory_success;
         device_data->next_bind_image_memory2 = mock_bind_image_memory2_success;
         device_data->next_cmd_copy_buffer_to_image = mock_record_cmd_copy_buffer_to_image;
@@ -251,7 +253,8 @@ TEST(FormatSizeCalculationTest, ArrayLayersAndNonPowerOfTwoDimensions) {
     const VkExtent3D extent_1k{1024, 1024, 1};
     EXPECT_EQ(calculate_native_texture_size(extent_1k, VK_FORMAT_BC7_UNORM_BLOCK, 1, 6), 6291456u);
 
-    // Non-Power-of-Two (1920x1080) BC7: ceil(1920/4)=480, ceil(1080/4)=270 => 480*270*16 = 2,073,600 bytes
+    // Non-Power-of-Two (1920x1080) BC7: ceil(1920/4)=480, ceil(1080/4)=270 => 480*270*16 =
+    // 2,073,600 bytes
     const VkExtent3D extent_1080p{1920, 1080, 1};
     EXPECT_EQ(calculate_native_texture_size(extent_1080p, VK_FORMAT_BC7_UNORM_BLOCK, 1, 1),
               2073600u);
@@ -266,8 +269,8 @@ TEST(FormatSizeCalculationTest, CompactNtcSizeCalculations) {
     EXPECT_EQ(ntc_rgba_fp16, 9288u);
 
     // FP16 RGB (3 layers, 64 hidden): 64-byte header + 9094 bytes weights = 9158 bytes
-    const uint64_t ntc_rgb_fp16 = calculate_ntc_compact_size(
-        extent, VK_FORMAT_BC1_RGB_UNORM_BLOCK, static_cast<uint8_t>(Precision::Fp16));
+    const uint64_t ntc_rgb_fp16 = calculate_ntc_compact_size(extent, VK_FORMAT_BC1_RGB_UNORM_BLOCK,
+                                                             static_cast<uint8_t>(Precision::Fp16));
     EXPECT_EQ(ntc_rgb_fp16, 9158u);
 
     // INT8 RGBA (3 layers, 64 hidden): 64-byte header + 4612 bytes weights = 4676 bytes
@@ -284,8 +287,7 @@ TEST(FormatSizeCalculationTest, ZeroDimensionAndBoundary) {
     EXPECT_EQ(calculate_native_texture_size(zero_w, VK_FORMAT_BC7_UNORM_BLOCK, 1), 0u);
     EXPECT_EQ(calculate_native_texture_size(zero_h, VK_FORMAT_BC7_UNORM_BLOCK, 1), 0u);
     EXPECT_EQ(calculate_native_texture_size(zero_d, VK_FORMAT_BC7_UNORM_BLOCK, 1), 0u);
-    EXPECT_EQ(calculate_native_texture_size(VkExtent3D{2048, 2048, 1}, VK_FORMAT_UNDEFINED, 1),
-              0u);
+    EXPECT_EQ(calculate_native_texture_size(VkExtent3D{2048, 2048, 1}, VK_FORMAT_UNDEFINED, 1), 0u);
 }
 
 // =========================================================================
@@ -369,9 +371,9 @@ TEST(InterceptionDownsizingMockTest, CandidateImageDownsizedAndTracked) {
     VkMemoryRequirements mem_reqs{};
     vntx_GetImageMemoryRequirements(mock_device, candidate_img, &mem_reqs);
 
-    EXPECT_EQ(mem_reqs.alignment, 65536u);  // Preserved from driver
+    EXPECT_EQ(mem_reqs.alignment, 65536u);     // Preserved from driver
     EXPECT_EQ(mem_reqs.memoryTypeBits, 0x7u);  // Preserved from driver
-    EXPECT_EQ(mem_reqs.size, 65536u);  // Downsized from 5,592,448 to 65,536
+    EXPECT_EQ(mem_reqs.size, 65536u);          // Downsized from 5,592,448 to 65,536
     EXPECT_LT(mem_reqs.size, 5592448u);
 
     // 3. Query Memory Requirements (v2) -> Verify Downsized Size
@@ -770,8 +772,8 @@ TEST(StagingCopyInterceptionMockTest, NonCandidateImageBypassesTranscodingDirect
 TEST(StagingCopyInterceptionMockTest, DynamicNtcPayloadAnd64ByteHeaderGeneration) {
     // Validate synthetic dynamic NTC payload creation for 2048x2048 BC7 staging block
     const VkExtent3D extent{2048, 2048, 1};
-    const uint64_t compact_size = calculate_ntc_compact_size(
-        extent, VK_FORMAT_BC7_UNORM_BLOCK, static_cast<uint8_t>(Precision::Fp16));
+    const uint64_t compact_size = calculate_ntc_compact_size(extent, VK_FORMAT_BC7_UNORM_BLOCK,
+                                                             static_cast<uint8_t>(Precision::Fp16));
     EXPECT_EQ(compact_size, 9288u);
 
     std::vector<uint8_t> ntc_payload(compact_size, 0);
@@ -789,8 +791,8 @@ TEST(StagingCopyInterceptionMockTest, DynamicNtcPayloadAnd64ByteHeaderGeneration
     header->hidden_dim = DEFAULT_HIDDEN_DIM;
     header->reserved_flags = 0;
     header->weights_offset = WEIGHTS_OFFSET_DEFAULT;
-    header->weights_size = calculate_expected_weights_size(
-        header->layers_count, header->hidden_dim, header->channels, header->precision);
+    header->weights_size = calculate_expected_weights_size(header->layers_count, header->hidden_dim,
+                                                           header->channels, header->precision);
 
     // Assert structural invariants
     EXPECT_TRUE(validate_header(*header));
@@ -847,7 +849,7 @@ TEST(StagingCopyInterceptionMockTest, LatencyBudgetExceededTriggersGracefulPasst
 
     // Call copy: elapsed latency will exceed 0.000001ms and gracefully pass through
     EXPECT_NO_THROW(vntx_CmdCopyBufferToImage(fixture.cmd_buffer, mock_buf, candidate_img,
-                                             VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &region));
+                                              VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &region));
 
     // Reset config
     set_layer_config(LayerConfig{});
@@ -866,11 +868,8 @@ TEST(StagingCopyInterceptionMockTest, UnhandledFormatsTriggerImmediateFallback) 
     MockDeviceFixture fixture;
 
     const std::vector<VkFormat> unhandled_formats = {
-        VK_FORMAT_R8G8B8A8_UNORM,
-        VK_FORMAT_B8G8R8A8_SRGB,
-        VK_FORMAT_R16G16B16A16_SFLOAT,
-        VK_FORMAT_D32_SFLOAT,
-        VK_FORMAT_UNDEFINED,
+        VK_FORMAT_R8G8B8A8_UNORM, VK_FORMAT_B8G8R8A8_SRGB, VK_FORMAT_R16G16B16A16_SFLOAT,
+        VK_FORMAT_D32_SFLOAT,     VK_FORMAT_UNDEFINED,
     };
 
     for (const auto format : unhandled_formats) {
@@ -1029,7 +1028,7 @@ TEST(StagingCopyInterceptionMockTest, NullAndZeroRegionBoundarySafety) {
 
     // 0 regions or null pointer calls must not crash
     EXPECT_NO_THROW(vntx_CmdCopyBufferToImage(fixture.cmd_buffer, VK_NULL_HANDLE, VK_NULL_HANDLE,
-                                             VK_IMAGE_LAYOUT_UNDEFINED, 0, nullptr));
+                                              VK_IMAGE_LAYOUT_UNDEFINED, 0, nullptr));
 
     EXPECT_NO_THROW(vntx_CmdCopyBufferToImage2(fixture.cmd_buffer, nullptr));
 
@@ -1049,15 +1048,21 @@ TEST(ShaderModuleInterceptionMockTest, CreateShaderModuleInterceptsAndTransforms
 
     // Create synthetic SPIR-V module with OpImageSampleImplicitLod (87)
     std::vector<uint32_t> spirv_in = {
-        spv::SPIRV_MAGIC_NUMBER, spv::SPIRV_VERSION_1_3,
+        spv::SPIRV_MAGIC_NUMBER,
+        spv::SPIRV_VERSION_1_3,
         0x00140000u,  // Generator
         10u,          // Bound
         0u,           // Schema
-        (3u << 16u) | static_cast<uint32_t>(spv::OpCode::OpMemoryModel), 0u, 1u,
-        (5u << 16u) | static_cast<uint32_t>(spv::OpCode::OpImageSampleImplicitLod), 1u, 2u, 3u, 4u,
+        (3u << 16u) | static_cast<uint32_t>(spv::OpCode::OpMemoryModel),
+        0u,
+        1u,
+        (5u << 16u) | static_cast<uint32_t>(spv::OpCode::OpImageSampleImplicitLod),
+        1u,
+        2u,
+        3u,
+        4u,
         (1u << 16u) | static_cast<uint32_t>(spv::OpCode::OpReturn),
-        (1u << 16u) | static_cast<uint32_t>(spv::OpCode::OpFunctionEnd)
-    };
+        (1u << 16u) | static_cast<uint32_t>(spv::OpCode::OpFunctionEnd)};
 
     VkShaderModuleCreateInfo create_info{};
     create_info.sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO;
@@ -1086,12 +1091,16 @@ TEST(ShaderModuleInterceptionMockTest, CreateShaderModulePassesThroughNonSamplin
     MockDeviceFixture fixture;
 
     std::vector<uint32_t> spirv_non_sampling = {
-        spv::SPIRV_MAGIC_NUMBER, spv::SPIRV_VERSION_1_3,
-        0x00140000u, 10u, 0u,
-        (3u << 16u) | static_cast<uint32_t>(spv::OpCode::OpMemoryModel), 0u, 1u,
+        spv::SPIRV_MAGIC_NUMBER,
+        spv::SPIRV_VERSION_1_3,
+        0x00140000u,
+        10u,
+        0u,
+        (3u << 16u) | static_cast<uint32_t>(spv::OpCode::OpMemoryModel),
+        0u,
+        1u,
         (1u << 16u) | static_cast<uint32_t>(spv::OpCode::OpReturn),
-        (1u << 16u) | static_cast<uint32_t>(spv::OpCode::OpFunctionEnd)
-    };
+        (1u << 16u) | static_cast<uint32_t>(spv::OpCode::OpFunctionEnd)};
 
     VkShaderModuleCreateInfo create_info{};
     create_info.sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO;
@@ -1127,13 +1136,21 @@ TEST(ShaderModuleInterceptionMockTest, ConcurrentShaderModuleCreation16Threads) 
             }
 
             const std::vector<uint32_t> spirv = {
-                spv::SPIRV_MAGIC_NUMBER, spv::SPIRV_VERSION_1_3,
-                0x00140000u, 10u, 0u,
-                (3u << 16u) | static_cast<uint32_t>(spv::OpCode::OpMemoryModel), 0u, 1u,
-                (5u << 16u) | static_cast<uint32_t>(spv::OpCode::OpImageSampleImplicitLod), 1u, 2u, 3u, 4u,
+                spv::SPIRV_MAGIC_NUMBER,
+                spv::SPIRV_VERSION_1_3,
+                0x00140000u,
+                10u,
+                0u,
+                (3u << 16u) | static_cast<uint32_t>(spv::OpCode::OpMemoryModel),
+                0u,
+                1u,
+                (5u << 16u) | static_cast<uint32_t>(spv::OpCode::OpImageSampleImplicitLod),
+                1u,
+                2u,
+                3u,
+                4u,
                 (1u << 16u) | static_cast<uint32_t>(spv::OpCode::OpReturn),
-                (1u << 16u) | static_cast<uint32_t>(spv::OpCode::OpFunctionEnd)
-            };
+                (1u << 16u) | static_cast<uint32_t>(spv::OpCode::OpFunctionEnd)};
 
             VkShaderModuleCreateInfo info{};
             info.sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO;
@@ -1142,7 +1159,8 @@ TEST(ShaderModuleInterceptionMockTest, ConcurrentShaderModuleCreation16Threads) 
 
             for (size_t i = 0; i < MODULES_PER_THREAD; ++i) {
                 VkShaderModule mod = VK_NULL_HANDLE;
-                EXPECT_EQ(vntx_CreateShaderModule(fixture.device, &info, nullptr, &mod), VK_SUCCESS);
+                EXPECT_EQ(vntx_CreateShaderModule(fixture.device, &info, nullptr, &mod),
+                          VK_SUCCESS);
                 EXPECT_NE(mod, VK_NULL_HANDLE);
                 vntx_DestroyShaderModule(fixture.device, mod, nullptr);
                 completed_count.fetch_add(1, std::memory_order_relaxed);

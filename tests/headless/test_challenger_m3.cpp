@@ -107,11 +107,18 @@ TEST(ChallengerM3CorruptedInputTest, BadMagicWordsMatrix) {
 
     for (const auto magic : bad_magics) {
         std::vector<uint32_t> corrupt_stream = {
-            magic, spv::SPIRV_VERSION_1_3, 0x00140000u, 15u, 0u,
-            (5u << 16u) | static_cast<uint32_t>(spv::OpCode::OpImageSampleImplicitLod), 1u, 2u, 3u, 4u,
+            magic,
+            spv::SPIRV_VERSION_1_3,
+            0x00140000u,
+            15u,
+            0u,
+            (5u << 16u) | static_cast<uint32_t>(spv::OpCode::OpImageSampleImplicitLod),
+            1u,
+            2u,
+            3u,
+            4u,
             (1u << 16u) | static_cast<uint32_t>(spv::OpCode::OpReturn),
-            (1u << 16u) | static_cast<uint32_t>(spv::OpCode::OpFunctionEnd)
-        };
+            (1u << 16u) | static_cast<uint32_t>(spv::OpCode::OpFunctionEnd)};
 
         EXPECT_FALSE(spv::is_valid_spirv(corrupt_stream.data(), corrupt_stream.size()));
 
@@ -149,7 +156,11 @@ TEST(ChallengerM3CorruptedInputTest, TruncatedHeadersSubFiveWords) {
 TEST(ChallengerM3CorruptedInputTest, ZeroWordCountInfiniteLoopAndBoundary) {
     // 1. Zero word count at instruction 0
     std::vector<uint32_t> zero_wc_head = {
-        spv::SPIRV_MAGIC_NUMBER, spv::SPIRV_VERSION_1_3, 0x00140000u, 10u, 0u,
+        spv::SPIRV_MAGIC_NUMBER,
+        spv::SPIRV_VERSION_1_3,
+        0x00140000u,
+        10u,
+        0u,
         0x00000057u  // word_count = 0, OpCode = 87 (OpImageSampleImplicitLod)
     };
     auto res1 = spv::rewrite_shader_bytecode(zero_wc_head.data(), zero_wc_head.size());
@@ -159,11 +170,16 @@ TEST(ChallengerM3CorruptedInputTest, ZeroWordCountInfiniteLoopAndBoundary) {
 
     // 2. Zero word count in middle of stream after valid instruction
     std::vector<uint32_t> zero_wc_mid = {
-        spv::SPIRV_MAGIC_NUMBER, spv::SPIRV_VERSION_1_3, 0x00140000u, 10u, 0u,
-        (3u << 16u) | static_cast<uint32_t>(spv::OpCode::OpMemoryModel), 0u, 1u,
+        spv::SPIRV_MAGIC_NUMBER,
+        spv::SPIRV_VERSION_1_3,
+        0x00140000u,
+        10u,
+        0u,
+        (3u << 16u) | static_cast<uint32_t>(spv::OpCode::OpMemoryModel),
+        0u,
+        1u,
         0x00000000u,  // word_count = 0, OpCode = 0 (OpNop)
-        (1u << 16u) | static_cast<uint32_t>(spv::OpCode::OpReturn)
-    };
+        (1u << 16u) | static_cast<uint32_t>(spv::OpCode::OpReturn)};
     auto res2 = spv::rewrite_shader_bytecode(zero_wc_mid.data(), zero_wc_mid.size());
     EXPECT_FALSE(res2.modified);
     EXPECT_EQ(res2.bytecode.size(), zero_wc_mid.size());
@@ -173,8 +189,13 @@ TEST(ChallengerM3CorruptedInputTest, ZeroWordCountInfiniteLoopAndBoundary) {
 TEST(ChallengerM3CorruptedInputTest, InstructionWordCountExceedingStream) {
     // 1. Exceeds stream by 1 word
     std::vector<uint32_t> oob_1 = {
-        spv::SPIRV_MAGIC_NUMBER, spv::SPIRV_VERSION_1_3, 0x00140000u, 10u, 0u,
-        (3u << 16u) | static_cast<uint32_t>(spv::OpCode::OpMemoryModel), 0u  // Missing 1 operand
+        spv::SPIRV_MAGIC_NUMBER,
+        spv::SPIRV_VERSION_1_3,
+        0x00140000u,
+        10u,
+        0u,
+        (3u << 16u) | static_cast<uint32_t>(spv::OpCode::OpMemoryModel),
+        0u  // Missing 1 operand
     };
     auto res1 = spv::rewrite_shader_bytecode(oob_1.data(), oob_1.size());
     EXPECT_FALSE(res1.modified);
@@ -182,9 +203,15 @@ TEST(ChallengerM3CorruptedInputTest, InstructionWordCountExceedingStream) {
 
     // 2. Huge word count (0xFFFF)
     std::vector<uint32_t> oob_huge = {
-        spv::SPIRV_MAGIC_NUMBER, spv::SPIRV_VERSION_1_3, 0x00140000u, 10u, 0u,
-        (0xFFFFu << 16u) | static_cast<uint32_t>(spv::OpCode::OpImageSampleImplicitLod), 1u, 2u, 3u
-    };
+        spv::SPIRV_MAGIC_NUMBER,
+        spv::SPIRV_VERSION_1_3,
+        0x00140000u,
+        10u,
+        0u,
+        (0xFFFFu << 16u) | static_cast<uint32_t>(spv::OpCode::OpImageSampleImplicitLod),
+        1u,
+        2u,
+        3u};
     auto res2 = spv::rewrite_shader_bytecode(oob_huge.data(), oob_huge.size());
     EXPECT_FALSE(res2.modified);
     EXPECT_EQ(res2.bytecode, oob_huge);
@@ -197,8 +224,7 @@ TEST(ChallengerM3CorruptedInputTest, TrailingGarbageWords) {
         (3u << 16u) | static_cast<uint32_t>(spv::OpCode::OpMemoryModel), 0u, 1u,
         (1u << 16u) | static_cast<uint32_t>(spv::OpCode::OpReturn),
         // Trailing garbage words that cannot form a valid opcode
-        0xDEADBEEFu, 0xCAFEBABEu
-    };
+        0xDEADBEEFu, 0xCAFEBABEu};
 
     auto res = spv::rewrite_shader_bytecode(trailing_garbage.data(), trailing_garbage.size());
     EXPECT_FALSE(res.modified);
@@ -208,12 +234,21 @@ TEST(ChallengerM3CorruptedInputTest, TrailingGarbageWords) {
 TEST(ChallengerM3CorruptedInputTest, ZeroIdsAndBoundaryOperands) {
     // Sampling opcode with Result ID = 0 or Result Type ID = 0
     std::vector<uint32_t> zero_ids_spv = {
-        spv::SPIRV_MAGIC_NUMBER, spv::SPIRV_VERSION_1_3, 0x00140000u, 10u, 0u,
-        (3u << 16u) | static_cast<uint32_t>(spv::OpCode::OpMemoryModel), 0u, 1u,
-        (5u << 16u) | static_cast<uint32_t>(spv::OpCode::OpImageSampleImplicitLod), 0u, 0u, 0u, 0u,
+        spv::SPIRV_MAGIC_NUMBER,
+        spv::SPIRV_VERSION_1_3,
+        0x00140000u,
+        10u,
+        0u,
+        (3u << 16u) | static_cast<uint32_t>(spv::OpCode::OpMemoryModel),
+        0u,
+        1u,
+        (5u << 16u) | static_cast<uint32_t>(spv::OpCode::OpImageSampleImplicitLod),
+        0u,
+        0u,
+        0u,
+        0u,
         (1u << 16u) | static_cast<uint32_t>(spv::OpCode::OpReturn),
-        (1u << 16u) | static_cast<uint32_t>(spv::OpCode::OpFunctionEnd)
-    };
+        (1u << 16u) | static_cast<uint32_t>(spv::OpCode::OpFunctionEnd)};
 
     // Should rewrite or pass through safely without crash
     auto res = spv::rewrite_shader_bytecode(zero_ids_spv.data(), zero_ids_spv.size());
@@ -226,18 +261,40 @@ TEST(ChallengerM3CorruptedInputTest, ZeroIdsAndBoundaryOperands) {
 TEST(ChallengerM3CorruptedInputTest, AdversarialMutationFuzzer1000Iterations) {
     // Base valid SPIR-V shader with multiple instructions
     const std::vector<uint32_t> base_valid_spirv = {
-        spv::SPIRV_MAGIC_NUMBER, spv::SPIRV_VERSION_1_3, 0x00140000u, 20u, 0u,
-        (3u << 16u) | static_cast<uint32_t>(spv::OpCode::OpMemoryModel), 0u, 1u,
-        (4u << 16u) | static_cast<uint32_t>(spv::OpCode::OpDecorate), 2u,
-        static_cast<uint32_t>(spv::Decoration::DescriptorSet), 0u,
-        (4u << 16u) | static_cast<uint32_t>(spv::OpCode::OpDecorate), 2u,
-        static_cast<uint32_t>(spv::Decoration::Binding), 0u,
-        (4u << 16u) | static_cast<uint32_t>(spv::OpCode::OpLoad), 1u, 3u, 2u,
-        (5u << 16u) | static_cast<uint32_t>(spv::OpCode::OpImageSampleImplicitLod), 1u, 4u, 3u, 5u,
-        (5u << 16u) | static_cast<uint32_t>(spv::OpCode::OpImageSampleExplicitLod), 1u, 6u, 3u, 5u, 2u, 7u,
+        spv::SPIRV_MAGIC_NUMBER,
+        spv::SPIRV_VERSION_1_3,
+        0x00140000u,
+        20u,
+        0u,
+        (3u << 16u) | static_cast<uint32_t>(spv::OpCode::OpMemoryModel),
+        0u,
+        1u,
+        (4u << 16u) | static_cast<uint32_t>(spv::OpCode::OpDecorate),
+        2u,
+        static_cast<uint32_t>(spv::Decoration::DescriptorSet),
+        0u,
+        (4u << 16u) | static_cast<uint32_t>(spv::OpCode::OpDecorate),
+        2u,
+        static_cast<uint32_t>(spv::Decoration::Binding),
+        0u,
+        (4u << 16u) | static_cast<uint32_t>(spv::OpCode::OpLoad),
+        1u,
+        3u,
+        2u,
+        (5u << 16u) | static_cast<uint32_t>(spv::OpCode::OpImageSampleImplicitLod),
+        1u,
+        4u,
+        3u,
+        5u,
+        (5u << 16u) | static_cast<uint32_t>(spv::OpCode::OpImageSampleExplicitLod),
+        1u,
+        6u,
+        3u,
+        5u,
+        2u,
+        7u,
         (1u << 16u) | static_cast<uint32_t>(spv::OpCode::OpReturn),
-        (1u << 16u) | static_cast<uint32_t>(spv::OpCode::OpFunctionEnd)
-    };
+        (1u << 16u) | static_cast<uint32_t>(spv::OpCode::OpFunctionEnd)};
 
     std::mt19937_64 rng(0x1337C0DEULL);
     std::uniform_int_distribution<size_t> mut_type_dist(0, 5);
@@ -335,13 +392,12 @@ TEST(ChallengerM3SsaIntegrityTest, VectorAluSsaDefUseChainPreservation) {
         (5u << 16u) | static_cast<uint32_t>(spv::OpCode::OpImageSampleImplicitLod),
         ORIGINAL_RESULT_TYPE, ORIGINAL_RESULT_ID, ORIGINAL_SAMPLED_IMAGE_ID, ORIGINAL_COORD_ID,
         // OpFMul consuming %42: ResultType=10, Result=50, Op1=42, Op2=42
-        (5u << 16u) | static_cast<uint32_t>(spv::OpCode::OpFMul),
-        ORIGINAL_RESULT_TYPE, DOWNSTREAM_RESULT_ID, ORIGINAL_RESULT_ID, ORIGINAL_RESULT_ID,
+        (5u << 16u) | static_cast<uint32_t>(spv::OpCode::OpFMul), ORIGINAL_RESULT_TYPE,
+        DOWNSTREAM_RESULT_ID, ORIGINAL_RESULT_ID, ORIGINAL_RESULT_ID,
         // OpReturn
         (1u << 16u) | static_cast<uint32_t>(spv::OpCode::OpReturn),
         // OpFunctionEnd
-        (1u << 16u) | static_cast<uint32_t>(spv::OpCode::OpFunctionEnd)
-    };
+        (1u << 16u) | static_cast<uint32_t>(spv::OpCode::OpFunctionEnd)};
 
     const auto result = spv::rewrite_shader_bytecode(spirv_code.data(), spirv_code.size(),
                                                      {.enable_tensor_cores = false});
@@ -406,13 +462,21 @@ TEST(ChallengerM3SsaIntegrityTest, TensorCoresSsaDefUseChainPreservation) {
     constexpr uint32_t ORIGINAL_BOUND = 100u;
 
     std::vector<uint32_t> spirv_code = {
-        spv::SPIRV_MAGIC_NUMBER, spv::SPIRV_VERSION_1_3, 0x00140000u, ORIGINAL_BOUND, 0u,
-        (3u << 16u) | static_cast<uint32_t>(spv::OpCode::OpMemoryModel), 0u, 1u,
+        spv::SPIRV_MAGIC_NUMBER,
+        spv::SPIRV_VERSION_1_3,
+        0x00140000u,
+        ORIGINAL_BOUND,
+        0u,
+        (3u << 16u) | static_cast<uint32_t>(spv::OpCode::OpMemoryModel),
+        0u,
+        1u,
         (5u << 16u) | static_cast<uint32_t>(spv::OpCode::OpImageSampleImplicitLod),
-        ORIGINAL_RESULT_TYPE, ORIGINAL_RESULT_ID, ORIGINAL_SAMPLED_IMAGE_ID, ORIGINAL_COORD_ID,
+        ORIGINAL_RESULT_TYPE,
+        ORIGINAL_RESULT_ID,
+        ORIGINAL_SAMPLED_IMAGE_ID,
+        ORIGINAL_COORD_ID,
         (1u << 16u) | static_cast<uint32_t>(spv::OpCode::OpReturn),
-        (1u << 16u) | static_cast<uint32_t>(spv::OpCode::OpFunctionEnd)
-    };
+        (1u << 16u) | static_cast<uint32_t>(spv::OpCode::OpFunctionEnd)};
 
     const auto result = spv::rewrite_shader_bytecode(spirv_code.data(), spirv_code.size(),
                                                      {.enable_tensor_cores = true});
@@ -445,23 +509,26 @@ TEST(ChallengerM3SsaIntegrityTest, TensorCoresSsaDefUseChainPreservation) {
 }
 
 TEST(ChallengerM3SsaIntegrityTest, AllSamplingOpcodeVariantsSsaPreservation) {
-    const std::vector<spv::OpCode> opcodes = {
-        spv::OpCode::OpImageSampleImplicitLod,
-        spv::OpCode::OpImageSampleExplicitLod,
-        spv::OpCode::OpImageSampleDrefImplicitLod,
-        spv::OpCode::OpImageSampleDrefExplicitLod,
-        spv::OpCode::OpImageFetch,
-        spv::OpCode::OpImageRead
-    };
+    const std::vector<spv::OpCode> opcodes = {spv::OpCode::OpImageSampleImplicitLod,
+                                              spv::OpCode::OpImageSampleExplicitLod,
+                                              spv::OpCode::OpImageSampleDrefImplicitLod,
+                                              spv::OpCode::OpImageSampleDrefExplicitLod,
+                                              spv::OpCode::OpImageFetch,
+                                              spv::OpCode::OpImageRead};
 
     for (const auto op : opcodes) {
         const uint32_t res_id = 100u;
         const uint32_t type_id = 25u;
 
         std::vector<uint32_t> spirv_code = {
-            spv::SPIRV_MAGIC_NUMBER, spv::SPIRV_VERSION_1_3, 0x00140000u, 150u, 0u,
-            (3u << 16u) | static_cast<uint32_t>(spv::OpCode::OpMemoryModel), 0u, 1u
-        };
+            spv::SPIRV_MAGIC_NUMBER,
+            spv::SPIRV_VERSION_1_3,
+            0x00140000u,
+            150u,
+            0u,
+            (3u << 16u) | static_cast<uint32_t>(spv::OpCode::OpMemoryModel),
+            0u,
+            1u};
 
         if (op == spv::OpCode::OpImageSampleExplicitLod) {
             spirv_code.push_back((7u << 16u) | static_cast<uint32_t>(op));
@@ -507,9 +574,14 @@ TEST(ChallengerM3BoundScalingTest, MultipleSamplingOpsBoundScalingExactFormula) 
     for (const auto count : op_counts) {
         constexpr uint32_t BASE_BOUND = 200u;
         std::vector<uint32_t> spirv_code = {
-            spv::SPIRV_MAGIC_NUMBER, spv::SPIRV_VERSION_1_3, 0x00140000u, BASE_BOUND, 0u,
-            (3u << 16u) | static_cast<uint32_t>(spv::OpCode::OpMemoryModel), 0u, 1u
-        };
+            spv::SPIRV_MAGIC_NUMBER,
+            spv::SPIRV_VERSION_1_3,
+            0x00140000u,
+            BASE_BOUND,
+            0u,
+            (3u << 16u) | static_cast<uint32_t>(spv::OpCode::OpMemoryModel),
+            0u,
+            1u};
 
         for (size_t i = 0; i < count; ++i) {
             const uint32_t res_id = static_cast<uint32_t>(10 + i);
@@ -556,12 +628,21 @@ TEST(ChallengerM3BoundScalingTest, InflatedInitialBoundPreserved) {
     // Module where original bound is already large (10,000)
     constexpr uint32_t INFLATED_BOUND = 10000u;
     std::vector<uint32_t> spirv_code = {
-        spv::SPIRV_MAGIC_NUMBER, spv::SPIRV_VERSION_1_3, 0x00140000u, INFLATED_BOUND, 0u,
-        (3u << 16u) | static_cast<uint32_t>(spv::OpCode::OpMemoryModel), 0u, 1u,
-        (5u << 16u) | static_cast<uint32_t>(spv::OpCode::OpImageSampleImplicitLod), 1u, 2u, 3u, 4u,
+        spv::SPIRV_MAGIC_NUMBER,
+        spv::SPIRV_VERSION_1_3,
+        0x00140000u,
+        INFLATED_BOUND,
+        0u,
+        (3u << 16u) | static_cast<uint32_t>(spv::OpCode::OpMemoryModel),
+        0u,
+        1u,
+        (5u << 16u) | static_cast<uint32_t>(spv::OpCode::OpImageSampleImplicitLod),
+        1u,
+        2u,
+        3u,
+        4u,
         (1u << 16u) | static_cast<uint32_t>(spv::OpCode::OpReturn),
-        (1u << 16u) | static_cast<uint32_t>(spv::OpCode::OpFunctionEnd)
-    };
+        (1u << 16u) | static_cast<uint32_t>(spv::OpCode::OpFunctionEnd)};
 
     const auto result = spv::rewrite_shader_bytecode(spirv_code.data(), spirv_code.size());
     EXPECT_TRUE(result.modified);
@@ -572,15 +653,24 @@ TEST(ChallengerM3BoundScalingTest, InflatedInitialBoundPreserved) {
 TEST(ChallengerM3BoundScalingTest, NonRewrittenShaderPreservesExactBound) {
     constexpr uint32_t ORIGINAL_BOUND = 42u;
     std::vector<uint32_t> non_sampling_spirv = {
-        spv::SPIRV_MAGIC_NUMBER, spv::SPIRV_VERSION_1_3, 0x00140000u, ORIGINAL_BOUND, 0u,
-        (3u << 16u) | static_cast<uint32_t>(spv::OpCode::OpMemoryModel), 0u, 1u,
-        (5u << 16u) | static_cast<uint32_t>(spv::OpCode::OpFAdd), 1u, 5u, 2u, 3u,
+        spv::SPIRV_MAGIC_NUMBER,
+        spv::SPIRV_VERSION_1_3,
+        0x00140000u,
+        ORIGINAL_BOUND,
+        0u,
+        (3u << 16u) | static_cast<uint32_t>(spv::OpCode::OpMemoryModel),
+        0u,
+        1u,
+        (5u << 16u) | static_cast<uint32_t>(spv::OpCode::OpFAdd),
+        1u,
+        5u,
+        2u,
+        3u,
         (1u << 16u) | static_cast<uint32_t>(spv::OpCode::OpReturn),
-        (1u << 16u) | static_cast<uint32_t>(spv::OpCode::OpFunctionEnd)
-    };
+        (1u << 16u) | static_cast<uint32_t>(spv::OpCode::OpFunctionEnd)};
 
-    const auto result = spv::rewrite_shader_bytecode(non_sampling_spirv.data(),
-                                                     non_sampling_spirv.size());
+    const auto result =
+        spv::rewrite_shader_bytecode(non_sampling_spirv.data(), non_sampling_spirv.size());
     EXPECT_FALSE(result.modified);
     EXPECT_EQ(result.bytecode[3], ORIGINAL_BOUND);
 }
@@ -624,24 +714,27 @@ TEST(ChallengerM3DescriptorFilterTest, MultiTextureBindingSelectiveRewriting) {
         (4u << 16u) | static_cast<uint32_t>(spv::OpCode::OpLoad), 1u, 14u, 4u,
         (4u << 16u) | static_cast<uint32_t>(spv::OpCode::OpLoad), 1u, 15u, 5u,
         // 4 Sampling opcodes
-        (5u << 16u) | static_cast<uint32_t>(spv::OpCode::OpImageSampleImplicitLod), 1u, 20u, 12u, 30u,
-        (5u << 16u) | static_cast<uint32_t>(spv::OpCode::OpImageSampleImplicitLod), 1u, 21u, 13u, 30u,
-        (5u << 16u) | static_cast<uint32_t>(spv::OpCode::OpImageSampleImplicitLod), 1u, 22u, 14u, 30u,
-        (5u << 16u) | static_cast<uint32_t>(spv::OpCode::OpImageSampleImplicitLod), 1u, 23u, 15u, 30u,
-        (1u << 16u) | static_cast<uint32_t>(spv::OpCode::OpReturn),
-        (1u << 16u) | static_cast<uint32_t>(spv::OpCode::OpFunctionEnd)
-    };
+        (5u << 16u) | static_cast<uint32_t>(spv::OpCode::OpImageSampleImplicitLod), 1u, 20u, 12u,
+        30u, (5u << 16u) | static_cast<uint32_t>(spv::OpCode::OpImageSampleImplicitLod), 1u, 21u,
+        13u, 30u, (5u << 16u) | static_cast<uint32_t>(spv::OpCode::OpImageSampleImplicitLod), 1u,
+        22u, 14u, 30u, (5u << 16u) | static_cast<uint32_t>(spv::OpCode::OpImageSampleImplicitLod),
+        1u, 23u, 15u, 30u, (1u << 16u) | static_cast<uint32_t>(spv::OpCode::OpReturn),
+        (1u << 16u) | static_cast<uint32_t>(spv::OpCode::OpFunctionEnd)};
 
     // Case A: Filter targeting specifically set=1, binding=1 (Var 5, Load 15, Sample 23)
-    spv::RewriteOptions options_exact{.enable_tensor_cores = false, .target_binding = 1, .target_set = 1};
-    const auto result_exact = spv::rewrite_shader_bytecode(spirv_code.data(), spirv_code.size(), options_exact);
+    spv::RewriteOptions options_exact{
+        .enable_tensor_cores = false, .target_binding = 1, .target_set = 1};
+    const auto result_exact =
+        spv::rewrite_shader_bytecode(spirv_code.data(), spirv_code.size(), options_exact);
 
     EXPECT_TRUE(result_exact.modified);
     EXPECT_EQ(result_exact.sample_instructions_found, 4u);
     EXPECT_EQ(result_exact.sample_instructions_rewritten, 1u);
 
-    // Verify SSA definition of 23 is rewritten (OpFMul), while 20, 21, 22 remain OpImageSampleImplicitLod
-    const auto instructions_exact = disassemble_spirv(result_exact.bytecode.data(), result_exact.bytecode.size());
+    // Verify SSA definition of 23 is rewritten (OpFMul), while 20, 21, 22 remain
+    // OpImageSampleImplicitLod
+    const auto instructions_exact =
+        disassemble_spirv(result_exact.bytecode.data(), result_exact.bytecode.size());
     std::unordered_map<uint32_t, spv::OpCode> op_map_exact;
     for (const auto& inst : instructions_exact) {
         if (inst.result_id != 0) {
@@ -654,15 +747,19 @@ TEST(ChallengerM3DescriptorFilterTest, MultiTextureBindingSelectiveRewriting) {
     EXPECT_EQ(op_map_exact[22u], spv::OpCode::OpImageSampleImplicitLod);
     EXPECT_EQ(op_map_exact[23u], spv::OpCode::OpFMul);  // Rewritten
 
-    // Case B: Filter targeting set=1 with target_binding=0 (acts as Set 1 wildcard, matching all bindings in set 1)
-    spv::RewriteOptions options_set_wildcard{.enable_tensor_cores = false, .target_binding = 0, .target_set = 1};
-    const auto result_wildcard = spv::rewrite_shader_bytecode(spirv_code.data(), spirv_code.size(), options_set_wildcard);
+    // Case B: Filter targeting set=1 with target_binding=0 (acts as Set 1 wildcard, matching all
+    // bindings in set 1)
+    spv::RewriteOptions options_set_wildcard{
+        .enable_tensor_cores = false, .target_binding = 0, .target_set = 1};
+    const auto result_wildcard =
+        spv::rewrite_shader_bytecode(spirv_code.data(), spirv_code.size(), options_set_wildcard);
 
     EXPECT_TRUE(result_wildcard.modified);
     EXPECT_EQ(result_wildcard.sample_instructions_found, 4u);
     EXPECT_EQ(result_wildcard.sample_instructions_rewritten, 2u);  // Var 4 and Var 5 rewritten
 
-    const auto instructions_wildcard = disassemble_spirv(result_wildcard.bytecode.data(), result_wildcard.bytecode.size());
+    const auto instructions_wildcard =
+        disassemble_spirv(result_wildcard.bytecode.data(), result_wildcard.bytecode.size());
     std::unordered_map<uint32_t, spv::OpCode> op_map_wildcard;
     for (const auto& inst : instructions_wildcard) {
         if (inst.result_id != 0) {
@@ -678,20 +775,37 @@ TEST(ChallengerM3DescriptorFilterTest, MultiTextureBindingSelectiveRewriting) {
 
 TEST(ChallengerM3DescriptorFilterTest, TargetFilterMismatchPassesThroughUnmodified) {
     std::vector<uint32_t> spirv_code = {
-        spv::SPIRV_MAGIC_NUMBER, spv::SPIRV_VERSION_1_3, 0x00140000u, 20u, 0u,
-        (3u << 16u) | static_cast<uint32_t>(spv::OpCode::OpMemoryModel), 0u, 1u,
-        (4u << 16u) | static_cast<uint32_t>(spv::OpCode::OpDecorate), 2u,
-        static_cast<uint32_t>(spv::Decoration::DescriptorSet), 0u,
-        (4u << 16u) | static_cast<uint32_t>(spv::OpCode::OpDecorate), 2u,
-        static_cast<uint32_t>(spv::Decoration::Binding), 0u,
-        (4u << 16u) | static_cast<uint32_t>(spv::OpCode::OpLoad), 1u, 3u, 2u,
-        (5u << 16u) | static_cast<uint32_t>(spv::OpCode::OpImageSampleImplicitLod), 1u, 4u, 3u, 5u,
+        spv::SPIRV_MAGIC_NUMBER,
+        spv::SPIRV_VERSION_1_3,
+        0x00140000u,
+        20u,
+        0u,
+        (3u << 16u) | static_cast<uint32_t>(spv::OpCode::OpMemoryModel),
+        0u,
+        1u,
+        (4u << 16u) | static_cast<uint32_t>(spv::OpCode::OpDecorate),
+        2u,
+        static_cast<uint32_t>(spv::Decoration::DescriptorSet),
+        0u,
+        (4u << 16u) | static_cast<uint32_t>(spv::OpCode::OpDecorate),
+        2u,
+        static_cast<uint32_t>(spv::Decoration::Binding),
+        0u,
+        (4u << 16u) | static_cast<uint32_t>(spv::OpCode::OpLoad),
+        1u,
+        3u,
+        2u,
+        (5u << 16u) | static_cast<uint32_t>(spv::OpCode::OpImageSampleImplicitLod),
+        1u,
+        4u,
+        3u,
+        5u,
         (1u << 16u) | static_cast<uint32_t>(spv::OpCode::OpReturn),
-        (1u << 16u) | static_cast<uint32_t>(spv::OpCode::OpFunctionEnd)
-    };
+        (1u << 16u) | static_cast<uint32_t>(spv::OpCode::OpFunctionEnd)};
 
     // Filter targeting non-existent binding (set=5, binding=99)
-    spv::RewriteOptions options{.enable_tensor_cores = false, .target_binding = 99, .target_set = 5};
+    spv::RewriteOptions options{
+        .enable_tensor_cores = false, .target_binding = 99, .target_set = 5};
     const auto result = spv::rewrite_shader_bytecode(spirv_code.data(), spirv_code.size(), options);
 
     EXPECT_FALSE(result.modified);
@@ -721,13 +835,21 @@ TEST(ChallengerM3ConcurrencyStressTest, HighConcurrencyRewriter16Threads) {
 
             for (size_t i = 0; i < OPS_PER_THREAD; ++i) {
                 std::vector<uint32_t> spv_buf = {
-                    spv::SPIRV_MAGIC_NUMBER, spv::SPIRV_VERSION_1_3, 0x00140000u, 30u, 0u,
-                    (3u << 16u) | static_cast<uint32_t>(spv::OpCode::OpMemoryModel), 0u, 1u,
+                    spv::SPIRV_MAGIC_NUMBER,
+                    spv::SPIRV_VERSION_1_3,
+                    0x00140000u,
+                    30u,
+                    0u,
+                    (3u << 16u) | static_cast<uint32_t>(spv::OpCode::OpMemoryModel),
+                    0u,
+                    1u,
                     (5u << 16u) | static_cast<uint32_t>(spv::OpCode::OpImageSampleImplicitLod),
-                    1u, static_cast<uint32_t>(10 + (t % 5)), 2u, 3u,
+                    1u,
+                    static_cast<uint32_t>(10 + (t % 5)),
+                    2u,
+                    3u,
                     (1u << 16u) | static_cast<uint32_t>(spv::OpCode::OpReturn),
-                    (1u << 16u) | static_cast<uint32_t>(spv::OpCode::OpFunctionEnd)
-                };
+                    (1u << 16u) | static_cast<uint32_t>(spv::OpCode::OpFunctionEnd)};
 
                 const auto res = spv::rewrite_shader_bytecode(
                     spv_buf.data(), spv_buf.size(), {.enable_tensor_cores = (i % 2 == 0)});
@@ -755,13 +877,28 @@ TEST(ChallengerM3ConcurrencyStressTest, ExtremeContentionSharedBuffer32Threads) 
     constexpr size_t OPS_PER_THREAD = 50;
 
     const std::vector<uint32_t> shared_spv = {
-        spv::SPIRV_MAGIC_NUMBER, spv::SPIRV_VERSION_1_3, 0x00140000u, 50u, 0u,
-        (3u << 16u) | static_cast<uint32_t>(spv::OpCode::OpMemoryModel), 0u, 1u,
-        (5u << 16u) | static_cast<uint32_t>(spv::OpCode::OpImageSampleImplicitLod), 1u, 10u, 2u, 3u,
-        (7u << 16u) | static_cast<uint32_t>(spv::OpCode::OpImageSampleExplicitLod), 1u, 11u, 2u, 3u, 2u, 4u,
+        spv::SPIRV_MAGIC_NUMBER,
+        spv::SPIRV_VERSION_1_3,
+        0x00140000u,
+        50u,
+        0u,
+        (3u << 16u) | static_cast<uint32_t>(spv::OpCode::OpMemoryModel),
+        0u,
+        1u,
+        (5u << 16u) | static_cast<uint32_t>(spv::OpCode::OpImageSampleImplicitLod),
+        1u,
+        10u,
+        2u,
+        3u,
+        (7u << 16u) | static_cast<uint32_t>(spv::OpCode::OpImageSampleExplicitLod),
+        1u,
+        11u,
+        2u,
+        3u,
+        2u,
+        4u,
         (1u << 16u) | static_cast<uint32_t>(spv::OpCode::OpReturn),
-        (1u << 16u) | static_cast<uint32_t>(spv::OpCode::OpFunctionEnd)
-    };
+        (1u << 16u) | static_cast<uint32_t>(spv::OpCode::OpFunctionEnd)};
 
     std::atomic<bool> start_signal{false};
     std::atomic<uint64_t> completed_rewrites{0};
@@ -775,8 +912,8 @@ TEST(ChallengerM3ConcurrencyStressTest, ExtremeContentionSharedBuffer32Threads) 
             }
 
             for (size_t i = 0; i < OPS_PER_THREAD; ++i) {
-                const auto res = spv::rewrite_shader_bytecode(
-                    shared_spv.data(), shared_spv.size(), {.enable_tensor_cores = true});
+                const auto res = spv::rewrite_shader_bytecode(shared_spv.data(), shared_spv.size(),
+                                                              {.enable_tensor_cores = true});
 
                 EXPECT_TRUE(res.modified);
                 EXPECT_EQ(res.sample_instructions_found, 2u);
@@ -822,10 +959,10 @@ TEST(ChallengerM3ControlFlowTest, MultiBasicBlockShaderWithBranchesAndLabels) {
         // OpReturn
         (1u << 16u) | static_cast<uint32_t>(spv::OpCode::OpReturn),
         // OpFunctionEnd
-        (1u << 16u) | static_cast<uint32_t>(spv::OpCode::OpFunctionEnd)
-    };
+        (1u << 16u) | static_cast<uint32_t>(spv::OpCode::OpFunctionEnd)};
 
-    const auto result = spv::rewrite_shader_bytecode(multi_block_spv.data(), multi_block_spv.size());
+    const auto result =
+        spv::rewrite_shader_bytecode(multi_block_spv.data(), multi_block_spv.size());
 
     EXPECT_TRUE(result.modified);
     EXPECT_EQ(result.sample_instructions_found, 2u);

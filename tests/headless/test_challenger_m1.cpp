@@ -24,12 +24,11 @@ static VkResult mock_challenger_create_image_success(VkDevice, const VkImageCrea
     return VK_SUCCESS;
 }
 
-static void mock_challenger_destroy_image_noop(VkDevice, VkImage,
-                                               const VkAllocationCallbacks*) {}
+static void mock_challenger_destroy_image_noop(VkDevice, VkImage, const VkAllocationCallbacks*) {}
 
 static void mock_challenger_get_mem_reqs_64k(VkDevice, VkImage,
                                              VkMemoryRequirements* pMemoryRequirements) {
-    pMemoryRequirements->size = 268435456u;  // Large 256MB driver size
+    pMemoryRequirements->size = 268435456u;   // Large 256MB driver size
     pMemoryRequirements->alignment = 65536u;  // 64KB alignment
     pMemoryRequirements->memoryTypeBits = 0xFFu;
 }
@@ -131,9 +130,9 @@ TEST(ChallengerM1ExtremeResolutionTest, Extreme16kResolutionSizeAndDownsizing) {
     EXPECT_EQ(mem_reqs.alignment, 65536u);
     EXPECT_EQ(mem_reqs.memoryTypeBits, 0xFFu);
 
-    EXPECT_EQ(vntx_BindImageMemory(mock_device, img_16k,
-                                   reinterpret_cast<VkDeviceMemory>(0xABCD0000), 0),
-              VK_SUCCESS);
+    EXPECT_EQ(
+        vntx_BindImageMemory(mock_device, img_16k, reinterpret_cast<VkDeviceMemory>(0xABCD0000), 0),
+        VK_SUCCESS);
 
     vntx_DestroyImage(mock_device, img_16k, nullptr);
     LayerContext::get().unregister_device(mock_device);
@@ -302,7 +301,8 @@ TEST(ChallengerM1MipsAndLayersTest, ArrayLayersAndCubemapStress) {
         calculate_native_texture_size(extent_2k, VK_FORMAT_BC7_UNORM_BLOCK, 12, 6);
     EXPECT_EQ(cubemap_size, 33554592u);
 
-    // Texture Array: 128 layers of 1024x1024 BC7 1 mip = 128 * 1,048,576 = 134,217,728 bytes (128 MB)
+    // Texture Array: 128 layers of 1024x1024 BC7 1 mip = 128 * 1,048,576 = 134,217,728 bytes (128
+    // MB)
     const VkExtent3D extent_1k{1024, 1024, 1};
     const uint64_t array_128_size =
         calculate_native_texture_size(extent_1k, VK_FORMAT_BC7_UNORM_BLOCK, 1, 128);
@@ -322,7 +322,8 @@ TEST(ChallengerM1MipsAndLayersTest, ArrayLayersAndCubemapStress) {
 // =========================================================================
 
 TEST(ChallengerM1AlignmentVariationsTest, ComprehensiveAlignmentMatrix) {
-    constexpr uint64_t ntc_size = 9288u;  // Standard NTC weight size (64B header + 9224B FP16 weights)
+    constexpr uint64_t ntc_size =
+        9288u;  // Standard NTC weight size (64B header + 9224B FP16 weights)
 
     // 0: returns size
     EXPECT_EQ(align_memory_size(ntc_size, 0), 9288u);
@@ -367,7 +368,7 @@ static void mock_dynamic_align_mem_reqs(VkDevice, VkImage, VkMemoryRequirements*
 
 TEST(ChallengerM1AlignmentVariationsTest, MockDriverVariousAlignmentsDownsizing) {
     const ScopedDownsizeEnabler enabler;
-    const std::vector<VkDeviceSize> alignments_to_test = {0,    1,    64,      128,     256,
+    const std::vector<VkDeviceSize> alignments_to_test = {0,    1,    64,     128,     256,
                                                           1024, 4096, 65536u, 2097152u};
 
     for (const auto align : alignments_to_test) {
@@ -440,10 +441,10 @@ TEST(ChallengerM1NonCandidateTest, ComprehensiveRejectionMatrix) {
 
     // 2. Uncompressed & Depth Formats (even at 2048x2048)
     const std::vector<VkFormat> uncompressed_formats = {
-        VK_FORMAT_R8G8B8A8_UNORM,       VK_FORMAT_R8G8B8A8_SRGB,   VK_FORMAT_B8G8R8A8_UNORM,
-        VK_FORMAT_R16G16B16A16_SFLOAT,   VK_FORMAT_R32G32B32A32_SFLOAT,
-        VK_FORMAT_D32_SFLOAT,           VK_FORMAT_D24_UNORM_S8_UINT,
-        VK_FORMAT_UNDEFINED};
+        VK_FORMAT_R8G8B8A8_UNORM,      VK_FORMAT_R8G8B8A8_SRGB,
+        VK_FORMAT_B8G8R8A8_UNORM,      VK_FORMAT_R16G16B16A16_SFLOAT,
+        VK_FORMAT_R32G32B32A32_SFLOAT, VK_FORMAT_D32_SFLOAT,
+        VK_FORMAT_D24_UNORM_S8_UINT,   VK_FORMAT_UNDEFINED};
 
     for (const auto fmt : uncompressed_formats) {
         VkImageCreateInfo info{};
@@ -867,7 +868,8 @@ TEST(ChallengerM1ConcurrencyTelemetryTest, HighThreadCountMixedWorkloadStress) {
             VkImageCreateInfo cand_info{};
             cand_info.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
             cand_info.imageType = VK_IMAGE_TYPE_2D;
-            cand_info.format = (t % 2 == 0) ? VK_FORMAT_BC7_UNORM_BLOCK : VK_FORMAT_BC1_RGBA_UNORM_BLOCK;
+            cand_info.format =
+                (t % 2 == 0) ? VK_FORMAT_BC7_UNORM_BLOCK : VK_FORMAT_BC1_RGBA_UNORM_BLOCK;
             cand_info.extent = {2048, 2048, 1};
             cand_info.mipLevels = 12;
             cand_info.arrayLayers = 1;
@@ -899,8 +901,10 @@ TEST(ChallengerM1ConcurrencyTelemetryTest, HighThreadCountMixedWorkloadStress) {
                 else if (t % 4 == 1) {
                     VkImage img1 = VK_NULL_HANDLE;
                     VkImage img2 = VK_NULL_HANDLE;
-                    EXPECT_EQ(vntx_CreateImage(mock_device, &cand_info, nullptr, &img1), VK_SUCCESS);
-                    EXPECT_EQ(vntx_CreateImage(mock_device, &cand_info, nullptr, &img2), VK_SUCCESS);
+                    EXPECT_EQ(vntx_CreateImage(mock_device, &cand_info, nullptr, &img1),
+                              VK_SUCCESS);
+                    EXPECT_EQ(vntx_CreateImage(mock_device, &cand_info, nullptr, &img2),
+                              VK_SUCCESS);
 
                     VkImageMemoryRequirementsInfo2 info2{};
                     info2.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_REQUIREMENTS_INFO_2;
@@ -942,8 +946,9 @@ TEST(ChallengerM1ConcurrencyTelemetryTest, HighThreadCountMixedWorkloadStress) {
                     auto* dev_data = LayerContext::get().get_device_data(mock_device);
                     EXPECT_NE(dev_data, nullptr);
                     if (dev_data) {
-                        const auto count = dev_data->session_telemetry.total_candidate_textures.load(
-                            std::memory_order_relaxed);
+                        const auto count =
+                            dev_data->session_telemetry.total_candidate_textures.load(
+                                std::memory_order_relaxed);
                         EXPECT_GE(count, 0u);
                     }
                 }
@@ -1143,4 +1148,3 @@ TEST(ChallengerM1ConcurrencyTelemetryTest, ConcurrentDeviceRegistrationAndLookup
         worker.join();
     }
 }
-

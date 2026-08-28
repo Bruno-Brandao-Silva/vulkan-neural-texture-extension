@@ -139,7 +139,8 @@ TEST(GuardrailBenchmarkTest, HighContentionConcurrentMeasurementStress) {
                 EXPECT_GE(ms, 0.0);
                 EXPECT_GE(us, 0u);
                 EXPECT_EQ(is_within_latency_budget(ms), ms <= get_layer_config().max_latency_ms);
-                EXPECT_EQ(is_within_latency_budget_us(us), us <= static_cast<uint64_t>(get_layer_config().max_latency_ms * 1000.0));
+                EXPECT_EQ(is_within_latency_budget_us(us),
+                          us <= static_cast<uint64_t>(get_layer_config().max_latency_ms * 1000.0));
                 completed_guards.fetch_add(1, std::memory_order_relaxed);
             }
         });

@@ -49,8 +49,7 @@ VKAPI_ATTR VkResult VKAPI_CALL vntx_CreateImage(const VkDevice device,
             const auto& cfg = vntx::get_layer_config();
             if (cfg.enable_compression && cfg.compression_scale_factor > 1) {
                 scale_factor = cfg.compression_scale_factor;
-                modified_info.extent.width =
-                    std::max(1u, pCreateInfo->extent.width / scale_factor);
+                modified_info.extent.width = std::max(1u, pCreateInfo->extent.width / scale_factor);
                 modified_info.extent.height =
                     std::max(1u, pCreateInfo->extent.height / scale_factor);
 
@@ -66,29 +65,27 @@ VKAPI_ATTR VkResult VKAPI_CALL vntx_CreateImage(const VkDevice device,
                 }
             }
 
-            ntc_size_bytes = vntx::calculate_ntc_compact_size(
-                pCreateInfo->extent, pCreateInfo->format,
-                static_cast<uint8_t>(vntx::Precision::Fp16));
+            ntc_size_bytes =
+                vntx::calculate_ntc_compact_size(pCreateInfo->extent, pCreateInfo->format,
+                                                 static_cast<uint8_t>(vntx::Precision::Fp16));
 
             const double orig_mb = static_cast<double>(native_size_bytes) / (1024.0 * 1024.0);
             const double comp_mb = static_cast<double>(ntc_size_bytes) / (1024.0 * 1024.0);
-            const double ratio = (ntc_size_bytes > 0)
-                                     ? (static_cast<double>(native_size_bytes) /
-                                        static_cast<double>(ntc_size_bytes))
-                                     : 1.0;
-            const double saved_pct =
-                (native_size_bytes > 0)
-                    ? ((1.0 - (static_cast<double>(ntc_size_bytes) /
-                               static_cast<double>(native_size_bytes))) *
-                       100.0)
-                    : 0.0;
+            const double ratio =
+                (ntc_size_bytes > 0)
+                    ? (static_cast<double>(native_size_bytes) / static_cast<double>(ntc_size_bytes))
+                    : 1.0;
+            const double saved_pct = (native_size_bytes > 0)
+                                         ? ((1.0 - (static_cast<double>(ntc_size_bytes) /
+                                                    static_cast<double>(native_size_bytes))) *
+                                            100.0)
+                                         : 0.0;
 
             VNTX_LOG_INFO(
                 "Candidate texture {}x{} compressed: {:.2f}MB -> {:.2f}MB ({:.2f}x ratio, "
                 "{:.1f}% saved) [created physical extent: {}x{}, scale={}x]",
-                pCreateInfo->extent.width, pCreateInfo->extent.height, orig_mb, comp_mb,
-                ratio, saved_pct, modified_info.extent.width, modified_info.extent.height,
-                scale_factor);
+                pCreateInfo->extent.width, pCreateInfo->extent.height, orig_mb, comp_mb, ratio,
+                saved_pct, modified_info.extent.width, modified_info.extent.height, scale_factor);
         } else {
             VNTX_LOG_DEBUG("Image passed through: {}",
                            vntx::get_filter_rejection_reason(*pCreateInfo));
@@ -227,10 +224,9 @@ VKAPI_ATTR void VKAPI_CALL vntx_GetImageMemoryRequirements(
     }
 }
 
-VKAPI_ATTR void VKAPI_CALL
-vntx_GetImageMemoryRequirements2(const VkDevice device,
-                                 const VkImageMemoryRequirementsInfo2* const pInfo,
-                                 VkMemoryRequirements2* const pMemoryRequirements) {
+VKAPI_ATTR void VKAPI_CALL vntx_GetImageMemoryRequirements2(
+    const VkDevice device, const VkImageMemoryRequirementsInfo2* const pInfo,
+    VkMemoryRequirements2* const pMemoryRequirements) {
     if (!device || !pInfo || !pMemoryRequirements) {
         return;
     }
@@ -261,10 +257,8 @@ vntx_GetImageMemoryRequirements2(const VkDevice device,
         }
 
         if (is_candidate && ntc_size > 0 && vntx::get_layer_config().downsize_vram_allocations) {
-            const VkDeviceSize original_driver_size =
-                pMemoryRequirements->memoryRequirements.size;
-            const VkDeviceSize driver_alignment =
-                pMemoryRequirements->memoryRequirements.alignment;
+            const VkDeviceSize original_driver_size = pMemoryRequirements->memoryRequirements.size;
+            const VkDeviceSize driver_alignment = pMemoryRequirements->memoryRequirements.alignment;
 
             const VkDeviceSize downsized_size =
                 vntx::align_memory_size(static_cast<VkDeviceSize>(ntc_size), driver_alignment);
@@ -278,8 +272,7 @@ vntx_GetImageMemoryRequirements2(const VkDevice device,
                 std::unique_lock<std::shared_mutex> lock(device_data->image_mutex);
                 auto it = device_data->candidate_textures.find(image);
                 if (it != device_data->candidate_textures.end()) {
-                    it->second.downsized_memory_size =
-                        pMemoryRequirements->memoryRequirements.size;
+                    it->second.downsized_memory_size = pMemoryRequirements->memoryRequirements.size;
                     it->second.alignment = driver_alignment;
                     it->second.memory_type_bits =
                         pMemoryRequirements->memoryRequirements.memoryTypeBits;
@@ -472,7 +465,8 @@ VKAPI_ATTR void VKAPI_CALL vntx_CmdCopyBufferToImage(const VkCommandBuffer comma
         // 5. Evaluate latency budget
         if (vntx::is_within_latency_budget(elapsed_ms)) {
             VNTX_LOG_DEBUG(
-                "Staging buffer copy intercepted for candidate image {} (guardrail latency={:.3f}ms <= "
+                "Staging buffer copy intercepted for candidate image {} (guardrail "
+                "latency={:.3f}ms <= "
                 "{:.1f}ms)",
                 static_cast<void*>(dstImage), elapsed_ms, max_budget);
 
@@ -580,7 +574,8 @@ vntx_CmdCopyBufferToImage2(const VkCommandBuffer commandBuffer,
         // 5. Evaluate latency budget
         if (vntx::is_within_latency_budget(elapsed_ms)) {
             VNTX_LOG_DEBUG(
-                "Staging buffer copy (v2) intercepted for candidate image {} (guardrail latency={:.3f}ms <= "
+                "Staging buffer copy (v2) intercepted for candidate image {} (guardrail "
+                "latency={:.3f}ms <= "
                 "{:.1f}ms)",
                 static_cast<void*>(dstImage), elapsed_ms, max_budget);
 

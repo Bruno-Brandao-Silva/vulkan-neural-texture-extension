@@ -70,10 +70,11 @@ static void m2_reset_copy_records() {
     g_m2_captured_copies.clear();
 }
 
-static void mock_m2_record_cmd_copy_buffer_to_image(
-    VkCommandBuffer commandBuffer, VkBuffer srcBuffer, VkImage dstImage,
-    VkImageLayout dstImageLayout, uint32_t regionCount,
-    const VkBufferImageCopy* pRegions) {
+static void mock_m2_record_cmd_copy_buffer_to_image(VkCommandBuffer commandBuffer,
+                                                    VkBuffer srcBuffer, VkImage dstImage,
+                                                    VkImageLayout dstImageLayout,
+                                                    uint32_t regionCount,
+                                                    const VkBufferImageCopy* pRegions) {
     std::lock_guard<std::mutex> lock(g_m2_captured_mutex);
     CapturedCopyCall rec{};
     rec.cmd_buffer = commandBuffer;
@@ -89,8 +90,7 @@ static void mock_m2_record_cmd_copy_buffer_to_image(
 }
 
 static void mock_m2_record_cmd_copy_buffer_to_image2(
-    VkCommandBuffer commandBuffer,
-    const VkCopyBufferToImageInfo2* pCopyBufferToImageInfo) {
+    VkCommandBuffer commandBuffer, const VkCopyBufferToImageInfo2* pCopyBufferToImageInfo) {
     std::lock_guard<std::mutex> lock(g_m2_captured_mutex);
     CapturedCopyCall rec{};
     rec.cmd_buffer = commandBuffer;
@@ -101,8 +101,9 @@ static void mock_m2_record_cmd_copy_buffer_to_image2(
         rec.dst_layout = pCopyBufferToImageInfo->dstImageLayout;
         rec.region_count = pCopyBufferToImageInfo->regionCount;
         if (pCopyBufferToImageInfo->pRegions && pCopyBufferToImageInfo->regionCount > 0) {
-            rec.regions2.assign(pCopyBufferToImageInfo->pRegions,
-                                pCopyBufferToImageInfo->pRegions + pCopyBufferToImageInfo->regionCount);
+            rec.regions2.assign(
+                pCopyBufferToImageInfo->pRegions,
+                pCopyBufferToImageInfo->pRegions + pCopyBufferToImageInfo->regionCount);
         }
     }
     g_m2_captured_copies.push_back(rec);
@@ -319,10 +320,9 @@ TEST(ChallengerM2PayloadTest, Float16ConversionFiniteRangeRoundtrips) {
     EXPECT_EQ(float_to_fp16(2.0f), 0x4000u);
 
     // Roundtrip verification for normal float values in MLP range [-10.0f, +10.0f]
-    const std::vector<float> test_values = {
-        0.0f, -0.0f, 0.05f, 0.1f, 0.25f, 0.5f, 0.75f, 1.0f, -1.0f, 2.5f, 10.0f, 64.0f, 255.0f,
-        -0.5f, -2.0f, -10.0f
-    };
+    const std::vector<float> test_values = {0.0f,   -0.0f, 0.05f, 0.1f,  0.25f, 0.5f,
+                                            0.75f,  1.0f,  -1.0f, 2.5f,  10.0f, 64.0f,
+                                            255.0f, -0.5f, -2.0f, -10.0f};
 
     for (const float orig : test_values) {
         const uint16_t half = float_to_fp16(orig);
@@ -337,8 +337,8 @@ TEST(ChallengerM2PayloadTest, AnalyticalWeightGenerationSanityAndFiniteValues) {
 
     // 1. Generate RGBA FP16 payload
     const auto rgba_payload = generate_analytical_ntc_payload(
-        extent, static_cast<uint8_t>(Channels::Rgba), static_cast<uint8_t>(Precision::Fp16),
-        3, 64, 0x12345678ULL, 0.2f, 0.4f, 0.6f, 0.8f);
+        extent, static_cast<uint8_t>(Channels::Rgba), static_cast<uint8_t>(Precision::Fp16), 3, 64,
+        0x12345678ULL, 0.2f, 0.4f, 0.6f, 0.8f);
 
     ASSERT_EQ(rgba_payload.size(), 9288u);
 
@@ -366,8 +366,8 @@ TEST(ChallengerM2PayloadTest, AnalyticalWeightGenerationSanityAndFiniteValues) {
 
     // 2. Generate RGB FP16 payload
     const auto rgb_payload = generate_analytical_ntc_payload(
-        extent, static_cast<uint8_t>(Channels::Rgb), static_cast<uint8_t>(Precision::Fp16),
-        3, 64, 0x87654321ULL, 0.3f, 0.6f, 0.9f, 1.0f);
+        extent, static_cast<uint8_t>(Channels::Rgb), static_cast<uint8_t>(Precision::Fp16), 3, 64,
+        0x87654321ULL, 0.3f, 0.6f, 0.9f, 1.0f);
 
     ASSERT_EQ(rgb_payload.size(), 9158u);
     const auto* rgb_hdr = reinterpret_cast<const NtcHeader*>(rgb_payload.data());
@@ -400,8 +400,8 @@ TEST(ChallengerM2PayloadTest, TranscodeStagingColorMomentsAndHashRobustness) {
         staging_data[i + 3] = 255;
     }
 
-    const auto payload = transcode_staging_to_ntc_payload(
-        staging_data.data(), staging_data.size(), extent, VK_FORMAT_BC7_UNORM_BLOCK);
+    const auto payload = transcode_staging_to_ntc_payload(staging_data.data(), staging_data.size(),
+                                                          extent, VK_FORMAT_BC7_UNORM_BLOCK);
 
     ASSERT_EQ(payload.size(), 9288u);
     const auto* header = reinterpret_cast<const NtcHeader*>(payload.data());
@@ -409,7 +409,8 @@ TEST(ChallengerM2PayloadTest, TranscodeStagingColorMomentsAndHashRobustness) {
     EXPECT_NE(header->texture_hash, 0u);
 
     // Verify output biases match sampled color moments
-    const auto* weights = reinterpret_cast<const uint16_t*>(payload.data() + header->weights_offset);
+    const auto* weights =
+        reinterpret_cast<const uint16_t*>(payload.data() + header->weights_offset);
     // b3 is at the end of the payload (indices 4608..4611)
     const float b3_r = fp16_to_float(weights[4608]);
     const float b3_g = fp16_to_float(weights[4609]);
@@ -457,7 +458,8 @@ TEST(ChallengerM2ConcurrencyTest, HighConcurrencyStagingCopies16Threads) {
     non_cand_info.extent = {512, 512, 1};
 
     for (size_t i = 0; i < NUM_THREADS; ++i) {
-        ASSERT_EQ(vntx_CreateImage(fixture.device, &cand_info, nullptr, &cand_images[i]), VK_SUCCESS);
+        ASSERT_EQ(vntx_CreateImage(fixture.device, &cand_info, nullptr, &cand_images[i]),
+                  VK_SUCCESS);
         ASSERT_EQ(vntx_CreateImage(fixture.device, &non_cand_info, nullptr, &non_cand_images[i]),
                   VK_SUCCESS);
         ASSERT_EQ(vntx_BindImageMemory(fixture.device, cand_images[i],
@@ -730,8 +732,9 @@ TEST(ChallengerM2MultiRegionTest, FourLevelMipChainWithNonZeroOffsets) {
 
     VkImage img = VK_NULL_HANDLE;
     ASSERT_EQ(vntx_CreateImage(fixture.device, &info, nullptr, &img), VK_SUCCESS);
-    ASSERT_EQ(vntx_BindImageMemory(fixture.device, img, reinterpret_cast<VkDeviceMemory>(0x9999), 0),
-              VK_SUCCESS);
+    ASSERT_EQ(
+        vntx_BindImageMemory(fixture.device, img, reinterpret_cast<VkDeviceMemory>(0x9999), 0),
+        VK_SUCCESS);
 
     // Mip 0: 2048x2048, Mip 1: 1024x1024, Mip 2: 512x512, Mip 3: 256x256
     // Starting with an initial non-zero staging buffer offset (e.g. 524,288 bytes = 0.5 MB)
@@ -807,14 +810,14 @@ TEST(ChallengerM2MultiRegionTest, SixFaceCubemapArrayWithNonZeroOffsets) {
 
     VkImage cube_img = VK_NULL_HANDLE;
     ASSERT_EQ(vntx_CreateImage(fixture.device, &info, nullptr, &cube_img), VK_SUCCESS);
-    ASSERT_EQ(vntx_BindImageMemory(fixture.device, cube_img,
-                                   reinterpret_cast<VkDeviceMemory>(0x6666), 0),
-              VK_SUCCESS);
+    ASSERT_EQ(
+        vntx_BindImageMemory(fixture.device, cube_img, reinterpret_cast<VkDeviceMemory>(0x6666), 0),
+        VK_SUCCESS);
 
     // 6 regions with non-zero initial offset and non-contiguous stride
-    constexpr VkDeviceSize CUBE_BASE_OFFSET = 1048576u;  // 1 MB base offset
+    constexpr VkDeviceSize CUBE_BASE_OFFSET = 1048576u;                // 1 MB base offset
     constexpr VkDeviceSize FACE_BYTES = (1024 / 4) * (1024 / 4) * 16;  // 1,048,576 bytes per face
-    constexpr VkDeviceSize ALIGN_GAP = 4096u;  // 4KB alignment gap
+    constexpr VkDeviceSize ALIGN_GAP = 4096u;                          // 4KB alignment gap
 
     VkBufferImageCopy2 regions2[6]{};
     for (uint32_t face = 0; face < 6; ++face) {
@@ -951,8 +954,9 @@ TEST(ChallengerM2MultiRegionTest, PartialSubRectangleUploadWithNonZeroImageOffse
 
     VkImage img = VK_NULL_HANDLE;
     ASSERT_EQ(vntx_CreateImage(fixture.device, &info, nullptr, &img), VK_SUCCESS);
-    ASSERT_EQ(vntx_BindImageMemory(fixture.device, img, reinterpret_cast<VkDeviceMemory>(0xCCCC), 0),
-              VK_SUCCESS);
+    ASSERT_EQ(
+        vntx_BindImageMemory(fixture.device, img, reinterpret_cast<VkDeviceMemory>(0xCCCC), 0),
+        VK_SUCCESS);
 
     // Staging copy updating a 512x512 patch at offset (256, 512)
     VkBufferImageCopy region{};
@@ -1007,8 +1011,9 @@ TEST(ChallengerM2GuardrailAndExceptionTest, DynamicBudgetOverrunPassThroughWitho
 
     VkImage img = VK_NULL_HANDLE;
     ASSERT_EQ(vntx_CreateImage(fixture.device, &info, nullptr, &img), VK_SUCCESS);
-    ASSERT_EQ(vntx_BindImageMemory(fixture.device, img, reinterpret_cast<VkDeviceMemory>(0xEEEE), 0),
-              VK_SUCCESS);
+    ASSERT_EQ(
+        vntx_BindImageMemory(fixture.device, img, reinterpret_cast<VkDeviceMemory>(0xEEEE), 0),
+        VK_SUCCESS);
 
     VkBufferImageCopy region{};
     region.bufferOffset = 0;
@@ -1018,7 +1023,7 @@ TEST(ChallengerM2GuardrailAndExceptionTest, DynamicBudgetOverrunPassThroughWitho
     const VkBuffer mock_buf = reinterpret_cast<VkBuffer>(0xFFFF);
 
     EXPECT_NO_THROW(vntx_CmdCopyBufferToImage(fixture.cmd_buffer, mock_buf, img,
-                                             VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &region));
+                                              VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &region));
 
     // Reset config
     set_layer_config(LayerConfig{});
@@ -1038,7 +1043,7 @@ TEST(ChallengerM2GuardrailAndExceptionTest, NullPointersAndZeroRegionsResilience
 
     // 1. Null command buffer (safe no-op)
     EXPECT_NO_THROW(vntx_CmdCopyBufferToImage(nullptr, VK_NULL_HANDLE, VK_NULL_HANDLE,
-                                             VK_IMAGE_LAYOUT_UNDEFINED, 0, nullptr));
+                                              VK_IMAGE_LAYOUT_UNDEFINED, 0, nullptr));
     EXPECT_NO_THROW(vntx_CmdCopyBufferToImage2(nullptr, nullptr));
 
     // 2. Null copy info or 0 region counts
@@ -1054,7 +1059,7 @@ TEST(ChallengerM2GuardrailAndExceptionTest, NullPointersAndZeroRegionsResilience
     VkBufferImageCopy region{};
     region.imageSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
     region.imageExtent = {2048, 2048, 1};
-    EXPECT_NO_THROW(vntx_CmdCopyBufferToImage(fixture.cmd_buffer, reinterpret_cast<VkBuffer>(0x1234),
-                                             VK_NULL_HANDLE, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
-                                             1, &region));
+    EXPECT_NO_THROW(vntx_CmdCopyBufferToImage(fixture.cmd_buffer,
+                                              reinterpret_cast<VkBuffer>(0x1234), VK_NULL_HANDLE,
+                                              VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &region));
 }

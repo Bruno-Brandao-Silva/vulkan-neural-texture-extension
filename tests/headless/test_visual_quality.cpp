@@ -108,7 +108,8 @@ TEST(VisualQualityTest, SpirvRewritingPreservesIntegrity) {
 }
 
 TEST(VisualQualityTest, SpirvRewriterExplicitLodAndDrefTransformation) {
-    // Shader with OpImageSampleExplicitLod (88), OpImageSampleDrefImplicitLod (89), OpImageSampleDrefExplicitLod (90)
+    // Shader with OpImageSampleExplicitLod (88), OpImageSampleDrefImplicitLod (89),
+    // OpImageSampleDrefExplicitLod (90)
     std::vector<uint32_t> spirv_code = {
         spv::SPIRV_MAGIC_NUMBER, spv::SPIRV_VERSION_1_3,
         0x00140000u,  // Generator magic
@@ -117,11 +118,14 @@ TEST(VisualQualityTest, SpirvRewriterExplicitLodAndDrefTransformation) {
         // OpMemoryModel Logical GLSL450
         (3u << 16u) | static_cast<uint32_t>(spv::OpCode::OpMemoryModel), 0u, 1u,
         // OpImageSampleExplicitLod (7 words)
-        (7u << 16u) | static_cast<uint32_t>(spv::OpCode::OpImageSampleExplicitLod), 1u, 2u, 3u, 4u, 2u, 5u,
+        (7u << 16u) | static_cast<uint32_t>(spv::OpCode::OpImageSampleExplicitLod), 1u, 2u, 3u, 4u,
+        2u, 5u,
         // OpImageSampleDrefImplicitLod (6 words)
-        (6u << 16u) | static_cast<uint32_t>(spv::OpCode::OpImageSampleDrefImplicitLod), 1u, 6u, 3u, 4u, 7u,
+        (6u << 16u) | static_cast<uint32_t>(spv::OpCode::OpImageSampleDrefImplicitLod), 1u, 6u, 3u,
+        4u, 7u,
         // OpImageSampleDrefExplicitLod (8 words)
-        (8u << 16u) | static_cast<uint32_t>(spv::OpCode::OpImageSampleDrefExplicitLod), 1u, 8u, 3u, 4u, 7u, 2u, 5u,
+        (8u << 16u) | static_cast<uint32_t>(spv::OpCode::OpImageSampleDrefExplicitLod), 1u, 8u, 3u,
+        4u, 7u, 2u, 5u,
         // OpReturn
         (1u << 16u) | static_cast<uint32_t>(spv::OpCode::OpReturn),
         // OpFunctionEnd
@@ -163,10 +167,19 @@ TEST(VisualQualityTest, SpirvRewriterImageFetchAndImageReadTransformation) {
 
 TEST(VisualQualityTest, SpirvRewriterTensorCoresBranching) {
     std::vector<uint32_t> spirv_code = {
-        spv::SPIRV_MAGIC_NUMBER, spv::SPIRV_VERSION_1_3,
-        0x00140000u, 10u, 0u,
-        (3u << 16u) | static_cast<uint32_t>(spv::OpCode::OpMemoryModel), 0u, 1u,
-        (5u << 16u) | static_cast<uint32_t>(spv::OpCode::OpImageSampleImplicitLod), 1u, 2u, 3u, 4u,
+        spv::SPIRV_MAGIC_NUMBER,
+        spv::SPIRV_VERSION_1_3,
+        0x00140000u,
+        10u,
+        0u,
+        (3u << 16u) | static_cast<uint32_t>(spv::OpCode::OpMemoryModel),
+        0u,
+        1u,
+        (5u << 16u) | static_cast<uint32_t>(spv::OpCode::OpImageSampleImplicitLod),
+        1u,
+        2u,
+        3u,
+        4u,
         (1u << 16u) | static_cast<uint32_t>(spv::OpCode::OpReturn),
         (1u << 16u) | static_cast<uint32_t>(spv::OpCode::OpFunctionEnd)};
 
@@ -188,8 +201,7 @@ TEST(VisualQualityTest, SpirvRewriterDescriptorSetAndBindingTargeting) {
     // Var 2: set = 0, binding = 1
     // Var 3: set = 0, binding = 2
     std::vector<uint32_t> spirv_code = {
-        spv::SPIRV_MAGIC_NUMBER, spv::SPIRV_VERSION_1_3,
-        0x00140000u, 25u, 0u,
+        spv::SPIRV_MAGIC_NUMBER, spv::SPIRV_VERSION_1_3, 0x00140000u, 25u, 0u,
         // OpMemoryModel Logical GLSL450
         (3u << 16u) | static_cast<uint32_t>(spv::OpCode::OpMemoryModel), 0u, 1u,
         // OpDecorate %2 DescriptorSet 0
