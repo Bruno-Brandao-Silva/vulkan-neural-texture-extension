@@ -315,8 +315,9 @@ VKAPI_ATTR VkResult VKAPI_CALL vntx_CreateDevice(const VkPhysicalDevice physical
             device_data->next_cmd_pipeline_barrier2 = reinterpret_cast<PFN_vkCmdPipelineBarrier2>(
                 next_get_device_proc_addr(*pDevice, "vkCmdPipelineBarrier2"));
             if (!device_data->next_cmd_pipeline_barrier2) {
-                device_data->next_cmd_pipeline_barrier2 = reinterpret_cast<PFN_vkCmdPipelineBarrier2>(
-                    next_get_device_proc_addr(*pDevice, "vkCmdPipelineBarrier2KHR"));
+                device_data->next_cmd_pipeline_barrier2 =
+                    reinterpret_cast<PFN_vkCmdPipelineBarrier2>(
+                        next_get_device_proc_addr(*pDevice, "vkCmdPipelineBarrier2KHR"));
             }
             device_data->next_create_image_view = reinterpret_cast<PFN_vkCreateImageView>(
                 next_get_device_proc_addr(*pDevice, "vkCreateImageView"));

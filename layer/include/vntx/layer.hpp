@@ -274,12 +274,13 @@ VKAPI_ATTR void VKAPI_CALL vntx_CmdPipelineBarrier(
     uint32_t bufferMemoryBarrierCount, const VkBufferMemoryBarrier* pBufferMemoryBarriers,
     uint32_t imageMemoryBarrierCount, const VkImageMemoryBarrier* pImageMemoryBarriers);
 
-VKAPI_ATTR void VKAPI_CALL
-vntx_CmdPipelineBarrier2(VkCommandBuffer commandBuffer, const VkDependencyInfo* pDependencyInfo);
+VKAPI_ATTR void VKAPI_CALL vntx_CmdPipelineBarrier2(VkCommandBuffer commandBuffer,
+                                                    const VkDependencyInfo* pDependencyInfo);
 
-VKAPI_ATTR VkResult VKAPI_CALL
-vntx_CreateImageView(VkDevice device, const VkImageViewCreateInfo* pCreateInfo,
-                     const VkAllocationCallbacks* pAllocator, VkImageView* pView);
+VKAPI_ATTR VkResult VKAPI_CALL vntx_CreateImageView(VkDevice device,
+                                                    const VkImageViewCreateInfo* pCreateInfo,
+                                                    const VkAllocationCallbacks* pAllocator,
+                                                    VkImageView* pView);
 
 VKAPI_ATTR void VKAPI_CALL vntx_DestroyImageView(VkDevice device, VkImageView imageView,
                                                  const VkAllocationCallbacks* pAllocator);
