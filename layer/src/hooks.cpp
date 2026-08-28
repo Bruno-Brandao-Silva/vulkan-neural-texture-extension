@@ -47,9 +47,13 @@ VKAPI_ATTR VkResult VKAPI_CALL vntx_CreateImage(const VkDevice device,
                 pCreateInfo->arrayLayers);
 
             const auto& cfg = vntx::get_layer_config();
-            if (cfg.enable_compression && cfg.compression_scale_factor > 1) {
+            // ONLY scale multi-mip 3D textures (mipLevels > 1).
+            // Single-mip textures (mipLevels == 1) are UI atlases, minimaps, and HUD elements which must stay unscaled.
+            if (pCreateInfo->mipLevels > 1 && cfg.enable_compression &&
+                cfg.compression_scale_factor > 1) {
                 scale_factor = cfg.compression_scale_factor;
-                modified_info.extent.width = std::max(1u, pCreateInfo->extent.width / scale_factor);
+                modified_info.extent.width =
+                    std::max(1u, pCreateInfo->extent.width / scale_factor);
                 modified_info.extent.height =
                     std::max(1u, pCreateInfo->extent.height / scale_factor);
 
@@ -61,7 +65,7 @@ VKAPI_ATTR VkResult VKAPI_CALL vntx_CreateImage(const VkDevice device,
                         dim >>= 1;
                         max_mips++;
                     }
-                    modified_info.mipLevels = std::min(pCreateInfo->mipLevels, max_mips);
+                    modified_info.mipLevels = std::min(pCreateInfo->mipLevels - 1, max_mips);
                 }
             }
 
@@ -442,21 +446,28 @@ VKAPI_ATTR void VKAPI_CALL vntx_CmdCopyBufferToImage(const VkCommandBuffer comma
         const vntx::TranscodingLatencyGuard latency_guard;
 
         // 4. Adapt copy parameters & normalize subresource regions
-        std::vector<VkBufferImageCopy> adjusted_regions(pRegions, pRegions + regionCount);
-        for (auto& region : adjusted_regions) {
+        std::vector<VkBufferImageCopy> adjusted_regions;
+        adjusted_regions.reserve(regionCount);
+
+        for (uint32_t i = 0; i < regionCount; ++i) {
+            VkBufferImageCopy region = pRegions[i];
             if (info.scale_factor > 1) {
-                region.imageExtent.width =
-                    std::max(1u, region.imageExtent.width / info.scale_factor);
-                region.imageExtent.height =
-                    std::max(1u, region.imageExtent.height / info.scale_factor);
-                region.imageOffset.x =
-                    region.imageOffset.x / static_cast<int32_t>(info.scale_factor);
-                region.imageOffset.y =
-                    region.imageOffset.y / static_cast<int32_t>(info.scale_factor);
+                // If upload targets Mip 0 of original image:
+                // Skip it because scaled image does not store the unscaled 2x top mip
+                if (region.imageSubresource.mipLevel == 0) {
+                    continue;
+                }
+                // Shift Mip k -> Mip (k - 1)
+                region.imageSubresource.mipLevel -= 1;
             }
             if (region.imageSubresource.aspectMask == 0) {
                 region.imageSubresource.aspectMask = DEFAULT_COLOR_ASPECT;
             }
+            adjusted_regions.push_back(region);
+        }
+
+        if (adjusted_regions.empty()) {
+            return;
         }
 
         const double max_budget = vntx::get_layer_config().max_latency_ms;
@@ -545,23 +556,28 @@ vntx_CmdCopyBufferToImage2(const VkCommandBuffer commandBuffer,
         const vntx::TranscodingLatencyGuard latency_guard;
 
         // 4. Adapt copy parameters & normalize subresource regions
-        std::vector<VkBufferImageCopy2> adjusted_regions(
-            pCopyBufferToImageInfo->pRegions,
-            pCopyBufferToImageInfo->pRegions + pCopyBufferToImageInfo->regionCount);
-        for (auto& region : adjusted_regions) {
+        std::vector<VkBufferImageCopy2> adjusted_regions;
+        adjusted_regions.reserve(pCopyBufferToImageInfo->regionCount);
+
+        for (uint32_t i = 0; i < pCopyBufferToImageInfo->regionCount; ++i) {
+            VkBufferImageCopy2 region = pCopyBufferToImageInfo->pRegions[i];
             if (info.scale_factor > 1) {
-                region.imageExtent.width =
-                    std::max(1u, region.imageExtent.width / info.scale_factor);
-                region.imageExtent.height =
-                    std::max(1u, region.imageExtent.height / info.scale_factor);
-                region.imageOffset.x =
-                    region.imageOffset.x / static_cast<int32_t>(info.scale_factor);
-                region.imageOffset.y =
-                    region.imageOffset.y / static_cast<int32_t>(info.scale_factor);
+                // If upload targets Mip 0 of original image:
+                // Skip it because scaled image does not store the unscaled 2x top mip
+                if (region.imageSubresource.mipLevel == 0) {
+                    continue;
+                }
+                // Shift Mip k -> Mip (k - 1)
+                region.imageSubresource.mipLevel -= 1;
             }
             if (region.imageSubresource.aspectMask == 0) {
                 region.imageSubresource.aspectMask = DEFAULT_COLOR_ASPECT;
             }
+            adjusted_regions.push_back(region);
+        }
+
+        if (adjusted_regions.empty()) {
+            return;
         }
 
         VkCopyBufferToImageInfo2 modified_info = *pCopyBufferToImageInfo;
