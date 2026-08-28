@@ -111,6 +111,25 @@ LayerConfig load_layer_config_internal() noexcept {
         cfg.cache_dir = cache_dir_env;
     }
 
+    const char* const downsize_env = std::getenv("VNTX_DOWNSIZE_VRAM");
+    if (downsize_env && downsize_env[0] != '\0') {
+        cfg.downsize_vram_allocations = parse_bool_value(downsize_env, false);
+    }
+
+    const char* const scale_env = std::getenv("VNTX_SCALE_FACTOR");
+    if (scale_env && scale_env[0] != '\0') {
+        try {
+            cfg.compression_scale_factor = static_cast<uint32_t>(std::stoul(scale_env));
+            if (cfg.compression_scale_factor < 1) cfg.compression_scale_factor = 1;
+        } catch (...) {
+        }
+    }
+
+    const char* const comp_env = std::getenv("VNTX_COMPRESSION");
+    if (comp_env && comp_env[0] != '\0') {
+        cfg.enable_compression = parse_bool_value(comp_env, true);
+    }
+
     return cfg;
 }
 
@@ -187,6 +206,20 @@ LayerConfig parse_toml_config(const std::string& toml_content) noexcept {
                 cfg.log_level = parse_log_level_string(strip_quotes(val), log::Level::Info);
             } else if (key == "enable_layer_by_default") {
                 cfg.enable_layer_by_default = parse_bool_value(val, true);
+            } else if (key == "downsize_vram_allocations") {
+                cfg.downsize_vram_allocations = parse_bool_value(val, false);
+            }
+        } else if (current_section == "memory" || current_section == "compression") {
+            if (key == "downsize_vram_allocations") {
+                cfg.downsize_vram_allocations = parse_bool_value(val, false);
+            } else if (key == "compression_scale_factor" || key == "scale_factor") {
+                try {
+                    cfg.compression_scale_factor = static_cast<uint32_t>(std::stoul(val));
+                    if (cfg.compression_scale_factor < 1) cfg.compression_scale_factor = 1;
+                } catch (...) {
+                }
+            } else if (key == "enable_compression" || key == "enabled") {
+                cfg.enable_compression = parse_bool_value(val, true);
             }
         }
     }

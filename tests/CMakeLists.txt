@@ -10,6 +10,9 @@ add_executable(ntc_headless_test
     headless/test_stress_boundary.cpp
     headless/test_wsl2_lavapipe.cpp
     headless/test_guardrail.cpp
+    headless/test_challenger_m1.cpp
+    headless/test_challenger_m2.cpp
+    headless/test_challenger_m3.cpp
 )
 
 target_include_directories(ntc_headless_test

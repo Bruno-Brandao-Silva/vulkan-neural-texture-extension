@@ -228,6 +228,9 @@ VKAPI_ATTR void VKAPI_CALL vntx_DestroyInstance(const VkInstance instance,
             return;
         }
 
+        // Log aggregate instance session telemetry summary
+        vntx::LayerContext::get().get_telemetry().log_summary("Session");
+
         auto next_destroy = instance_data->next_destroy_instance;
         vntx::LayerContext::get().unregister_instance(instance);
 
@@ -335,6 +338,9 @@ VKAPI_ATTR void VKAPI_CALL vntx_DestroyDevice(const VkDevice device,
         if (!device_data) {
             return;
         }
+
+        // Log device session telemetry summary
+        device_data->session_telemetry.log_summary("Device");
 
         auto next_destroy = device_data->next_destroy_device;
         vntx::LayerContext::get().unregister_device(device);

@@ -118,3 +118,57 @@ TEST(FallbackTest, SpirvRewriterHandlesPrematureEndOfStream) {
     EXPECT_FALSE(result.modified);
     EXPECT_EQ(result.bytecode.size(), truncated_spv.size());
 }
+
+TEST(FallbackTest, SpirvRewriterZeroSamplingShaderPassthrough) {
+    // Shader with only arithmetic and memory ops (no sampling instructions)
+    std::vector<uint32_t> spirv_in = {
+        spv::SPIRV_MAGIC_NUMBER, spv::SPIRV_VERSION_1_3, 0x00140000u, 10u, 0u,
+        (3u << 16u) | static_cast<uint32_t>(spv::OpCode::OpMemoryModel), 0u, 1u,
+        (4u << 16u) | static_cast<uint32_t>(spv::OpCode::OpVariable), 1u, 2u, 0u,
+        (4u << 16u) | static_cast<uint32_t>(spv::OpCode::OpLoad), 1u, 3u, 2u,
+        (1u << 16u) | static_cast<uint32_t>(spv::OpCode::OpReturn),
+        (1u << 16u) | static_cast<uint32_t>(spv::OpCode::OpFunctionEnd)
+    };
+
+    const auto result = spv::rewrite_shader_bytecode(spirv_in.data(), spirv_in.size());
+    EXPECT_FALSE(result.modified);
+    EXPECT_EQ(result.sample_instructions_found, 0u);
+    EXPECT_EQ(result.sample_instructions_rewritten, 0u);
+    EXPECT_EQ(result.bytecode.size(), spirv_in.size());
+    EXPECT_EQ(result.bytecode, spirv_in);
+}
+
+TEST(FallbackTest, SpirvRewriterZeroWordCountInfiniteLoopPrevention) {
+    // Bytecode with opcode claiming word count 0
+    std::vector<uint32_t> zero_wc_spv = {
+        spv::SPIRV_MAGIC_NUMBER, spv::SPIRV_VERSION_1_3, 0u, 10u, 0u,
+        0x00000057u  // word_count = 0, opcode = 87
+    };
+    const auto result = spv::rewrite_shader_bytecode(zero_wc_spv.data(), zero_wc_spv.size());
+    EXPECT_FALSE(result.modified);
+    EXPECT_EQ(result.sample_instructions_found, 0u);
+    EXPECT_EQ(result.bytecode.size(), zero_wc_spv.size());
+}
+
+TEST(FallbackTest, SpirvRewriterTruncatedInstructionBoundary) {
+    // Instruction declares 100 words, but buffer ends after 1 word
+    std::vector<uint32_t> trunc_inst_spv = {
+        spv::SPIRV_MAGIC_NUMBER, spv::SPIRV_VERSION_1_3, 0u, 10u, 0u,
+        (100u << 16u) | static_cast<uint32_t>(spv::OpCode::OpImageSampleImplicitLod)
+    };
+    const auto result = spv::rewrite_shader_bytecode(trunc_inst_spv.data(), trunc_inst_spv.size());
+    EXPECT_FALSE(result.modified);
+    EXPECT_EQ(result.sample_instructions_found, 0u);
+    EXPECT_EQ(result.bytecode.size(), trunc_inst_spv.size());
+}
+
+TEST(FallbackTest, SpirvRewriterCorruptedMagicVariations) {
+    const std::vector<uint32_t> bad_magics = {0x00000000u, 0xDEADBEEFu, 0xFFFFFFFFu, 0x07230204u};
+    for (const auto bad_magic : bad_magics) {
+        std::vector<uint32_t> corrupt_spv = {bad_magic, spv::SPIRV_VERSION_1_3, 0u, 10u, 0u};
+        EXPECT_FALSE(spv::is_valid_spirv(corrupt_spv.data(), corrupt_spv.size()));
+        const auto result = spv::rewrite_shader_bytecode(corrupt_spv.data(), corrupt_spv.size());
+        EXPECT_FALSE(result.modified);
+        EXPECT_TRUE(result.bytecode.empty());
+    }
+}

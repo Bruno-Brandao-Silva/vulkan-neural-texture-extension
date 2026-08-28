@@ -15,6 +15,9 @@ struct LayerConfig {
     log::Level log_level{log::Level::Info};
     std::string cache_dir{"~/.cache/ntc"};
     bool enable_layer_by_default{true};
+    bool downsize_vram_allocations{false};
+    uint32_t compression_scale_factor{1};
+    bool enable_compression{true};
     std::string loaded_from_path{};
 };
 

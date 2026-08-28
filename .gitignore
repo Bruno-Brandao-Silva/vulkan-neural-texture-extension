@@ -12,6 +12,8 @@ __pycache__/
 
 # Build & Test outputs
 build/
+build-*/
+.agents/
 outputs/
 *.so
 /pkg/

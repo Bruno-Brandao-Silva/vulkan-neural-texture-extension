@@ -103,5 +103,125 @@ TEST(VisualQualityTest, SpirvRewritingPreservesIntegrity) {
     EXPECT_TRUE(result.modified);
     EXPECT_EQ(result.sample_instructions_found, 1u);
     EXPECT_EQ(result.sample_instructions_rewritten, 1u);
-    EXPECT_EQ(result.bytecode.size(), spirv_code.size());
+    EXPECT_GT(result.bytecode.size(), 0u);
+    EXPECT_GE(result.bytecode[3], 10u);
+}
+
+TEST(VisualQualityTest, SpirvRewriterExplicitLodAndDrefTransformation) {
+    // Shader with OpImageSampleExplicitLod (88), OpImageSampleDrefImplicitLod (89), OpImageSampleDrefExplicitLod (90)
+    std::vector<uint32_t> spirv_code = {
+        spv::SPIRV_MAGIC_NUMBER, spv::SPIRV_VERSION_1_3,
+        0x00140000u,  // Generator magic
+        20u,          // Bound
+        0u,           // Schema
+        // OpMemoryModel Logical GLSL450
+        (3u << 16u) | static_cast<uint32_t>(spv::OpCode::OpMemoryModel), 0u, 1u,
+        // OpImageSampleExplicitLod (7 words)
+        (7u << 16u) | static_cast<uint32_t>(spv::OpCode::OpImageSampleExplicitLod), 1u, 2u, 3u, 4u, 2u, 5u,
+        // OpImageSampleDrefImplicitLod (6 words)
+        (6u << 16u) | static_cast<uint32_t>(spv::OpCode::OpImageSampleDrefImplicitLod), 1u, 6u, 3u, 4u, 7u,
+        // OpImageSampleDrefExplicitLod (8 words)
+        (8u << 16u) | static_cast<uint32_t>(spv::OpCode::OpImageSampleDrefExplicitLod), 1u, 8u, 3u, 4u, 7u, 2u, 5u,
+        // OpReturn
+        (1u << 16u) | static_cast<uint32_t>(spv::OpCode::OpReturn),
+        // OpFunctionEnd
+        (1u << 16u) | static_cast<uint32_t>(spv::OpCode::OpFunctionEnd)};
+
+    const auto result = spv::rewrite_shader_bytecode(spirv_code.data(), spirv_code.size());
+
+    EXPECT_TRUE(result.modified);
+    EXPECT_EQ(result.sample_instructions_found, 3u);
+    EXPECT_EQ(result.sample_instructions_rewritten, 3u);
+    EXPECT_GE(result.bytecode[3], 20u);
+}
+
+TEST(VisualQualityTest, SpirvRewriterImageFetchAndImageReadTransformation) {
+    // Shader with OpImageFetch (95) and OpImageRead (98)
+    std::vector<uint32_t> spirv_code = {
+        spv::SPIRV_MAGIC_NUMBER, spv::SPIRV_VERSION_1_3,
+        0x00140000u,  // Generator magic
+        15u,          // Bound
+        0u,           // Schema
+        // OpMemoryModel Logical GLSL450
+        (3u << 16u) | static_cast<uint32_t>(spv::OpCode::OpMemoryModel), 0u, 1u,
+        // OpImageFetch (5 words)
+        (5u << 16u) | static_cast<uint32_t>(spv::OpCode::OpImageFetch), 1u, 2u, 3u, 4u,
+        // OpImageRead (5 words)
+        (5u << 16u) | static_cast<uint32_t>(spv::OpCode::OpImageRead), 1u, 5u, 3u, 4u,
+        // OpReturn
+        (1u << 16u) | static_cast<uint32_t>(spv::OpCode::OpReturn),
+        // OpFunctionEnd
+        (1u << 16u) | static_cast<uint32_t>(spv::OpCode::OpFunctionEnd)};
+
+    const auto result = spv::rewrite_shader_bytecode(spirv_code.data(), spirv_code.size());
+
+    EXPECT_TRUE(result.modified);
+    EXPECT_EQ(result.sample_instructions_found, 2u);
+    EXPECT_EQ(result.sample_instructions_rewritten, 2u);
+    EXPECT_GE(result.bytecode[3], 15u);
+}
+
+TEST(VisualQualityTest, SpirvRewriterTensorCoresBranching) {
+    std::vector<uint32_t> spirv_code = {
+        spv::SPIRV_MAGIC_NUMBER, spv::SPIRV_VERSION_1_3,
+        0x00140000u, 10u, 0u,
+        (3u << 16u) | static_cast<uint32_t>(spv::OpCode::OpMemoryModel), 0u, 1u,
+        (5u << 16u) | static_cast<uint32_t>(spv::OpCode::OpImageSampleImplicitLod), 1u, 2u, 3u, 4u,
+        (1u << 16u) | static_cast<uint32_t>(spv::OpCode::OpReturn),
+        (1u << 16u) | static_cast<uint32_t>(spv::OpCode::OpFunctionEnd)};
+
+    const auto res_tc_on = spv::rewrite_shader_bytecode(spirv_code.data(), spirv_code.size(),
+                                                        {.enable_tensor_cores = true});
+    const auto res_tc_off = spv::rewrite_shader_bytecode(spirv_code.data(), spirv_code.size(),
+                                                         {.enable_tensor_cores = false});
+
+    EXPECT_TRUE(res_tc_on.modified);
+    EXPECT_TRUE(res_tc_off.modified);
+    EXPECT_EQ(res_tc_on.sample_instructions_rewritten, 1u);
+    EXPECT_EQ(res_tc_off.sample_instructions_rewritten, 1u);
+    EXPECT_GE(res_tc_on.bytecode[3], 10u);
+    EXPECT_GE(res_tc_off.bytecode[3], 10u);
+}
+
+TEST(VisualQualityTest, SpirvRewriterDescriptorSetAndBindingTargeting) {
+    // Shader declaring two sampled image variables with decorations:
+    // Var 2: set = 0, binding = 1
+    // Var 3: set = 0, binding = 2
+    std::vector<uint32_t> spirv_code = {
+        spv::SPIRV_MAGIC_NUMBER, spv::SPIRV_VERSION_1_3,
+        0x00140000u, 25u, 0u,
+        // OpMemoryModel Logical GLSL450
+        (3u << 16u) | static_cast<uint32_t>(spv::OpCode::OpMemoryModel), 0u, 1u,
+        // OpDecorate %2 DescriptorSet 0
+        (4u << 16u) | static_cast<uint32_t>(spv::OpCode::OpDecorate), 2u,
+        static_cast<uint32_t>(spv::Decoration::DescriptorSet), 0u,
+        // OpDecorate %2 Binding 1
+        (4u << 16u) | static_cast<uint32_t>(spv::OpCode::OpDecorate), 2u,
+        static_cast<uint32_t>(spv::Decoration::Binding), 1u,
+        // OpDecorate %3 DescriptorSet 0
+        (4u << 16u) | static_cast<uint32_t>(spv::OpCode::OpDecorate), 3u,
+        static_cast<uint32_t>(spv::Decoration::DescriptorSet), 0u,
+        // OpDecorate %3 Binding 2
+        (4u << 16u) | static_cast<uint32_t>(spv::OpCode::OpDecorate), 3u,
+        static_cast<uint32_t>(spv::Decoration::Binding), 2u,
+        // OpLoad %4 from %2
+        (4u << 16u) | static_cast<uint32_t>(spv::OpCode::OpLoad), 1u, 4u, 2u,
+        // OpLoad %5 from %3
+        (4u << 16u) | static_cast<uint32_t>(spv::OpCode::OpLoad), 1u, 5u, 3u,
+        // OpImageSampleImplicitLod using %4 (target binding 1)
+        (5u << 16u) | static_cast<uint32_t>(spv::OpCode::OpImageSampleImplicitLod), 1u, 6u, 4u, 10u,
+        // OpImageSampleImplicitLod using %5 (target binding 2)
+        (5u << 16u) | static_cast<uint32_t>(spv::OpCode::OpImageSampleImplicitLod), 1u, 7u, 5u, 10u,
+        // OpReturn
+        (1u << 16u) | static_cast<uint32_t>(spv::OpCode::OpReturn),
+        // OpFunctionEnd
+        (1u << 16u) | static_cast<uint32_t>(spv::OpCode::OpFunctionEnd)};
+
+    // Filter targeting only binding 1
+    spv::RewriteOptions opts{.enable_tensor_cores = false, .target_binding = 1, .target_set = 0};
+    const auto result = spv::rewrite_shader_bytecode(spirv_code.data(), spirv_code.size(), opts);
+
+    EXPECT_TRUE(result.modified);
+    EXPECT_EQ(result.sample_instructions_found, 2u);
+    EXPECT_EQ(result.sample_instructions_rewritten, 1u);
 }

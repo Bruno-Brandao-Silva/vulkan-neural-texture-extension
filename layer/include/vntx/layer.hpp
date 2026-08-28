@@ -6,10 +6,119 @@
 #include <atomic>
 #include <memory>
 #include <shared_mutex>
+#include <string_view>
 #include <unordered_map>
 #include <unordered_set>
 
+#include "vntx/logging.hpp"
+
 namespace vntx {
+
+/// @brief Metadata and VRAM sizing state for a candidate Neural Texture.
+struct CandidateTextureInfo {
+    VkExtent3D extent{0, 0, 0};
+    VkFormat format{VK_FORMAT_UNDEFINED};
+    uint32_t mip_levels{1};
+    uint32_t array_layers{1};
+    VkImageUsageFlags usage{0};
+    uint64_t native_size_bytes{0};        ///< Exact native BC uncompressed size across all mips & layers
+    uint64_t ntc_size_bytes{0};           ///< Compact NTC size (64-byte header + MLP weights)
+    uint64_t downsized_memory_size{0};   ///< Driver-aligned memory requirement size in VRAM
+    VkDeviceMemory bound_memory{VK_NULL_HANDLE}; ///< Bound VkDeviceMemory handle
+    VkDeviceSize bound_offset{0};         ///< Bound memory offset
+    uint64_t texture_hash{0};             ///< xxHash3 64-bit identifier
+    VkDeviceSize alignment{0};            ///< Driver required memory alignment
+    uint32_t memory_type_bits{0};        ///< Driver supported memory type bits
+    uint32_t scale_factor{1};            ///< Physical dimension compression scale factor (e.g. 2 = 75% VRAM saved)
+    VkExtent3D created_extent{0, 0, 0};  ///< Actual physical image extent created on GPU
+    bool is_bound{false};                 ///< True after vkBindImageMemory[2]
+};
+
+/// @brief Thread-safe instance-wide and device-wide telemetry counters for VRAM reduction statistics.
+struct SessionTelemetry {
+    std::atomic<uint64_t> total_candidate_textures{0};
+    std::atomic<uint64_t> total_native_vram_bytes{0};
+    std::atomic<uint64_t> total_compressed_vram_bytes{0};
+    std::atomic<uint64_t> total_vram_saved_bytes{0};
+
+    SessionTelemetry() = default;
+    SessionTelemetry(const SessionTelemetry& other) noexcept
+        : total_candidate_textures(other.total_candidate_textures.load(std::memory_order_relaxed)),
+          total_native_vram_bytes(other.total_native_vram_bytes.load(std::memory_order_relaxed)),
+          total_compressed_vram_bytes(
+              other.total_compressed_vram_bytes.load(std::memory_order_relaxed)),
+          total_vram_saved_bytes(other.total_vram_saved_bytes.load(std::memory_order_relaxed)) {}
+
+    SessionTelemetry& operator=(const SessionTelemetry& other) noexcept {
+        if (this != &other) {
+            total_candidate_textures.store(
+                other.total_candidate_textures.load(std::memory_order_relaxed),
+                std::memory_order_relaxed);
+            total_native_vram_bytes.store(
+                other.total_native_vram_bytes.load(std::memory_order_relaxed),
+                std::memory_order_relaxed);
+            total_compressed_vram_bytes.store(
+                other.total_compressed_vram_bytes.load(std::memory_order_relaxed),
+                std::memory_order_relaxed);
+            total_vram_saved_bytes.store(
+                other.total_vram_saved_bytes.load(std::memory_order_relaxed),
+                std::memory_order_relaxed);
+        }
+        return *this;
+    }
+
+    void record_candidate(const uint64_t native_bytes, const uint64_t compressed_bytes) noexcept {
+        total_candidate_textures.fetch_add(1, std::memory_order_relaxed);
+        total_native_vram_bytes.fetch_add(native_bytes, std::memory_order_relaxed);
+        total_compressed_vram_bytes.fetch_add(compressed_bytes, std::memory_order_relaxed);
+        if (native_bytes > compressed_bytes) {
+            total_vram_saved_bytes.fetch_add(native_bytes - compressed_bytes,
+                                             std::memory_order_relaxed);
+        }
+    }
+
+    [[nodiscard]] double get_compression_ratio() const noexcept {
+        const uint64_t comp = total_compressed_vram_bytes.load(std::memory_order_relaxed);
+        if (comp == 0) return 1.0;
+        return static_cast<double>(total_native_vram_bytes.load(std::memory_order_relaxed)) /
+               static_cast<double>(comp);
+    }
+
+    [[nodiscard]] double get_savings_percentage() const noexcept {
+        const uint64_t native = total_native_vram_bytes.load(std::memory_order_relaxed);
+        if (native == 0) return 0.0;
+        const uint64_t saved = total_vram_saved_bytes.load(std::memory_order_relaxed);
+        return (static_cast<double>(saved) / static_cast<double>(native)) * 100.0;
+    }
+
+    void log_summary(const std::string_view context_name = "Session") const noexcept {
+        const uint64_t count = total_candidate_textures.load(std::memory_order_relaxed);
+        if (count == 0) {
+            VNTX_LOG_INFO("{} VRAM telemetry: 0 candidate textures processed", context_name);
+            return;
+        }
+        const uint64_t native_bytes = total_native_vram_bytes.load(std::memory_order_relaxed);
+        const uint64_t comp_bytes = total_compressed_vram_bytes.load(std::memory_order_relaxed);
+        const uint64_t saved_bytes = total_vram_saved_bytes.load(std::memory_order_relaxed);
+
+        const double native_mb = static_cast<double>(native_bytes) / (1024.0 * 1024.0);
+        const double comp_mb = static_cast<double>(comp_bytes) / (1024.0 * 1024.0);
+        const double saved_mb = static_cast<double>(saved_bytes) / (1024.0 * 1024.0);
+        const double ratio =
+            (comp_bytes > 0)
+                ? (static_cast<double>(native_bytes) / static_cast<double>(comp_bytes))
+                : 1.0;
+        const double saved_pct =
+            (native_bytes > 0)
+                ? ((static_cast<double>(saved_bytes) / static_cast<double>(native_bytes)) * 100.0)
+                : 0.0;
+
+        VNTX_LOG_INFO(
+            "{} VRAM telemetry: {} candidate textures, native VRAM={:.2f}MB, compressed "
+            "VRAM={:.2f}MB, saved VRAM={:.2f}MB ({:.2f}x ratio, {:.1f}% saved)",
+            context_name, count, native_mb, comp_mb, saved_mb, ratio, saved_pct);
+    }
+};
 
 /// @brief Instance-level state and downstream dispatch functions.
 struct InstanceData {
@@ -37,8 +146,10 @@ struct DeviceData {
     PFN_vkDestroyShaderModule next_destroy_shader_module{nullptr};
 
     std::shared_mutex image_mutex;
+    std::unordered_map<VkImage, CandidateTextureInfo> candidate_textures;
     std::unordered_set<VkImage> candidate_images;
     std::unordered_set<VkImage> active_ntc_images;
+    SessionTelemetry session_telemetry;
 };
 
 /// @brief Registry for instance and device contexts with graceful fallback state.
@@ -59,6 +170,9 @@ public:
     [[nodiscard]] DeviceData* get_device_data_from_command_buffer(
         VkCommandBuffer commandBuffer) const;
 
+    [[nodiscard]] SessionTelemetry& get_telemetry() noexcept { return telemetry_; }
+    [[nodiscard]] const SessionTelemetry& get_telemetry() const noexcept { return telemetry_; }
+
 private:
     LayerContext() = default;
     ~LayerContext() = default;
@@ -72,6 +186,8 @@ private:
 
     mutable std::shared_mutex device_map_mutex_;
     std::unordered_map<void*, std::unique_ptr<DeviceData>> device_map_;
+
+    SessionTelemetry telemetry_;
 };
 
 // Dispatch key helpers (Khronos Layer Dispatch Architecture)
