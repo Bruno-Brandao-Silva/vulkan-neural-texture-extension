@@ -14,7 +14,8 @@ namespace vntx {
 constexpr uint32_t DEFAULT_MIN_CANDIDATE_DIMENSION = 1024;
 constexpr uint32_t MIN_CANDIDATE_DIMENSION = 1024;
 
-/// Default maximum allowed latency budget for dynamic texture transcoding in milliseconds (anti-stutter guardrail).
+/// Default maximum allowed latency budget for dynamic texture transcoding in milliseconds
+/// (anti-stutter guardrail).
 constexpr double DEFAULT_MAX_TRANSCODING_LATENCY_MS = 2.5;
 constexpr double MAX_TRANSCODING_LATENCY_MS = 2.5;
 
@@ -27,7 +28,8 @@ constexpr uint64_t MAX_TRANSCODING_BUDGET_US = 2500;
     return duration_ms <= get_layer_config().max_latency_ms;
 }
 
-/// @brief Checks whether a measured transcoding duration is within a specific budget in milliseconds.
+/// @brief Checks whether a measured transcoding duration is within a specific budget in
+/// milliseconds.
 [[nodiscard]] constexpr bool is_within_latency_budget(const double duration_ms,
                                                       const double max_budget_ms) noexcept {
     return duration_ms <= max_budget_ms;
@@ -35,12 +37,12 @@ constexpr uint64_t MAX_TRANSCODING_BUDGET_US = 2500;
 
 /// @brief Checks whether a measured transcoding duration in microseconds is within budget.
 [[nodiscard]] inline bool is_within_latency_budget_us(const uint64_t duration_us) noexcept {
-    const uint64_t budget_us =
-        static_cast<uint64_t>(get_layer_config().max_latency_ms * 1000.0);
+    const uint64_t budget_us = static_cast<uint64_t>(get_layer_config().max_latency_ms * 1000.0);
     return duration_us <= budget_us;
 }
 
-/// @brief Checks whether a measured transcoding duration in microseconds is within a specific budget.
+/// @brief Checks whether a measured transcoding duration in microseconds is within a specific
+/// budget.
 [[nodiscard]] constexpr bool is_within_latency_budget_us(const uint64_t duration_us,
                                                          const uint64_t max_budget_us) noexcept {
     return duration_us <= max_budget_us;

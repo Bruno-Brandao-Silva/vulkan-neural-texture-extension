@@ -4,8 +4,8 @@
 #include <mutex>
 #include <string_view>
 
-#include "vntx/logging.hpp"
 #include "vntx/config.hpp"
+#include "vntx/logging.hpp"
 
 namespace vntx {
 
@@ -119,7 +119,8 @@ vntx_NegotiateLoaderLayerInterfaceVersion(VkNegotiateLayerInterface* const pVers
 
     const auto& cfg = vntx::get_layer_config();
     VNTX_LOG_INFO(
-        "VNTX implicit layer initialized (Max Latency Budget={:.1f}ms, Min Resolution={}x{}, Special Maps Preserved={})",
+        "VNTX implicit layer initialized (Max Latency Budget={:.1f}ms, Min Resolution={}x{}, "
+        "Special Maps Preserved={})",
         cfg.max_latency_ms, cfg.min_resolution_threshold, cfg.min_resolution_threshold,
         cfg.preserve_special_maps ? "true" : "false");
     return VK_SUCCESS;

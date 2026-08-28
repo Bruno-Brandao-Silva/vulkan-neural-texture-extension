@@ -27,8 +27,7 @@ bool is_candidate_texture(const VkImageCreateInfo& create_info, uint32_t min_dim
     const uint32_t active_min_dim =
         (min_dimension > 0) ? min_dimension : get_layer_config().min_resolution_threshold;
 
-    if (create_info.extent.width < active_min_dim ||
-        create_info.extent.height < active_min_dim) {
+    if (create_info.extent.width < active_min_dim || create_info.extent.height < active_min_dim) {
         return false;
     }
 
@@ -60,11 +59,10 @@ std::string get_filter_rejection_reason(const VkImageCreateInfo& create_info,
     const uint32_t active_min_dim =
         (min_dimension > 0) ? min_dimension : get_layer_config().min_resolution_threshold;
 
-    if (create_info.extent.width < active_min_dim ||
-        create_info.extent.height < active_min_dim) {
+    if (create_info.extent.width < active_min_dim || create_info.extent.height < active_min_dim) {
         return std::format("Dimensions {}x{} smaller than threshold {}x{}",
-                           create_info.extent.width, create_info.extent.height,
-                           active_min_dim, active_min_dim);
+                           create_info.extent.width, create_info.extent.height, active_min_dim,
+                           active_min_dim);
     }
 
     if (create_info.mipLevels < 1) {

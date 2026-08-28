@@ -24,8 +24,8 @@ std::string trim_string(std::string_view sv) {
 
 std::string strip_quotes(std::string_view sv) {
     std::string s = trim_string(sv);
-    if (s.size() >= 2 && ((s.front() == '"' && s.back() == '"') ||
-                          (s.front() == '\'' && s.back() == '\''))) {
+    if (s.size() >= 2 &&
+        ((s.front() == '"' && s.back() == '"') || (s.front() == '\'' && s.back() == '\''))) {
         return s.substr(1, s.size() - 2);
     }
     return s;

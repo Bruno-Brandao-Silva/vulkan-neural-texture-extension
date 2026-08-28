@@ -233,4 +233,3 @@ preserve_special_maps = true
     EXPECT_EQ(cfg.cache_dir, "~/.cache/ntc");
     EXPECT_EQ(cfg.log_level, log::Level::Debug);
 }
-
