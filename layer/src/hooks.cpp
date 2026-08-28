@@ -48,12 +48,12 @@ VKAPI_ATTR VkResult VKAPI_CALL vntx_CreateImage(const VkDevice device,
 
             const auto& cfg = vntx::get_layer_config();
             // ONLY scale multi-mip 3D textures (mipLevels > 1).
-            // Single-mip textures (mipLevels == 1) are UI atlases, minimaps, and HUD elements which must stay unscaled.
+            // Single-mip textures (mipLevels == 1) are UI atlases, minimaps, and HUD elements which
+            // must stay unscaled.
             if (pCreateInfo->mipLevels > 1 && cfg.enable_compression &&
                 cfg.compression_scale_factor > 1) {
                 scale_factor = cfg.compression_scale_factor;
-                modified_info.extent.width =
-                    std::max(1u, pCreateInfo->extent.width / scale_factor);
+                modified_info.extent.width = std::max(1u, pCreateInfo->extent.width / scale_factor);
                 modified_info.extent.height =
                     std::max(1u, pCreateInfo->extent.height / scale_factor);
 
