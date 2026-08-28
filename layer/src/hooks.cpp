@@ -452,7 +452,8 @@ VKAPI_ATTR void VKAPI_CALL vntx_CmdCopyBufferToImage(const VkCommandBuffer comma
         for (uint32_t i = 0; i < regionCount; ++i) {
             VkBufferImageCopy region = pRegions[i];
             if (info.scale_factor > 1) {
-                // Ensure row length and height are anchored to source buffer geometry before downscaling extent
+                // Ensure row length and height are anchored to source buffer geometry before
+                // downscaling extent
                 if (region.bufferRowLength == 0) {
                     region.bufferRowLength = region.imageExtent.width;
                 }
@@ -627,9 +628,10 @@ vntx_CmdCopyBufferToImage2(const VkCommandBuffer commandBuffer,
     }
 }
 
-VKAPI_ATTR VkResult VKAPI_CALL
-vntx_CreateImageView(const VkDevice device, const VkImageViewCreateInfo* const pCreateInfo,
-                     const VkAllocationCallbacks* const pAllocator, VkImageView* const pView) {
+VKAPI_ATTR VkResult VKAPI_CALL vntx_CreateImageView(const VkDevice device,
+                                                    const VkImageViewCreateInfo* const pCreateInfo,
+                                                    const VkAllocationCallbacks* const pAllocator,
+                                                    VkImageView* const pView) {
     if (!device || !pCreateInfo || !pView) {
         return VK_ERROR_INITIALIZATION_FAILED;
     }
@@ -682,9 +684,8 @@ vntx_CreateImageView(const VkDevice device, const VkImageViewCreateInfo* const p
     }
 }
 
-VKAPI_ATTR void VKAPI_CALL
-vntx_DestroyImageView(const VkDevice device, const VkImageView imageView,
-                      const VkAllocationCallbacks* const pAllocator) {
+VKAPI_ATTR void VKAPI_CALL vntx_DestroyImageView(const VkDevice device, const VkImageView imageView,
+                                                 const VkAllocationCallbacks* const pAllocator) {
     if (!device || imageView == VK_NULL_HANDLE) {
         return;
     }

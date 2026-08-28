@@ -265,12 +265,13 @@ VKAPI_ATTR void VKAPI_CALL vntx_CmdCopyBufferToImage(VkCommandBuffer commandBuff
 VKAPI_ATTR void VKAPI_CALL vntx_CmdCopyBufferToImage2(
     VkCommandBuffer commandBuffer, const VkCopyBufferToImageInfo2* pCopyBufferToImageInfo);
 
-VKAPI_ATTR VkResult VKAPI_CALL
-vntx_CreateImageView(VkDevice device, const VkImageViewCreateInfo* pCreateInfo,
-                     const VkAllocationCallbacks* pAllocator, VkImageView* pView);
+VKAPI_ATTR VkResult VKAPI_CALL vntx_CreateImageView(VkDevice device,
+                                                    const VkImageViewCreateInfo* pCreateInfo,
+                                                    const VkAllocationCallbacks* pAllocator,
+                                                    VkImageView* pView);
 
 VKAPI_ATTR void VKAPI_CALL vntx_DestroyImageView(VkDevice device, VkImageView imageView,
-                                                const VkAllocationCallbacks* pAllocator);
+                                                 const VkAllocationCallbacks* pAllocator);
 
 VKAPI_ATTR VkResult VKAPI_CALL vntx_CreateShaderModule(VkDevice device,
                                                        const VkShaderModuleCreateInfo* pCreateInfo,
