@@ -452,10 +452,6 @@ VKAPI_ATTR void VKAPI_CALL vntx_CmdCopyBufferToImage(const VkCommandBuffer comma
         for (uint32_t i = 0; i < regionCount; ++i) {
             VkBufferImageCopy region = pRegions[i];
             if (info.scale_factor > 1) {
-<<<<<<< HEAD
-                // Ensure row length and height are anchored to source buffer geometry before
-                // downscaling extent
-=======
                 const uint32_t mip =
                     std::min(info.mip_levels - 1, region.imageSubresource.mipLevel);
                 region.imageSubresource.mipLevel = mip;
@@ -466,7 +462,6 @@ VKAPI_ATTR void VKAPI_CALL vntx_CmdCopyBufferToImage(const VkCommandBuffer comma
                     std::max(1u, info.created_extent.height >> mip);
 
                 // Source buffer pitch must match the original extent width if not explicitly specified
->>>>>>> 88626af (fix(layer): intercept pipeline barriers and clamp mip subresource ranges)
                 if (region.bufferRowLength == 0) {
                     region.bufferRowLength = region.imageExtent.width;
                 }
