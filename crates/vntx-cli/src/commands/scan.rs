@@ -12,9 +12,9 @@ pub struct ScanArgs {
     #[arg(short = 'g', long = "game")]
     pub game: Option<String>,
 
-    /// Minimum texture resolution threshold in pixels (e.g. 1024 or 2048).
-    #[arg(short = 'm', long = "min-size", default_value = "1024")]
-    pub min_size: u32,
+    /// Minimum texture resolution threshold in pixels (e.g. 512, 1024 or 2048).
+    #[arg(short = 'm', long = "min-size")]
+    pub min_size: Option<u32>,
 
     /// Filter by texture format extension (e.g. dds, png, ktx2).
     #[arg(short = 'f', long = "format")]
@@ -42,7 +42,10 @@ pub fn execute(args: &ScanArgs, config: &VntxConfig) -> Result<(), VntxError> {
         let game = find_game_by_query(&games, query)
             .ok_or_else(|| VntxError::GameNotFound(query.clone()))?;
 
-        scan_single_game(&game, args.min_size)?;
+        let min_dim = args
+            .min_size
+            .unwrap_or(config.guardrails.min_resolution_threshold);
+        scan_single_game(&game, min_dim)?;
     } else {
         list_discovered_games(&games);
     }
@@ -68,15 +71,14 @@ fn list_discovered_games(games: &[InstalledGame]) {
     println!("\nUse 'vntx scan -g <game_name_or_appid>' to inspect candidate textures.");
 }
 
-fn scan_single_game(game: &InstalledGame, _min_size: u32) -> Result<(), VntxError> {
+fn scan_single_game(game: &InstalledGame, min_dim: u32) -> Result<(), VntxError> {
     println!(
         "\nScanning texture assets for: {} (AppID: {})",
         game.name, game.app_id
     );
     println!("Install directory: {}", game.install_dir.display());
 
-    // Filter textures >= 1MB (corresponding to ~1024x1024 raw RGBA)
-    let min_bytes = 1024 * 1024;
+    let min_bytes = u64::from(min_dim) * u64::from(min_dim);
     let result = scan_game_textures(game, min_bytes)?;
 
     #[allow(clippy::cast_precision_loss)]

@@ -176,3 +176,61 @@ TEST(FilterTest, LatencyGuardrailBudgetCheck) {
     EXPECT_TRUE(guard.within_budget());
     EXPECT_GE(guard.elapsed_ms(), 0.0);
 }
+
+TEST(FilterTest, DynamicMinResolutionThreshold512) {
+    LayerConfig cfg{};
+    cfg.min_resolution_threshold = 512;
+    cfg.max_latency_ms = 10.0;
+    set_layer_config(cfg);
+
+    const auto info_512 = make_default_create_info(512, 512);
+    EXPECT_TRUE(is_candidate_texture(info_512));
+    EXPECT_TRUE(get_filter_rejection_reason(info_512).empty());
+
+    const auto info_256 = make_default_create_info(256, 256);
+    EXPECT_FALSE(is_candidate_texture(info_256));
+    EXPECT_FALSE(get_filter_rejection_reason(info_256).empty());
+
+    // Reset back to default
+    set_layer_config(LayerConfig{});
+}
+
+TEST(FilterTest, DynamicLatencyBudget10ms) {
+    LayerConfig cfg{};
+    cfg.max_latency_ms = 10.0;
+    set_layer_config(cfg);
+
+    EXPECT_TRUE(is_within_latency_budget(2.5));
+    EXPECT_TRUE(is_within_latency_budget(5.0));
+    EXPECT_TRUE(is_within_latency_budget(9.99));
+    EXPECT_TRUE(is_within_latency_budget(10.0));
+    EXPECT_FALSE(is_within_latency_budget(10.01));
+
+    const TranscodingLatencyGuard guard;
+    EXPECT_TRUE(guard.within_budget(10.0));
+
+    // Reset back to default
+    set_layer_config(LayerConfig{});
+}
+
+TEST(FilterTest, TomlConfigParsing) {
+    const std::string toml_sample = R"(
+[general]
+cache_dir = "~/.cache/ntc"
+log_level = "debug"
+enable_layer_by_default = true
+
+[guardrails]
+max_latency_ms = 10.0
+min_resolution_threshold = 512
+preserve_special_maps = true
+)";
+
+    const auto cfg = parse_toml_config(toml_sample);
+    EXPECT_DOUBLE_EQ(cfg.max_latency_ms, 10.0);
+    EXPECT_EQ(cfg.min_resolution_threshold, 512u);
+    EXPECT_TRUE(cfg.preserve_special_maps);
+    EXPECT_EQ(cfg.cache_dir, "~/.cache/ntc");
+    EXPECT_EQ(cfg.log_level, log::Level::Debug);
+}
+

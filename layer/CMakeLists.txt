@@ -1,4 +1,5 @@
 add_library(vntx_layer SHARED
+    src/config.cpp
     src/layer.cpp
     src/filter.cpp
     src/hooks.cpp

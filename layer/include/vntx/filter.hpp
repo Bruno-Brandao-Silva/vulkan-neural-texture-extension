@@ -6,27 +6,44 @@
 #include <cstdint>
 #include <string>
 
+#include "vntx/config.hpp"
+
 namespace vntx {
 
-/// Minimum dimension in pixels for texture candidate eligibility.
+/// Default minimum dimension in pixels for texture candidate eligibility.
+constexpr uint32_t DEFAULT_MIN_CANDIDATE_DIMENSION = 1024;
 constexpr uint32_t MIN_CANDIDATE_DIMENSION = 1024;
 
-/// Maximum allowed latency budget for dynamic texture transcoding in milliseconds (anti-stutter
-/// guardrail).
+/// Default maximum allowed latency budget for dynamic texture transcoding in milliseconds (anti-stutter guardrail).
+constexpr double DEFAULT_MAX_TRANSCODING_LATENCY_MS = 2.5;
 constexpr double MAX_TRANSCODING_LATENCY_MS = 2.5;
 
-/// Maximum allowed latency budget for dynamic texture transcoding in microseconds.
+/// Default maximum allowed latency budget for dynamic texture transcoding in microseconds.
+constexpr uint64_t DEFAULT_MAX_TRANSCODING_BUDGET_US = 2500;
 constexpr uint64_t MAX_TRANSCODING_BUDGET_US = 2500;
 
-/// @brief Checks whether a measured transcoding duration is within the anti-stutter latency budget
-/// (<= 2.5ms).
-[[nodiscard]] constexpr bool is_within_latency_budget(const double duration_ms) noexcept {
-    return duration_ms <= MAX_TRANSCODING_LATENCY_MS;
+/// @brief Checks whether a measured transcoding duration is within the anti-stutter latency budget.
+[[nodiscard]] inline bool is_within_latency_budget(const double duration_ms) noexcept {
+    return duration_ms <= get_layer_config().max_latency_ms;
+}
+
+/// @brief Checks whether a measured transcoding duration is within a specific budget in milliseconds.
+[[nodiscard]] constexpr bool is_within_latency_budget(const double duration_ms,
+                                                      const double max_budget_ms) noexcept {
+    return duration_ms <= max_budget_ms;
 }
 
 /// @brief Checks whether a measured transcoding duration in microseconds is within budget.
-[[nodiscard]] constexpr bool is_within_latency_budget_us(const uint64_t duration_us) noexcept {
-    return duration_us <= MAX_TRANSCODING_BUDGET_US;
+[[nodiscard]] inline bool is_within_latency_budget_us(const uint64_t duration_us) noexcept {
+    const uint64_t budget_us =
+        static_cast<uint64_t>(get_layer_config().max_latency_ms * 1000.0);
+    return duration_us <= budget_us;
+}
+
+/// @brief Checks whether a measured transcoding duration in microseconds is within a specific budget.
+[[nodiscard]] constexpr bool is_within_latency_budget_us(const uint64_t duration_us,
+                                                         const uint64_t max_budget_us) noexcept {
+    return duration_us <= max_budget_us;
 }
 
 /// @brief RAII latency guard for measuring texture transcoding time against the anti-stutter
@@ -50,6 +67,10 @@ public:
         return is_within_latency_budget(elapsed_ms());
     }
 
+    [[nodiscard]] bool within_budget(const double max_budget_ms) const noexcept {
+        return is_within_latency_budget(elapsed_ms(), max_budget_ms);
+    }
+
 private:
     std::chrono::steady_clock::time_point start_;
 };
@@ -61,23 +82,11 @@ private:
 }
 
 /// @brief Evaluates whether a VkImage is eligible for Neural Texture Compression.
-///
-/// Rules from ARCHITECTURE.md Section 2.2:
-/// 1. Usage Flags: VK_IMAGE_USAGE_SAMPLED_BIT MUST be present.
-/// 2. Exclusion Flags: MUST NOT contain COLOR_ATTACHMENT or DEPTH_STENCIL_ATTACHMENT.
-/// 3. Dimensions: width >= 1024 AND height >= 1024.
-/// 4. Image Type: MUST be VK_IMAGE_TYPE_2D.
-/// 5. Format: Standard BC1-BC7 block-compressed albedo/color formats.
-/// 6. Mip Levels: mipLevels >= 1 (supports dynamic mip streaming).
-///
-/// @param create_info Reference to VkImageCreateInfo supplied during image creation.
-/// @return true if all criteria are satisfied, false otherwise.
-[[nodiscard]] bool is_candidate_texture(const VkImageCreateInfo& create_info) noexcept;
+[[nodiscard]] bool is_candidate_texture(const VkImageCreateInfo& create_info,
+                                        uint32_t min_dimension = 0) noexcept;
 
 /// @brief Explains why a VkImage was rejected by the filter (useful for debugging/logging).
-///
-/// @param create_info Reference to VkImageCreateInfo.
-/// @return Human-readable reason string if rejected, empty string if accepted.
-[[nodiscard]] std::string get_filter_rejection_reason(const VkImageCreateInfo& create_info);
+[[nodiscard]] std::string get_filter_rejection_reason(const VkImageCreateInfo& create_info,
+                                                      uint32_t min_dimension = 0);
 
 }  // namespace vntx

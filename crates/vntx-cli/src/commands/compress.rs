@@ -41,7 +41,8 @@ pub fn execute(args: &CompressArgs, config: &VntxConfig) -> Result<(), VntxError
     println!("\nPreparing neural texture compression for: {}", game.name);
     println!("AppID: {}", game.app_id);
 
-    let min_bytes = 1024 * 1024;
+    let min_dim = u64::from(config.guardrails.min_resolution_threshold);
+    let min_bytes = min_dim * min_dim;
     let scan_res = scan_game_textures(&game, min_bytes)?;
 
     if scan_res.textures.is_empty() {

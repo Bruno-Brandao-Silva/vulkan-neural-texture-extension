@@ -137,10 +137,15 @@ pub struct VntxGuiApp {
 }
 
 impl VntxGuiApp {
-    /// Initializes a new application state.
+    /// Initializes a new application state with default or disk-loaded configuration.
     #[must_use]
     pub fn new() -> Self {
-        let config = VntxConfig::load_or_default();
+        Self::with_config(VntxConfig::load_or_default())
+    }
+
+    /// Initializes a new application state with a specific configuration.
+    #[must_use]
+    pub fn with_config(config: VntxConfig) -> Self {
         let cache_dir = config.resolved_cache_dir();
         let cache_mgr = CacheManager::new(cache_dir);
         let gpu_telemetry = query_gpu_telemetry();

@@ -11,7 +11,7 @@ constexpr VkImageUsageFlags EXCLUDED_ATTACHMENT_FLAGS =
 
 }  // namespace
 
-bool is_candidate_texture(const VkImageCreateInfo& create_info) noexcept {
+bool is_candidate_texture(const VkImageCreateInfo& create_info, uint32_t min_dimension) noexcept {
     if (create_info.imageType != VK_IMAGE_TYPE_2D) {
         return false;
     }
@@ -24,8 +24,11 @@ bool is_candidate_texture(const VkImageCreateInfo& create_info) noexcept {
         return false;
     }
 
-    if (create_info.extent.width < MIN_CANDIDATE_DIMENSION ||
-        create_info.extent.height < MIN_CANDIDATE_DIMENSION) {
+    const uint32_t active_min_dim =
+        (min_dimension > 0) ? min_dimension : get_layer_config().min_resolution_threshold;
+
+    if (create_info.extent.width < active_min_dim ||
+        create_info.extent.height < active_min_dim) {
         return false;
     }
 
@@ -40,7 +43,8 @@ bool is_candidate_texture(const VkImageCreateInfo& create_info) noexcept {
     return true;
 }
 
-std::string get_filter_rejection_reason(const VkImageCreateInfo& create_info) {
+std::string get_filter_rejection_reason(const VkImageCreateInfo& create_info,
+                                        uint32_t min_dimension) {
     if (create_info.imageType != VK_IMAGE_TYPE_2D) {
         return std::format("Non-2D image type ({})", static_cast<int>(create_info.imageType));
     }
@@ -53,11 +57,14 @@ std::string get_filter_rejection_reason(const VkImageCreateInfo& create_info) {
         return std::format("Contains excluded usage flags (0x{:08x})", create_info.usage);
     }
 
-    if (create_info.extent.width < MIN_CANDIDATE_DIMENSION ||
-        create_info.extent.height < MIN_CANDIDATE_DIMENSION) {
+    const uint32_t active_min_dim =
+        (min_dimension > 0) ? min_dimension : get_layer_config().min_resolution_threshold;
+
+    if (create_info.extent.width < active_min_dim ||
+        create_info.extent.height < active_min_dim) {
         return std::format("Dimensions {}x{} smaller than threshold {}x{}",
                            create_info.extent.width, create_info.extent.height,
-                           MIN_CANDIDATE_DIMENSION, MIN_CANDIDATE_DIMENSION);
+                           active_min_dim, active_min_dim);
     }
 
     if (create_info.mipLevels < 1) {

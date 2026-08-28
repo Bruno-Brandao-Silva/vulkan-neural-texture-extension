@@ -1,6 +1,7 @@
 #include <mutex>
 #include <vector>
 
+#include "vntx/config.hpp"
 #include "vntx/filter.hpp"
 #include "vntx/format.hpp"
 #include "vntx/layer.hpp"
@@ -271,20 +272,21 @@ VKAPI_ATTR void VKAPI_CALL vntx_CmdCopyBufferToImage(const VkCommandBuffer comma
             }
         }
 
+        const double max_budget = vntx::get_layer_config().max_latency_ms;
         const double elapsed_ms = latency_guard.elapsed_ms();
         if (vntx::is_within_latency_budget(elapsed_ms)) {
             VNTX_LOG_INFO(
                 "Staging buffer copy intercepted for candidate image {} (guardrail "
-                "latency={:.3f}ms <= 2.5ms)",
-                static_cast<void*>(dstImage), elapsed_ms);
+                "latency={:.3f}ms <= {:.1f}ms)",
+                static_cast<void*>(dstImage), elapsed_ms, max_budget);
             device_data->next_cmd_copy_buffer_to_image(
                 commandBuffer, srcBuffer, dstImage, dstImageLayout,
                 static_cast<uint32_t>(adjusted_regions.size()), adjusted_regions.data());
         } else {
             VNTX_LOG_WARN(
-                "Transcoding budget exceeded ({:.3f}ms > 2.5ms) for image {} - triggering "
+                "Transcoding budget exceeded ({:.3f}ms > {:.1f}ms) for image {} - triggering "
                 "pass-through",
-                elapsed_ms, static_cast<void*>(dstImage));
+                elapsed_ms, max_budget, static_cast<void*>(dstImage));
             device_data->next_cmd_copy_buffer_to_image(commandBuffer, srcBuffer, dstImage,
                                                        dstImageLayout, regionCount, pRegions);
         }
@@ -347,18 +349,19 @@ vntx_CmdCopyBufferToImage2(const VkCommandBuffer commandBuffer,
         modified_info.pRegions = adjusted_regions.data();
         modified_info.regionCount = static_cast<uint32_t>(adjusted_regions.size());
 
+        const double max_budget = vntx::get_layer_config().max_latency_ms;
         const double elapsed_ms = latency_guard.elapsed_ms();
         if (vntx::is_within_latency_budget(elapsed_ms)) {
             VNTX_LOG_INFO(
                 "Staging buffer copy (v2) intercepted for candidate image {} (guardrail "
-                "latency={:.3f}ms <= 2.5ms)",
-                static_cast<void*>(dstImage), elapsed_ms);
+                "latency={:.3f}ms <= {:.1f}ms)",
+                static_cast<void*>(dstImage), elapsed_ms, max_budget);
             device_data->next_cmd_copy_buffer_to_image2(commandBuffer, &modified_info);
         } else {
             VNTX_LOG_WARN(
-                "Transcoding budget exceeded (v2) ({:.3f}ms > 2.5ms) for image {} - triggering "
+                "Transcoding budget exceeded (v2) ({:.3f}ms > {:.1f}ms) for image {} - triggering "
                 "pass-through",
-                elapsed_ms, static_cast<void*>(dstImage));
+                elapsed_ms, max_budget, static_cast<void*>(dstImage));
             device_data->next_cmd_copy_buffer_to_image2(commandBuffer, pCopyBufferToImageInfo);
         }
     } catch (...) {

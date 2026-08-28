@@ -4,7 +4,7 @@ use vntx_gui::{CompressionStatus, Tab, VntxGuiApp};
 
 #[test]
 fn test_gui_initial_state() {
-    let app = VntxGuiApp::new();
+    let app = VntxGuiApp::with_config(vntx_core::VntxConfig::default());
     assert_eq!(app.selected_tab, Tab::Dashboard);
     assert_eq!(app.compression_status, CompressionStatus::Idle);
     assert_eq!(app.selected_quality, "balanced");
