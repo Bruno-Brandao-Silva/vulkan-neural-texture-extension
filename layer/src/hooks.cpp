@@ -452,22 +452,29 @@ VKAPI_ATTR void VKAPI_CALL vntx_CmdCopyBufferToImage(const VkCommandBuffer comma
         for (uint32_t i = 0; i < regionCount; ++i) {
             VkBufferImageCopy region = pRegions[i];
             if (info.scale_factor > 1) {
-                // If upload targets Mip 0 of original image:
-                // Skip it because scaled image does not store the unscaled 2x top mip
-                if (region.imageSubresource.mipLevel == 0) {
-                    continue;
+                // Ensure row length and height are anchored to source buffer geometry before downscaling extent
+                if (region.bufferRowLength == 0) {
+                    region.bufferRowLength = region.imageExtent.width;
                 }
-                // Shift Mip k -> Mip (k - 1)
-                region.imageSubresource.mipLevel -= 1;
+                if (region.bufferImageHeight == 0) {
+                    region.bufferImageHeight = region.imageExtent.height;
+                }
+
+                region.imageExtent.width =
+                    std::max(1u, region.imageExtent.width / info.scale_factor);
+                region.imageExtent.height =
+                    std::max(1u, region.imageExtent.height / info.scale_factor);
+                region.imageOffset.x =
+                    region.imageOffset.x / static_cast<int32_t>(info.scale_factor);
+                region.imageOffset.y =
+                    region.imageOffset.y / static_cast<int32_t>(info.scale_factor);
+                region.imageSubresource.mipLevel =
+                    std::min(info.mip_levels - 1, region.imageSubresource.mipLevel);
             }
             if (region.imageSubresource.aspectMask == 0) {
                 region.imageSubresource.aspectMask = DEFAULT_COLOR_ASPECT;
             }
             adjusted_regions.push_back(region);
-        }
-
-        if (adjusted_regions.empty()) {
-            return;
         }
 
         const double max_budget = vntx::get_layer_config().max_latency_ms;
@@ -562,22 +569,28 @@ vntx_CmdCopyBufferToImage2(const VkCommandBuffer commandBuffer,
         for (uint32_t i = 0; i < pCopyBufferToImageInfo->regionCount; ++i) {
             VkBufferImageCopy2 region = pCopyBufferToImageInfo->pRegions[i];
             if (info.scale_factor > 1) {
-                // If upload targets Mip 0 of original image:
-                // Skip it because scaled image does not store the unscaled 2x top mip
-                if (region.imageSubresource.mipLevel == 0) {
-                    continue;
+                if (region.bufferRowLength == 0) {
+                    region.bufferRowLength = region.imageExtent.width;
                 }
-                // Shift Mip k -> Mip (k - 1)
-                region.imageSubresource.mipLevel -= 1;
+                if (region.bufferImageHeight == 0) {
+                    region.bufferImageHeight = region.imageExtent.height;
+                }
+
+                region.imageExtent.width =
+                    std::max(1u, region.imageExtent.width / info.scale_factor);
+                region.imageExtent.height =
+                    std::max(1u, region.imageExtent.height / info.scale_factor);
+                region.imageOffset.x =
+                    region.imageOffset.x / static_cast<int32_t>(info.scale_factor);
+                region.imageOffset.y =
+                    region.imageOffset.y / static_cast<int32_t>(info.scale_factor);
+                region.imageSubresource.mipLevel =
+                    std::min(info.mip_levels - 1, region.imageSubresource.mipLevel);
             }
             if (region.imageSubresource.aspectMask == 0) {
                 region.imageSubresource.aspectMask = DEFAULT_COLOR_ASPECT;
             }
             adjusted_regions.push_back(region);
-        }
-
-        if (adjusted_regions.empty()) {
-            return;
         }
 
         VkCopyBufferToImageInfo2 modified_info = *pCopyBufferToImageInfo;
@@ -611,6 +624,80 @@ vntx_CmdCopyBufferToImage2(const VkCommandBuffer commandBuffer,
         if (device_data && device_data->next_cmd_copy_buffer_to_image2) {
             device_data->next_cmd_copy_buffer_to_image2(commandBuffer, pCopyBufferToImageInfo);
         }
+    }
+}
+
+VKAPI_ATTR VkResult VKAPI_CALL
+vntx_CreateImageView(const VkDevice device, const VkImageViewCreateInfo* const pCreateInfo,
+                     const VkAllocationCallbacks* const pAllocator, VkImageView* const pView) {
+    if (!device || !pCreateInfo || !pView) {
+        return VK_ERROR_INITIALIZATION_FAILED;
+    }
+
+    try {
+        auto* const device_data = vntx::LayerContext::get().get_device_data(device);
+        if (!device_data || !device_data->next_create_image_view) {
+            return VK_ERROR_INITIALIZATION_FAILED;
+        }
+
+        if (vntx::LayerContext::get().is_disabled() || pCreateInfo->image == VK_NULL_HANDLE) {
+            return device_data->next_create_image_view(device, pCreateInfo, pAllocator, pView);
+        }
+
+        vntx::CandidateTextureInfo info{};
+        bool is_candidate = false;
+        {
+            std::shared_lock<std::shared_mutex> lock(device_data->image_mutex);
+            const auto it = device_data->candidate_textures.find(pCreateInfo->image);
+            if (it != device_data->candidate_textures.end()) {
+                is_candidate = true;
+                info = it->second;
+            }
+        }
+
+        if (!is_candidate || info.scale_factor <= 1) {
+            return device_data->next_create_image_view(device, pCreateInfo, pAllocator, pView);
+        }
+
+        VkImageViewCreateInfo modified_info = *pCreateInfo;
+        if (modified_info.subresourceRange.levelCount != VK_REMAINING_MIP_LEVELS) {
+            if (modified_info.subresourceRange.baseMipLevel >= info.mip_levels) {
+                modified_info.subresourceRange.baseMipLevel = std::max(0u, info.mip_levels - 1);
+                modified_info.subresourceRange.levelCount = 1;
+            } else if (modified_info.subresourceRange.baseMipLevel +
+                           modified_info.subresourceRange.levelCount >
+                       info.mip_levels) {
+                modified_info.subresourceRange.levelCount =
+                    info.mip_levels - modified_info.subresourceRange.baseMipLevel;
+            }
+        }
+
+        return device_data->next_create_image_view(device, &modified_info, pAllocator, pView);
+    } catch (...) {
+        auto* const device_data = vntx::LayerContext::get().get_device_data(device);
+        if (device_data && device_data->next_create_image_view) {
+            return device_data->next_create_image_view(device, pCreateInfo, pAllocator, pView);
+        }
+        return VK_ERROR_INITIALIZATION_FAILED;
+    }
+}
+
+VKAPI_ATTR void VKAPI_CALL
+vntx_DestroyImageView(const VkDevice device, const VkImageView imageView,
+                      const VkAllocationCallbacks* const pAllocator) {
+    if (!device || imageView == VK_NULL_HANDLE) {
+        return;
+    }
+
+    try {
+        auto* const device_data = vntx::LayerContext::get().get_device_data(device);
+        if (!device_data || !device_data->next_destroy_image_view) {
+            return;
+        }
+
+        device_data->next_destroy_image_view(device, imageView, pAllocator);
+    } catch (...) {
+        // Prevent exception from escaping DestroyImageView
     }
 }
 
