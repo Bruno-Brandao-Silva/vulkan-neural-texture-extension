@@ -310,6 +310,14 @@ VKAPI_ATTR VkResult VKAPI_CALL vntx_CreateDevice(const VkPhysicalDevice physical
             device_data->next_cmd_copy_buffer_to_image2 =
                 reinterpret_cast<PFN_vkCmdCopyBufferToImage2>(
                     next_get_device_proc_addr(*pDevice, "vkCmdCopyBufferToImage2"));
+            device_data->next_cmd_pipeline_barrier = reinterpret_cast<PFN_vkCmdPipelineBarrier>(
+                next_get_device_proc_addr(*pDevice, "vkCmdPipelineBarrier"));
+            device_data->next_cmd_pipeline_barrier2 = reinterpret_cast<PFN_vkCmdPipelineBarrier2>(
+                next_get_device_proc_addr(*pDevice, "vkCmdPipelineBarrier2"));
+            if (!device_data->next_cmd_pipeline_barrier2) {
+                device_data->next_cmd_pipeline_barrier2 = reinterpret_cast<PFN_vkCmdPipelineBarrier2>(
+                    next_get_device_proc_addr(*pDevice, "vkCmdPipelineBarrier2KHR"));
+            }
             device_data->next_create_image_view = reinterpret_cast<PFN_vkCreateImageView>(
                 next_get_device_proc_addr(*pDevice, "vkCreateImageView"));
             device_data->next_destroy_image_view = reinterpret_cast<PFN_vkDestroyImageView>(
@@ -399,6 +407,10 @@ VKAPI_ATTR PFN_vkVoidFunction VKAPI_CALL vntx_GetInstanceProcAddr(const VkInstan
             return reinterpret_cast<PFN_vkVoidFunction>(vntx_CmdCopyBufferToImage);
         if (name == "vkCmdCopyBufferToImage2")
             return reinterpret_cast<PFN_vkVoidFunction>(vntx_CmdCopyBufferToImage2);
+        if (name == "vkCmdPipelineBarrier")
+            return reinterpret_cast<PFN_vkVoidFunction>(vntx_CmdPipelineBarrier);
+        if (name == "vkCmdPipelineBarrier2" || name == "vkCmdPipelineBarrier2KHR")
+            return reinterpret_cast<PFN_vkVoidFunction>(vntx_CmdPipelineBarrier2);
         if (name == "vkCreateImageView")
             return reinterpret_cast<PFN_vkVoidFunction>(vntx_CreateImageView);
         if (name == "vkDestroyImageView")
@@ -449,6 +461,10 @@ VKAPI_ATTR PFN_vkVoidFunction VKAPI_CALL vntx_GetDeviceProcAddr(const VkDevice d
             return reinterpret_cast<PFN_vkVoidFunction>(vntx_CmdCopyBufferToImage);
         if (name == "vkCmdCopyBufferToImage2")
             return reinterpret_cast<PFN_vkVoidFunction>(vntx_CmdCopyBufferToImage2);
+        if (name == "vkCmdPipelineBarrier")
+            return reinterpret_cast<PFN_vkVoidFunction>(vntx_CmdPipelineBarrier);
+        if (name == "vkCmdPipelineBarrier2" || name == "vkCmdPipelineBarrier2KHR")
+            return reinterpret_cast<PFN_vkVoidFunction>(vntx_CmdPipelineBarrier2);
         if (name == "vkCreateImageView")
             return reinterpret_cast<PFN_vkVoidFunction>(vntx_CreateImageView);
         if (name == "vkDestroyImageView")

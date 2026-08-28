@@ -452,8 +452,21 @@ VKAPI_ATTR void VKAPI_CALL vntx_CmdCopyBufferToImage(const VkCommandBuffer comma
         for (uint32_t i = 0; i < regionCount; ++i) {
             VkBufferImageCopy region = pRegions[i];
             if (info.scale_factor > 1) {
+<<<<<<< HEAD
                 // Ensure row length and height are anchored to source buffer geometry before
                 // downscaling extent
+=======
+                const uint32_t mip =
+                    std::min(info.mip_levels - 1, region.imageSubresource.mipLevel);
+                region.imageSubresource.mipLevel = mip;
+
+                const uint32_t dst_mip_w =
+                    std::max(1u, info.created_extent.width >> mip);
+                const uint32_t dst_mip_h =
+                    std::max(1u, info.created_extent.height >> mip);
+
+                // Source buffer pitch must match the original extent width if not explicitly specified
+>>>>>>> 88626af (fix(layer): intercept pipeline barriers and clamp mip subresource ranges)
                 if (region.bufferRowLength == 0) {
                     region.bufferRowLength = region.imageExtent.width;
                 }
@@ -461,16 +474,24 @@ VKAPI_ATTR void VKAPI_CALL vntx_CmdCopyBufferToImage(const VkCommandBuffer comma
                     region.bufferImageHeight = region.imageExtent.height;
                 }
 
-                region.imageExtent.width =
+                const uint32_t scaled_w =
                     std::max(1u, region.imageExtent.width / info.scale_factor);
-                region.imageExtent.height =
+                const uint32_t scaled_h =
                     std::max(1u, region.imageExtent.height / info.scale_factor);
-                region.imageOffset.x =
+                const int32_t scaled_ox =
                     region.imageOffset.x / static_cast<int32_t>(info.scale_factor);
-                region.imageOffset.y =
+                const int32_t scaled_oy =
                     region.imageOffset.y / static_cast<int32_t>(info.scale_factor);
-                region.imageSubresource.mipLevel =
-                    std::min(info.mip_levels - 1, region.imageSubresource.mipLevel);
+
+                region.imageOffset.x =
+                    std::clamp(scaled_ox, 0, static_cast<int32_t>(dst_mip_w - 1));
+                region.imageOffset.y =
+                    std::clamp(scaled_oy, 0, static_cast<int32_t>(dst_mip_h - 1));
+
+                region.imageExtent.width =
+                    std::min(scaled_w, dst_mip_w - static_cast<uint32_t>(region.imageOffset.x));
+                region.imageExtent.height =
+                    std::min(scaled_h, dst_mip_h - static_cast<uint32_t>(region.imageOffset.y));
             }
             if (region.imageSubresource.aspectMask == 0) {
                 region.imageSubresource.aspectMask = DEFAULT_COLOR_ASPECT;
@@ -570,6 +591,15 @@ vntx_CmdCopyBufferToImage2(const VkCommandBuffer commandBuffer,
         for (uint32_t i = 0; i < pCopyBufferToImageInfo->regionCount; ++i) {
             VkBufferImageCopy2 region = pCopyBufferToImageInfo->pRegions[i];
             if (info.scale_factor > 1) {
+                const uint32_t mip =
+                    std::min(info.mip_levels - 1, region.imageSubresource.mipLevel);
+                region.imageSubresource.mipLevel = mip;
+
+                const uint32_t dst_mip_w =
+                    std::max(1u, info.created_extent.width >> mip);
+                const uint32_t dst_mip_h =
+                    std::max(1u, info.created_extent.height >> mip);
+
                 if (region.bufferRowLength == 0) {
                     region.bufferRowLength = region.imageExtent.width;
                 }
@@ -577,16 +607,24 @@ vntx_CmdCopyBufferToImage2(const VkCommandBuffer commandBuffer,
                     region.bufferImageHeight = region.imageExtent.height;
                 }
 
-                region.imageExtent.width =
+                const uint32_t scaled_w =
                     std::max(1u, region.imageExtent.width / info.scale_factor);
-                region.imageExtent.height =
+                const uint32_t scaled_h =
                     std::max(1u, region.imageExtent.height / info.scale_factor);
-                region.imageOffset.x =
+                const int32_t scaled_ox =
                     region.imageOffset.x / static_cast<int32_t>(info.scale_factor);
-                region.imageOffset.y =
+                const int32_t scaled_oy =
                     region.imageOffset.y / static_cast<int32_t>(info.scale_factor);
-                region.imageSubresource.mipLevel =
-                    std::min(info.mip_levels - 1, region.imageSubresource.mipLevel);
+
+                region.imageOffset.x =
+                    std::clamp(scaled_ox, 0, static_cast<int32_t>(dst_mip_w - 1));
+                region.imageOffset.y =
+                    std::clamp(scaled_oy, 0, static_cast<int32_t>(dst_mip_h - 1));
+
+                region.imageExtent.width =
+                    std::min(scaled_w, dst_mip_w - static_cast<uint32_t>(region.imageOffset.x));
+                region.imageExtent.height =
+                    std::min(scaled_h, dst_mip_h - static_cast<uint32_t>(region.imageOffset.y));
             }
             if (region.imageSubresource.aspectMask == 0) {
                 region.imageSubresource.aspectMask = DEFAULT_COLOR_ASPECT;
@@ -628,10 +666,144 @@ vntx_CmdCopyBufferToImage2(const VkCommandBuffer commandBuffer,
     }
 }
 
-VKAPI_ATTR VkResult VKAPI_CALL vntx_CreateImageView(const VkDevice device,
-                                                    const VkImageViewCreateInfo* const pCreateInfo,
-                                                    const VkAllocationCallbacks* const pAllocator,
-                                                    VkImageView* const pView) {
+VKAPI_ATTR void VKAPI_CALL
+vntx_CmdPipelineBarrier(const VkCommandBuffer commandBuffer,
+                        const VkPipelineStageFlags srcStageMask,
+                        const VkPipelineStageFlags dstStageMask,
+                        const VkDependencyFlags dependencyFlags,
+                        const uint32_t memoryBarrierCount,
+                        const VkMemoryBarrier* const pMemoryBarriers,
+                        const uint32_t bufferMemoryBarrierCount,
+                        const VkBufferMemoryBarrier* const pBufferMemoryBarriers,
+                        const uint32_t imageMemoryBarrierCount,
+                        const VkImageMemoryBarrier* const pImageMemoryBarriers) {
+    if (!commandBuffer) {
+        return;
+    }
+
+    try {
+        auto* const device_data =
+            vntx::LayerContext::get().get_device_data_from_command_buffer(commandBuffer);
+        if (!device_data || !device_data->next_cmd_pipeline_barrier) {
+            return;
+        }
+
+        if (vntx::LayerContext::get().is_disabled() || imageMemoryBarrierCount == 0 ||
+            !pImageMemoryBarriers) {
+            device_data->next_cmd_pipeline_barrier(
+                commandBuffer, srcStageMask, dstStageMask, dependencyFlags, memoryBarrierCount,
+                pMemoryBarriers, bufferMemoryBarrierCount, pBufferMemoryBarriers,
+                imageMemoryBarrierCount, pImageMemoryBarriers);
+            return;
+        }
+
+        std::vector<VkImageMemoryBarrier> adjusted_barriers(
+            pImageMemoryBarriers, pImageMemoryBarriers + imageMemoryBarrierCount);
+
+        {
+            std::shared_lock<std::shared_mutex> lock(device_data->image_mutex);
+            for (auto& barrier : adjusted_barriers) {
+                if (barrier.image != VK_NULL_HANDLE) {
+                    const auto it = device_data->candidate_textures.find(barrier.image);
+                    if (it != device_data->candidate_textures.end() && it->second.scale_factor > 1) {
+                        const uint32_t max_mips = it->second.mip_levels;
+                        if (barrier.subresourceRange.levelCount != VK_REMAINING_MIP_LEVELS) {
+                            if (barrier.subresourceRange.baseMipLevel >= max_mips) {
+                                barrier.subresourceRange.baseMipLevel =
+                                    std::max(0u, max_mips - 1);
+                                barrier.subresourceRange.levelCount = 1;
+                            } else if (barrier.subresourceRange.baseMipLevel +
+                                           barrier.subresourceRange.levelCount >
+                                       max_mips) {
+                                barrier.subresourceRange.levelCount =
+                                    max_mips - barrier.subresourceRange.baseMipLevel;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        device_data->next_cmd_pipeline_barrier(
+            commandBuffer, srcStageMask, dstStageMask, dependencyFlags, memoryBarrierCount,
+            pMemoryBarriers, bufferMemoryBarrierCount, pBufferMemoryBarriers,
+            imageMemoryBarrierCount, adjusted_barriers.data());
+    } catch (...) {
+        auto* const device_data =
+            vntx::LayerContext::get().get_device_data_from_command_buffer(commandBuffer);
+        if (device_data && device_data->next_cmd_pipeline_barrier) {
+            device_data->next_cmd_pipeline_barrier(
+                commandBuffer, srcStageMask, dstStageMask, dependencyFlags, memoryBarrierCount,
+                pMemoryBarriers, bufferMemoryBarrierCount, pBufferMemoryBarriers,
+                imageMemoryBarrierCount, pImageMemoryBarriers);
+        }
+    }
+}
+
+VKAPI_ATTR void VKAPI_CALL
+vntx_CmdPipelineBarrier2(const VkCommandBuffer commandBuffer,
+                         const VkDependencyInfo* const pDependencyInfo) {
+    if (!commandBuffer || !pDependencyInfo) {
+        return;
+    }
+
+    try {
+        auto* const device_data =
+            vntx::LayerContext::get().get_device_data_from_command_buffer(commandBuffer);
+        if (!device_data || !device_data->next_cmd_pipeline_barrier2) {
+            return;
+        }
+
+        if (vntx::LayerContext::get().is_disabled() ||
+            pDependencyInfo->imageMemoryBarrierCount == 0 ||
+            !pDependencyInfo->pImageMemoryBarriers) {
+            device_data->next_cmd_pipeline_barrier2(commandBuffer, pDependencyInfo);
+            return;
+        }
+
+        std::vector<VkImageMemoryBarrier2> adjusted_barriers(
+            pDependencyInfo->pImageMemoryBarriers,
+            pDependencyInfo->pImageMemoryBarriers + pDependencyInfo->imageMemoryBarrierCount);
+
+        {
+            std::shared_lock<std::shared_mutex> lock(device_data->image_mutex);
+            for (auto& barrier : adjusted_barriers) {
+                if (barrier.image != VK_NULL_HANDLE) {
+                    const auto it = device_data->candidate_textures.find(barrier.image);
+                    if (it != device_data->candidate_textures.end() && it->second.scale_factor > 1) {
+                        const uint32_t max_mips = it->second.mip_levels;
+                        if (barrier.subresourceRange.levelCount != VK_REMAINING_MIP_LEVELS) {
+                            if (barrier.subresourceRange.baseMipLevel >= max_mips) {
+                                barrier.subresourceRange.baseMipLevel =
+                                    std::max(0u, max_mips - 1);
+                                barrier.subresourceRange.levelCount = 1;
+                            } else if (barrier.subresourceRange.baseMipLevel +
+                                           barrier.subresourceRange.levelCount >
+                                       max_mips) {
+                                barrier.subresourceRange.levelCount =
+                                    max_mips - barrier.subresourceRange.baseMipLevel;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        VkDependencyInfo modified_dep_info = *pDependencyInfo;
+        modified_dep_info.pImageMemoryBarriers = adjusted_barriers.data();
+        device_data->next_cmd_pipeline_barrier2(commandBuffer, &modified_dep_info);
+    } catch (...) {
+        auto* const device_data =
+            vntx::LayerContext::get().get_device_data_from_command_buffer(commandBuffer);
+        if (device_data && device_data->next_cmd_pipeline_barrier2) {
+            device_data->next_cmd_pipeline_barrier2(commandBuffer, pDependencyInfo);
+        }
+    }
+}
+
+VKAPI_ATTR VkResult VKAPI_CALL
+vntx_CreateImageView(const VkDevice device, const VkImageViewCreateInfo* const pCreateInfo,
+                     const VkAllocationCallbacks* const pAllocator, VkImageView* const pView) {
     if (!device || !pCreateInfo || !pView) {
         return VK_ERROR_INITIALIZATION_FAILED;
     }
