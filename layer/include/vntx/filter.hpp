@@ -87,6 +87,24 @@ private:
 [[nodiscard]] bool is_candidate_texture(const VkImageCreateInfo& create_info,
                                         uint32_t min_dimension = 0) noexcept;
 
+/// Usage bits whose consumers the layer is able to rewrite when an image is physically downscaled.
+/// Anything outside this set (TRANSFER_SRC, STORAGE, attachments, ...) can address the image with
+/// the application's original extents through a path the layer does not control.
+constexpr VkImageUsageFlags DOWNSCALE_SAFE_USAGE =
+    VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT;
+
+/// @brief Evaluates whether an image may be created smaller than the application requested.
+///
+/// Physically shrinking an image is only sound while every command that can address it is one the
+/// layer rewrites. An image that can be copied from, written through a storage descriptor, aliased,
+/// viewed under a different format, or shared across queues will be addressed elsewhere with the
+/// application's original extents - which makes the GPU transfer engine walk outside the bound
+/// allocation and fault the MMU. Such images are tracked but created at their native size.
+[[nodiscard]] bool is_downscale_safe(const VkImageCreateInfo& create_info) noexcept;
+
+/// @brief Explains why an image was rejected for physical downscaling (empty when it is safe).
+[[nodiscard]] std::string get_downscale_rejection_reason(const VkImageCreateInfo& create_info);
+
 /// @brief Explains why a VkImage was rejected by the filter (useful for debugging/logging).
 [[nodiscard]] std::string get_filter_rejection_reason(const VkImageCreateInfo& create_info,
                                                       uint32_t min_dimension = 0);

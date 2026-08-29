@@ -1,5 +1,9 @@
 #include <algorithm>
+#include <atomic>
+#include <cstdint>
 #include <mutex>
+#include <string>
+#include <unordered_set>
 #include <vector>
 
 #include "vntx/config.hpp"
@@ -7,11 +11,364 @@
 #include "vntx/format.hpp"
 #include "vntx/layer.hpp"
 #include "vntx/logging.hpp"
-#include "vntx/spirv_rewriter.hpp"
 
 namespace {
 
 constexpr VkImageAspectFlags DEFAULT_COLOR_ASPECT = VK_IMAGE_ASPECT_COLOR_BIT;
+
+/// Block dimension shared by every BC1-BC7 format the filter accepts.
+constexpr uint32_t BC_BLOCK_DIM = 4u;
+
+/// Number of regions a transfer command can rewrite without touching the heap.
+constexpr size_t STACK_TRANSFER_REGIONS = 8;
+
+/// Physical geometry of an image that was created smaller than the application asked for.
+/// `constrained == false` means the image is untracked or was created at its native size, so the
+/// geometry the caller passes already describes it and only needs narrowing on the other side's
+/// behalf.
+struct PhysicalImage {
+    bool constrained{false};
+    uint32_t mip_levels{1};
+    uint32_t array_layers{1};
+    VkExtent3D extent{1, 1, 1};  ///< Physical mip 0 extent
+    uint32_t block{1};
+};
+
+/// One side of a transfer region, for the block-alignment rule.
+struct AxisBound {
+    bool is_image{true};  ///< False for the buffer side of an image<->buffer copy: no image rule
+    uint32_t bound{0};    ///< 0 marks an image the layer did not resize (geometry unknown to us)
+};
+
+/// Resolves an image's physical geometry. The caller must hold `device_data.image_mutex`.
+PhysicalImage physical_image_locked(const vntx::DeviceData& device_data, const VkImage image) {
+    PhysicalImage phys{};
+    if (image == VK_NULL_HANDLE) {
+        return phys;
+    }
+    const auto it = device_data.candidate_textures.find(image);
+    if (it == device_data.candidate_textures.end() || it->second.scale_factor <= 1) {
+        return phys;
+    }
+    phys.constrained = true;
+    phys.mip_levels = std::max(1u, it->second.mip_levels);
+    phys.array_layers = std::max(1u, it->second.array_layers);
+    phys.extent.width = std::max(1u, it->second.created_extent.width);
+    phys.extent.height = std::max(1u, it->second.created_extent.height);
+    phys.extent.depth = std::max(1u, it->second.created_extent.depth);
+    phys.block = vntx::is_supported_texture_format(it->second.format) ? BC_BLOCK_DIM : 1u;
+    return phys;
+}
+
+uint32_t mip_dimension(const uint32_t base, const uint32_t mip) noexcept {
+    return (mip >= 32u) ? 1u : std::max(1u, base >> mip);
+}
+
+AxisBound image_axis(const PhysicalImage& phys, const uint32_t mip, const uint32_t axis) noexcept {
+    AxisBound side{};
+    side.is_image = true;
+    if (!phys.constrained) {
+        return side;
+    }
+    const uint32_t base = (axis == 0u)   ? phys.extent.width
+                          : (axis == 1u) ? phys.extent.height
+                                         : phys.extent.depth;
+    side.bound = mip_dimension(base, mip);
+    return side;
+}
+
+constexpr AxisBound BUFFER_SIDE{false, 0u};
+
+/// Clamps a copy/blit subresource selector onto the physical mip and layer counts.
+bool clamp_subresource_layers(const PhysicalImage& phys, VkImageSubresourceLayers& sub) {
+    if (!phys.constrained) {
+        return false;
+    }
+    bool clamped = false;
+    if (sub.mipLevel >= phys.mip_levels) {
+        sub.mipLevel = phys.mip_levels - 1u;
+        clamped = true;
+    }
+    if (sub.baseArrayLayer >= phys.array_layers) {
+        sub.baseArrayLayer = phys.array_layers - 1u;
+        sub.layerCount = 1u;
+        clamped = true;
+    } else if (sub.layerCount != VK_REMAINING_ARRAY_LAYERS &&
+               sub.baseArrayLayer + sub.layerCount > phys.array_layers) {
+        sub.layerCount = phys.array_layers - sub.baseArrayLayer;
+        clamped = true;
+    }
+    if (sub.layerCount == 0u) {
+        sub.layerCount = 1u;
+    }
+    if (sub.aspectMask == 0u) {
+        sub.aspectMask = DEFAULT_COLOR_ASPECT;
+    }
+    return clamped;
+}
+
+/// Clamps a subresource range onto the physical mip and layer counts.
+bool clamp_subresource_range(const PhysicalImage& phys, VkImageSubresourceRange& range) {
+    if (!phys.constrained) {
+        return false;
+    }
+    bool clamped = false;
+    if (range.baseMipLevel >= phys.mip_levels) {
+        range.baseMipLevel = phys.mip_levels - 1u;
+        if (range.levelCount != VK_REMAINING_MIP_LEVELS) {
+            range.levelCount = 1u;
+        }
+        clamped = true;
+    } else if (range.levelCount != VK_REMAINING_MIP_LEVELS &&
+               range.baseMipLevel + range.levelCount > phys.mip_levels) {
+        range.levelCount = phys.mip_levels - range.baseMipLevel;
+        clamped = true;
+    }
+    if (range.levelCount == 0u) {
+        range.levelCount = 1u;
+    }
+    if (range.baseArrayLayer >= phys.array_layers) {
+        range.baseArrayLayer = phys.array_layers - 1u;
+        if (range.layerCount != VK_REMAINING_ARRAY_LAYERS) {
+            range.layerCount = 1u;
+        }
+        clamped = true;
+    } else if (range.layerCount != VK_REMAINING_ARRAY_LAYERS &&
+               range.baseArrayLayer + range.layerCount > phys.array_layers) {
+        range.layerCount = phys.array_layers - range.baseArrayLayer;
+        clamped = true;
+    }
+    if (range.layerCount == 0u) {
+        range.layerCount = 1u;
+    }
+    if (range.aspectMask == 0u) {
+        range.aspectMask = DEFAULT_COLOR_ASPECT;
+    }
+    return clamped;
+}
+
+/// Fits one axis of a transfer region inside whichever side the layer resized.
+///
+/// Returns false when the region collapses to nothing on this axis and has to be dropped
+/// altogether - skipping a copy costs a wrong texel, whereas letting it run past the end of the
+/// physical image faults the GPU MMU.
+bool fit_transfer_axis(int32_t& src_offset, const AxisBound src, int32_t& dst_offset,
+                       const AxisBound dst, uint32_t& extent, const uint32_t block) {
+    const auto clamp_offset = [block](int32_t& offset, const AxisBound side) {
+        if (side.bound == 0u) {
+            return;
+        }
+        offset = std::clamp(offset, 0, static_cast<int32_t>(side.bound - 1u));
+        if (block > 1u) {
+            offset = (offset / static_cast<int32_t>(block)) * static_cast<int32_t>(block);
+        }
+    };
+    clamp_offset(src_offset, src);
+    clamp_offset(dst_offset, dst);
+
+    uint32_t fitted = extent;
+    if (src.bound != 0u) {
+        fitted = std::min(fitted, src.bound - static_cast<uint32_t>(src_offset));
+    }
+    if (dst.bound != 0u) {
+        fitted = std::min(fitted, dst.bound - static_cast<uint32_t>(dst_offset));
+    }
+    if (fitted == 0u) {
+        return false;
+    }
+
+    // A compressed region may only end off a block boundary where it reaches the edge of the mip.
+    // Narrowing an extent usually moves it away from that edge, so round back down to a block.
+    if (fitted != extent && block > 1u && (fitted % block) != 0u) {
+        const auto ends_on_edge = [](const AxisBound side, const int32_t offset,
+                                     const uint32_t width) {
+            if (!side.is_image) {
+                return true;  // The buffer side carries no image geometry rule
+            }
+            return side.bound != 0u && static_cast<uint32_t>(offset) + width == side.bound;
+        };
+        if (!ends_on_edge(src, src_offset, fitted) || !ends_on_edge(dst, dst_offset, fitted)) {
+            fitted = (fitted / block) * block;
+            if (fitted == 0u) {
+                return false;
+            }
+        }
+    }
+    extent = fitted;
+    return true;
+}
+
+/// Fits an image<->image transfer region (copy, resolve) onto both physical images.
+bool fit_image_transfer_region(const PhysicalImage& src, const PhysicalImage& dst,
+                               VkImageSubresourceLayers& src_sub, VkOffset3D& src_offset,
+                               VkImageSubresourceLayers& dst_sub, VkOffset3D& dst_offset,
+                               VkExtent3D& extent, bool& clamped) {
+    clamped |= clamp_subresource_layers(src, src_sub);
+    clamped |= clamp_subresource_layers(dst, dst_sub);
+
+    const uint32_t block =
+        std::max(src.constrained ? src.block : 1u, dst.constrained ? dst.block : 1u);
+    const VkOffset3D before_src = src_offset;
+    const VkOffset3D before_dst = dst_offset;
+    const VkExtent3D before_extent = extent;
+
+    for (uint32_t axis = 0; axis < 3u; ++axis) {
+        int32_t& so = (axis == 0u) ? src_offset.x : (axis == 1u) ? src_offset.y : src_offset.z;
+        int32_t& doff = (axis == 0u) ? dst_offset.x : (axis == 1u) ? dst_offset.y : dst_offset.z;
+        uint32_t& ext = (axis == 0u) ? extent.width : (axis == 1u) ? extent.height : extent.depth;
+        const uint32_t axis_block = (axis == 2u) ? 1u : block;
+        if (!fit_transfer_axis(so, image_axis(src, src_sub.mipLevel, axis), doff,
+                               image_axis(dst, dst_sub.mipLevel, axis), ext, axis_block)) {
+            return false;
+        }
+    }
+
+    clamped |= before_src.x != src_offset.x || before_src.y != src_offset.y ||
+               before_src.z != src_offset.z || before_dst.x != dst_offset.x ||
+               before_dst.y != dst_offset.y || before_dst.z != dst_offset.z ||
+               before_extent.width != extent.width || before_extent.height != extent.height ||
+               before_extent.depth != extent.depth;
+    return true;
+}
+
+/// Fits an image<->buffer transfer region onto the single physical image involved.
+bool fit_buffer_image_region(const PhysicalImage& phys, VkImageSubresourceLayers& sub,
+                             VkOffset3D& offset, VkExtent3D& extent, bool& clamped) {
+    clamped |= clamp_subresource_layers(phys, sub);
+    if (!phys.constrained) {
+        return true;
+    }
+
+    const VkOffset3D before_offset = offset;
+    const VkExtent3D before_extent = extent;
+
+    for (uint32_t axis = 0; axis < 3u; ++axis) {
+        int32_t& off = (axis == 0u) ? offset.x : (axis == 1u) ? offset.y : offset.z;
+        uint32_t& ext = (axis == 0u) ? extent.width : (axis == 1u) ? extent.height : extent.depth;
+        int32_t buffer_offset = 0;
+        const uint32_t axis_block = (axis == 2u) ? 1u : phys.block;
+        if (!fit_transfer_axis(off, image_axis(phys, sub.mipLevel, axis), buffer_offset,
+                               BUFFER_SIDE, ext, axis_block)) {
+            return false;
+        }
+    }
+
+    clamped |= before_offset.x != offset.x || before_offset.y != offset.y ||
+               before_offset.z != offset.z || before_extent.width != extent.width ||
+               before_extent.height != extent.height || before_extent.depth != extent.depth;
+    return true;
+}
+
+/// Clamps one axis of a blit corner pair onto [0, mip dimension]. Blits address corners rather
+/// than an offset plus extent, and may legitimately be mirrored, so both ends are simply clamped.
+bool fit_blit_axis(int32_t& first, int32_t& second, const AxisBound side, bool& clamped) {
+    if (side.bound == 0u) {
+        return first != second;
+    }
+    const int32_t limit = static_cast<int32_t>(side.bound);
+    const int32_t before_first = first;
+    const int32_t before_second = second;
+    first = std::clamp(first, 0, limit);
+    second = std::clamp(second, 0, limit);
+    clamped |= (before_first != first) || (before_second != second);
+    return first != second;
+}
+
+bool fit_blit_region(const PhysicalImage& src, const PhysicalImage& dst,
+                     VkImageSubresourceLayers& src_sub, VkOffset3D* const src_offsets,
+                     VkImageSubresourceLayers& dst_sub, VkOffset3D* const dst_offsets,
+                     bool& clamped) {
+    clamped |= clamp_subresource_layers(src, src_sub);
+    clamped |= clamp_subresource_layers(dst, dst_sub);
+
+    for (uint32_t axis = 0; axis < 3u; ++axis) {
+        int32_t& s0 = (axis == 0u)   ? src_offsets[0].x
+                      : (axis == 1u) ? src_offsets[0].y
+                                     : src_offsets[0].z;
+        int32_t& s1 = (axis == 0u)   ? src_offsets[1].x
+                      : (axis == 1u) ? src_offsets[1].y
+                                     : src_offsets[1].z;
+        int32_t& d0 = (axis == 0u)   ? dst_offsets[0].x
+                      : (axis == 1u) ? dst_offsets[0].y
+                                     : dst_offsets[0].z;
+        int32_t& d1 = (axis == 0u)   ? dst_offsets[1].x
+                      : (axis == 1u) ? dst_offsets[1].y
+                                     : dst_offsets[1].z;
+        if (!fit_blit_axis(s0, s1, image_axis(src, src_sub.mipLevel, axis), clamped) ||
+            !fit_blit_axis(d0, d1, image_axis(dst, dst_sub.mipLevel, axis), clamped)) {
+            return false;
+        }
+    }
+    return true;
+}
+
+/// Small scratch buffer for rewriting a region array without allocating in the common case.
+template <typename Region>
+struct RegionScratch {
+    Region stack_storage[STACK_TRANSFER_REGIONS];
+    std::vector<Region> heap_storage;
+
+    Region* data(const uint32_t count) {
+        if (count <= STACK_TRANSFER_REGIONS) {
+            return stack_storage;
+        }
+        heap_storage.resize(count);
+        return heap_storage.data();
+    }
+};
+
+/// Copies `count` regions through `fit`, keeping only those that survive. Returns the kept count.
+template <typename Region, typename Fit>
+uint32_t fit_regions(const Region* const in, const uint32_t count, Region* const out, Fit&& fit,
+                     bool& clamped) {
+    uint32_t kept = 0;
+    for (uint32_t i = 0; i < count; ++i) {
+        Region region = in[i];
+        if (fit(region, clamped)) {
+            out[kept] = region;
+            ++kept;
+        } else {
+            clamped = true;
+        }
+    }
+    return kept;
+}
+
+/// Reports each distinct reason candidates are left at their native size, once per session.
+///
+/// Under a D3D12 translation layer nearly every texture carries VK_IMAGE_USAGE_TRANSFER_SRC_BIT,
+/// so this is what tells a post-mortem log why the layer went quiet instead of saving VRAM.
+template <typename ReasonFn>
+void note_native_size_reason(ReasonFn&& reason_fn) {
+    // Bounded because this sits on the image-creation path: the distinct reasons all surface
+    // within the first handful of textures a session creates.
+    static std::atomic<uint64_t> inspected{0};
+    if (inspected.fetch_add(1, std::memory_order_relaxed) >= 256) {
+        return;
+    }
+
+    std::string reason = reason_fn();
+    static std::mutex reason_mutex;
+    static std::unordered_set<std::string> reported;
+    std::lock_guard<std::mutex> lock(reason_mutex);
+    if (!reported.insert(reason).second) {
+        return;
+    }
+    VNTX_LOG_INFO("Candidate textures kept at native size (no VRAM reduction): {}", reason);
+}
+
+/// Reports the first clamp a command performs and counts the rest.
+///
+/// Open-world streaming issues these by the thousand; flushing a log line per occurrence is itself
+/// a source of the stutter the layer exists to remove.
+void note_clamp(std::atomic<uint64_t>& counter, const char* const command, const VkImage image) {
+    if (counter.fetch_add(1, std::memory_order_relaxed) == 0) {
+        VNTX_LOG_WARN(
+            "{} addressed downscaled image {} with out-of-range geometry and was clamped to the "
+            "physical image; further occurrences are counted silently",
+            command, static_cast<void*>(image));
+    }
+}
 
 }  // namespace
 
@@ -47,11 +404,20 @@ VKAPI_ATTR VkResult VKAPI_CALL vntx_CreateImage(const VkDevice device,
                 pCreateInfo->arrayLayers);
 
             const auto& cfg = vntx::get_layer_config();
+            const bool downscale_requested = pCreateInfo->mipLevels > 1 && cfg.enable_compression &&
+                                             cfg.compression_scale_factor > 1;
+
+            // Creating an image smaller than the application asked for is only sound while the
+            // layer rewrites every command that can address it. Images the application can copy
+            // from, store into, alias or reinterpret are still addressed elsewhere with the
+            // original extents, which walks the transfer engine outside the bound allocation.
             // ONLY scale multi-mip 3D textures (mipLevels > 1).
             // Single-mip textures (mipLevels == 1) are UI atlases, minimaps, and HUD elements which
             // must stay unscaled.
-            if (pCreateInfo->mipLevels > 1 && cfg.enable_compression &&
-                cfg.compression_scale_factor > 1) {
+            if (downscale_requested && !vntx::is_downscale_safe(*pCreateInfo)) {
+                note_native_size_reason(
+                    [&] { return vntx::get_downscale_rejection_reason(*pCreateInfo); });
+            } else if (downscale_requested) {
                 scale_factor = cfg.compression_scale_factor;
                 modified_info.extent.width = std::max(1u, pCreateInfo->extent.width / scale_factor);
                 modified_info.extent.height =
@@ -73,7 +439,7 @@ VKAPI_ATTR VkResult VKAPI_CALL vntx_CreateImage(const VkDevice device,
                         dim >>= 1;
                         max_mips++;
                     }
-                    modified_info.mipLevels = std::min(pCreateInfo->mipLevels - 1, max_mips);
+                    modified_info.mipLevels = std::min(pCreateInfo->mipLevels, max_mips);
                 }
             }
 
@@ -93,7 +459,7 @@ VKAPI_ATTR VkResult VKAPI_CALL vntx_CreateImage(const VkDevice device,
                                             100.0)
                                          : 0.0;
 
-            VNTX_LOG_INFO(
+            VNTX_LOG_DEBUG(
                 "Candidate texture {}x{} compressed: {:.2f}MB -> {:.2f}MB ({:.2f}x ratio, "
                 "{:.1f}% saved) [created physical extent: {}x{}, scale={}x]",
                 pCreateInfo->extent.width, pCreateInfo->extent.height, orig_mb, comp_mb, ratio,
@@ -435,7 +801,7 @@ VKAPI_ATTR VkResult VKAPI_CALL vntx_BindImageMemory(const VkDevice device, const
                     it->second.is_bound = true;
                     device_data->active_ntc_images.insert(image);
 
-                    VNTX_LOG_INFO(
+                    VNTX_LOG_DEBUG(
                         "Bound device memory for candidate NTC image {}: memory={} offset={} "
                         "(downsized_size={} bytes)",
                         static_cast<void*>(image), static_cast<void*>(memory), memoryOffset,
@@ -526,7 +892,7 @@ vntx_BindImageMemory2(const VkDevice device, const uint32_t bindInfoCount,
                         it->second.is_bound = true;
                         device_data->active_ntc_images.insert(bind_info.image);
 
-                        VNTX_LOG_INFO(
+                        VNTX_LOG_DEBUG(
                             "Bound device memory (v2) for candidate NTC image {}: memory={} "
                             "offset={} (downsized_size={} bytes)",
                             static_cast<void*>(bind_info.image),
@@ -1148,6 +1514,565 @@ VKAPI_ATTR void VKAPI_CALL vntx_CmdPipelineBarrier2(const VkCommandBuffer comman
     }
 }
 
+VKAPI_ATTR void VKAPI_CALL vntx_CmdCopyImage(
+    const VkCommandBuffer commandBuffer, const VkImage srcImage, const VkImageLayout srcImageLayout,
+    const VkImage dstImage, const VkImageLayout dstImageLayout, const uint32_t regionCount,
+    const VkImageCopy* const pRegions) {
+    if (!commandBuffer) {
+        return;
+    }
+
+    auto* const device_data =
+        vntx::LayerContext::get().get_device_data_from_command_buffer(commandBuffer);
+    if (!device_data || !device_data->next_cmd_copy_image) {
+        return;
+    }
+
+    const auto forward = [&](const uint32_t count, const VkImageCopy* const regions) {
+        device_data->next_cmd_copy_image(commandBuffer, srcImage, srcImageLayout, dstImage,
+                                         dstImageLayout, count, regions);
+    };
+
+    PhysicalImage src{};
+    PhysicalImage dst{};
+    try {
+        if (vntx::LayerContext::get().is_disabled() || regionCount == 0 || !pRegions) {
+            forward(regionCount, pRegions);
+            return;
+        }
+
+        {
+            std::shared_lock<std::shared_mutex> lock(device_data->image_mutex);
+            src = physical_image_locked(*device_data, srcImage);
+            dst = physical_image_locked(*device_data, dstImage);
+        }
+
+        if (!src.constrained && !dst.constrained) {
+            forward(regionCount, pRegions);
+            return;
+        }
+
+        RegionScratch<VkImageCopy> scratch;
+        VkImageCopy* const out = scratch.data(regionCount);
+        bool clamped = false;
+        const uint32_t kept = fit_regions(
+            pRegions, regionCount, out,
+            [&](VkImageCopy& region, bool& changed) {
+                return fit_image_transfer_region(src, dst, region.srcSubresource, region.srcOffset,
+                                                 region.dstSubresource, region.dstOffset,
+                                                 region.extent, changed);
+            },
+            clamped);
+
+        if (clamped) {
+            static std::atomic<uint64_t> clamp_count{0};
+            note_clamp(clamp_count, "vkCmdCopyImage", dst.constrained ? dstImage : srcImage);
+        }
+        if (kept > 0) {
+            forward(kept, out);
+        }
+    } catch (...) {
+        VNTX_LOG_ERROR("Exception in vntx_CmdCopyImage");
+        if (!src.constrained && !dst.constrained) {
+            forward(regionCount, pRegions);
+        }
+    }
+}
+
+VKAPI_ATTR void VKAPI_CALL vntx_CmdCopyImage2(const VkCommandBuffer commandBuffer,
+                                              const VkCopyImageInfo2* const pCopyImageInfo) {
+    if (!commandBuffer || !pCopyImageInfo) {
+        return;
+    }
+
+    auto* const device_data =
+        vntx::LayerContext::get().get_device_data_from_command_buffer(commandBuffer);
+    if (!device_data || !device_data->next_cmd_copy_image2) {
+        return;
+    }
+
+    PhysicalImage src{};
+    PhysicalImage dst{};
+    try {
+        if (vntx::LayerContext::get().is_disabled() || pCopyImageInfo->regionCount == 0 ||
+            !pCopyImageInfo->pRegions) {
+            device_data->next_cmd_copy_image2(commandBuffer, pCopyImageInfo);
+            return;
+        }
+
+        {
+            std::shared_lock<std::shared_mutex> lock(device_data->image_mutex);
+            src = physical_image_locked(*device_data, pCopyImageInfo->srcImage);
+            dst = physical_image_locked(*device_data, pCopyImageInfo->dstImage);
+        }
+
+        if (!src.constrained && !dst.constrained) {
+            device_data->next_cmd_copy_image2(commandBuffer, pCopyImageInfo);
+            return;
+        }
+
+        RegionScratch<VkImageCopy2> scratch;
+        VkImageCopy2* const out = scratch.data(pCopyImageInfo->regionCount);
+        bool clamped = false;
+        const uint32_t kept = fit_regions(
+            pCopyImageInfo->pRegions, pCopyImageInfo->regionCount, out,
+            [&](VkImageCopy2& region, bool& changed) {
+                return fit_image_transfer_region(src, dst, region.srcSubresource, region.srcOffset,
+                                                 region.dstSubresource, region.dstOffset,
+                                                 region.extent, changed);
+            },
+            clamped);
+
+        if (clamped) {
+            static std::atomic<uint64_t> clamp_count{0};
+            note_clamp(clamp_count, "vkCmdCopyImage2",
+                       dst.constrained ? pCopyImageInfo->dstImage : pCopyImageInfo->srcImage);
+        }
+        if (kept > 0) {
+            VkCopyImageInfo2 modified_info = *pCopyImageInfo;
+            modified_info.regionCount = kept;
+            modified_info.pRegions = out;
+            device_data->next_cmd_copy_image2(commandBuffer, &modified_info);
+        }
+    } catch (...) {
+        VNTX_LOG_ERROR("Exception in vntx_CmdCopyImage2");
+        if (!src.constrained && !dst.constrained) {
+            device_data->next_cmd_copy_image2(commandBuffer, pCopyImageInfo);
+        }
+    }
+}
+
+VKAPI_ATTR void VKAPI_CALL vntx_CmdCopyImageToBuffer(
+    const VkCommandBuffer commandBuffer, const VkImage srcImage, const VkImageLayout srcImageLayout,
+    const VkBuffer dstBuffer, const uint32_t regionCount, const VkBufferImageCopy* const pRegions) {
+    if (!commandBuffer) {
+        return;
+    }
+
+    auto* const device_data =
+        vntx::LayerContext::get().get_device_data_from_command_buffer(commandBuffer);
+    if (!device_data || !device_data->next_cmd_copy_image_to_buffer) {
+        return;
+    }
+
+    const auto forward = [&](const uint32_t count, const VkBufferImageCopy* const regions) {
+        device_data->next_cmd_copy_image_to_buffer(commandBuffer, srcImage, srcImageLayout,
+                                                   dstBuffer, count, regions);
+    };
+
+    PhysicalImage src{};
+    try {
+        if (vntx::LayerContext::get().is_disabled() || regionCount == 0 || !pRegions) {
+            forward(regionCount, pRegions);
+            return;
+        }
+
+        {
+            std::shared_lock<std::shared_mutex> lock(device_data->image_mutex);
+            src = physical_image_locked(*device_data, srcImage);
+        }
+
+        if (!src.constrained) {
+            forward(regionCount, pRegions);
+            return;
+        }
+
+        RegionScratch<VkBufferImageCopy> scratch;
+        VkBufferImageCopy* const out = scratch.data(regionCount);
+        bool clamped = false;
+        const uint32_t kept = fit_regions(
+            pRegions, regionCount, out,
+            [&](VkBufferImageCopy& region, bool& changed) {
+                return fit_buffer_image_region(src, region.imageSubresource, region.imageOffset,
+                                               region.imageExtent, changed);
+            },
+            clamped);
+
+        if (clamped) {
+            static std::atomic<uint64_t> clamp_count{0};
+            note_clamp(clamp_count, "vkCmdCopyImageToBuffer", srcImage);
+        }
+        if (kept > 0) {
+            forward(kept, out);
+        }
+    } catch (...) {
+        VNTX_LOG_ERROR("Exception in vntx_CmdCopyImageToBuffer");
+        if (!src.constrained) {
+            forward(regionCount, pRegions);
+        }
+    }
+}
+
+VKAPI_ATTR void VKAPI_CALL
+vntx_CmdCopyImageToBuffer2(const VkCommandBuffer commandBuffer,
+                           const VkCopyImageToBufferInfo2* const pCopyImageToBufferInfo) {
+    if (!commandBuffer || !pCopyImageToBufferInfo) {
+        return;
+    }
+
+    auto* const device_data =
+        vntx::LayerContext::get().get_device_data_from_command_buffer(commandBuffer);
+    if (!device_data || !device_data->next_cmd_copy_image_to_buffer2) {
+        return;
+    }
+
+    PhysicalImage src{};
+    try {
+        if (vntx::LayerContext::get().is_disabled() || pCopyImageToBufferInfo->regionCount == 0 ||
+            !pCopyImageToBufferInfo->pRegions) {
+            device_data->next_cmd_copy_image_to_buffer2(commandBuffer, pCopyImageToBufferInfo);
+            return;
+        }
+
+        {
+            std::shared_lock<std::shared_mutex> lock(device_data->image_mutex);
+            src = physical_image_locked(*device_data, pCopyImageToBufferInfo->srcImage);
+        }
+
+        if (!src.constrained) {
+            device_data->next_cmd_copy_image_to_buffer2(commandBuffer, pCopyImageToBufferInfo);
+            return;
+        }
+
+        RegionScratch<VkBufferImageCopy2> scratch;
+        VkBufferImageCopy2* const out = scratch.data(pCopyImageToBufferInfo->regionCount);
+        bool clamped = false;
+        const uint32_t kept = fit_regions(
+            pCopyImageToBufferInfo->pRegions, pCopyImageToBufferInfo->regionCount, out,
+            [&](VkBufferImageCopy2& region, bool& changed) {
+                return fit_buffer_image_region(src, region.imageSubresource, region.imageOffset,
+                                               region.imageExtent, changed);
+            },
+            clamped);
+
+        if (clamped) {
+            static std::atomic<uint64_t> clamp_count{0};
+            note_clamp(clamp_count, "vkCmdCopyImageToBuffer2", pCopyImageToBufferInfo->srcImage);
+        }
+        if (kept > 0) {
+            VkCopyImageToBufferInfo2 modified_info = *pCopyImageToBufferInfo;
+            modified_info.regionCount = kept;
+            modified_info.pRegions = out;
+            device_data->next_cmd_copy_image_to_buffer2(commandBuffer, &modified_info);
+        }
+    } catch (...) {
+        VNTX_LOG_ERROR("Exception in vntx_CmdCopyImageToBuffer2");
+        if (!src.constrained) {
+            device_data->next_cmd_copy_image_to_buffer2(commandBuffer, pCopyImageToBufferInfo);
+        }
+    }
+}
+
+VKAPI_ATTR void VKAPI_CALL vntx_CmdBlitImage(
+    const VkCommandBuffer commandBuffer, const VkImage srcImage, const VkImageLayout srcImageLayout,
+    const VkImage dstImage, const VkImageLayout dstImageLayout, const uint32_t regionCount,
+    const VkImageBlit* const pRegions, const VkFilter filter) {
+    if (!commandBuffer) {
+        return;
+    }
+
+    auto* const device_data =
+        vntx::LayerContext::get().get_device_data_from_command_buffer(commandBuffer);
+    if (!device_data || !device_data->next_cmd_blit_image) {
+        return;
+    }
+
+    const auto forward = [&](const uint32_t count, const VkImageBlit* const regions) {
+        device_data->next_cmd_blit_image(commandBuffer, srcImage, srcImageLayout, dstImage,
+                                         dstImageLayout, count, regions, filter);
+    };
+
+    PhysicalImage src{};
+    PhysicalImage dst{};
+    try {
+        if (vntx::LayerContext::get().is_disabled() || regionCount == 0 || !pRegions) {
+            forward(regionCount, pRegions);
+            return;
+        }
+
+        {
+            std::shared_lock<std::shared_mutex> lock(device_data->image_mutex);
+            src = physical_image_locked(*device_data, srcImage);
+            dst = physical_image_locked(*device_data, dstImage);
+        }
+
+        if (!src.constrained && !dst.constrained) {
+            forward(regionCount, pRegions);
+            return;
+        }
+
+        RegionScratch<VkImageBlit> scratch;
+        VkImageBlit* const out = scratch.data(regionCount);
+        bool clamped = false;
+        const uint32_t kept = fit_regions(
+            pRegions, regionCount, out,
+            [&](VkImageBlit& region, bool& changed) {
+                return fit_blit_region(src, dst, region.srcSubresource, region.srcOffsets,
+                                       region.dstSubresource, region.dstOffsets, changed);
+            },
+            clamped);
+
+        if (clamped) {
+            static std::atomic<uint64_t> clamp_count{0};
+            note_clamp(clamp_count, "vkCmdBlitImage", dst.constrained ? dstImage : srcImage);
+        }
+        if (kept > 0) {
+            forward(kept, out);
+        }
+    } catch (...) {
+        VNTX_LOG_ERROR("Exception in vntx_CmdBlitImage");
+        if (!src.constrained && !dst.constrained) {
+            forward(regionCount, pRegions);
+        }
+    }
+}
+
+VKAPI_ATTR void VKAPI_CALL vntx_CmdBlitImage2(const VkCommandBuffer commandBuffer,
+                                              const VkBlitImageInfo2* const pBlitImageInfo) {
+    if (!commandBuffer || !pBlitImageInfo) {
+        return;
+    }
+
+    auto* const device_data =
+        vntx::LayerContext::get().get_device_data_from_command_buffer(commandBuffer);
+    if (!device_data || !device_data->next_cmd_blit_image2) {
+        return;
+    }
+
+    PhysicalImage src{};
+    PhysicalImage dst{};
+    try {
+        if (vntx::LayerContext::get().is_disabled() || pBlitImageInfo->regionCount == 0 ||
+            !pBlitImageInfo->pRegions) {
+            device_data->next_cmd_blit_image2(commandBuffer, pBlitImageInfo);
+            return;
+        }
+
+        {
+            std::shared_lock<std::shared_mutex> lock(device_data->image_mutex);
+            src = physical_image_locked(*device_data, pBlitImageInfo->srcImage);
+            dst = physical_image_locked(*device_data, pBlitImageInfo->dstImage);
+        }
+
+        if (!src.constrained && !dst.constrained) {
+            device_data->next_cmd_blit_image2(commandBuffer, pBlitImageInfo);
+            return;
+        }
+
+        RegionScratch<VkImageBlit2> scratch;
+        VkImageBlit2* const out = scratch.data(pBlitImageInfo->regionCount);
+        bool clamped = false;
+        const uint32_t kept = fit_regions(
+            pBlitImageInfo->pRegions, pBlitImageInfo->regionCount, out,
+            [&](VkImageBlit2& region, bool& changed) {
+                return fit_blit_region(src, dst, region.srcSubresource, region.srcOffsets,
+                                       region.dstSubresource, region.dstOffsets, changed);
+            },
+            clamped);
+
+        if (clamped) {
+            static std::atomic<uint64_t> clamp_count{0};
+            note_clamp(clamp_count, "vkCmdBlitImage2",
+                       dst.constrained ? pBlitImageInfo->dstImage : pBlitImageInfo->srcImage);
+        }
+        if (kept > 0) {
+            VkBlitImageInfo2 modified_info = *pBlitImageInfo;
+            modified_info.regionCount = kept;
+            modified_info.pRegions = out;
+            device_data->next_cmd_blit_image2(commandBuffer, &modified_info);
+        }
+    } catch (...) {
+        VNTX_LOG_ERROR("Exception in vntx_CmdBlitImage2");
+        if (!src.constrained && !dst.constrained) {
+            device_data->next_cmd_blit_image2(commandBuffer, pBlitImageInfo);
+        }
+    }
+}
+
+VKAPI_ATTR void VKAPI_CALL vntx_CmdResolveImage(
+    const VkCommandBuffer commandBuffer, const VkImage srcImage, const VkImageLayout srcImageLayout,
+    const VkImage dstImage, const VkImageLayout dstImageLayout, const uint32_t regionCount,
+    const VkImageResolve* const pRegions) {
+    if (!commandBuffer) {
+        return;
+    }
+
+    auto* const device_data =
+        vntx::LayerContext::get().get_device_data_from_command_buffer(commandBuffer);
+    if (!device_data || !device_data->next_cmd_resolve_image) {
+        return;
+    }
+
+    const auto forward = [&](const uint32_t count, const VkImageResolve* const regions) {
+        device_data->next_cmd_resolve_image(commandBuffer, srcImage, srcImageLayout, dstImage,
+                                            dstImageLayout, count, regions);
+    };
+
+    PhysicalImage src{};
+    PhysicalImage dst{};
+    try {
+        if (vntx::LayerContext::get().is_disabled() || regionCount == 0 || !pRegions) {
+            forward(regionCount, pRegions);
+            return;
+        }
+
+        {
+            std::shared_lock<std::shared_mutex> lock(device_data->image_mutex);
+            src = physical_image_locked(*device_data, srcImage);
+            dst = physical_image_locked(*device_data, dstImage);
+        }
+
+        if (!src.constrained && !dst.constrained) {
+            forward(regionCount, pRegions);
+            return;
+        }
+
+        RegionScratch<VkImageResolve> scratch;
+        VkImageResolve* const out = scratch.data(regionCount);
+        bool clamped = false;
+        const uint32_t kept = fit_regions(
+            pRegions, regionCount, out,
+            [&](VkImageResolve& region, bool& changed) {
+                return fit_image_transfer_region(src, dst, region.srcSubresource, region.srcOffset,
+                                                 region.dstSubresource, region.dstOffset,
+                                                 region.extent, changed);
+            },
+            clamped);
+
+        if (clamped) {
+            static std::atomic<uint64_t> clamp_count{0};
+            note_clamp(clamp_count, "vkCmdResolveImage", dst.constrained ? dstImage : srcImage);
+        }
+        if (kept > 0) {
+            forward(kept, out);
+        }
+    } catch (...) {
+        VNTX_LOG_ERROR("Exception in vntx_CmdResolveImage");
+        if (!src.constrained && !dst.constrained) {
+            forward(regionCount, pRegions);
+        }
+    }
+}
+
+VKAPI_ATTR void VKAPI_CALL vntx_CmdResolveImage2(
+    const VkCommandBuffer commandBuffer, const VkResolveImageInfo2* const pResolveImageInfo) {
+    if (!commandBuffer || !pResolveImageInfo) {
+        return;
+    }
+
+    auto* const device_data =
+        vntx::LayerContext::get().get_device_data_from_command_buffer(commandBuffer);
+    if (!device_data || !device_data->next_cmd_resolve_image2) {
+        return;
+    }
+
+    PhysicalImage src{};
+    PhysicalImage dst{};
+    try {
+        if (vntx::LayerContext::get().is_disabled() || pResolveImageInfo->regionCount == 0 ||
+            !pResolveImageInfo->pRegions) {
+            device_data->next_cmd_resolve_image2(commandBuffer, pResolveImageInfo);
+            return;
+        }
+
+        {
+            std::shared_lock<std::shared_mutex> lock(device_data->image_mutex);
+            src = physical_image_locked(*device_data, pResolveImageInfo->srcImage);
+            dst = physical_image_locked(*device_data, pResolveImageInfo->dstImage);
+        }
+
+        if (!src.constrained && !dst.constrained) {
+            device_data->next_cmd_resolve_image2(commandBuffer, pResolveImageInfo);
+            return;
+        }
+
+        RegionScratch<VkImageResolve2> scratch;
+        VkImageResolve2* const out = scratch.data(pResolveImageInfo->regionCount);
+        bool clamped = false;
+        const uint32_t kept = fit_regions(
+            pResolveImageInfo->pRegions, pResolveImageInfo->regionCount, out,
+            [&](VkImageResolve2& region, bool& changed) {
+                return fit_image_transfer_region(src, dst, region.srcSubresource, region.srcOffset,
+                                                 region.dstSubresource, region.dstOffset,
+                                                 region.extent, changed);
+            },
+            clamped);
+
+        if (clamped) {
+            static std::atomic<uint64_t> clamp_count{0};
+            note_clamp(clamp_count, "vkCmdResolveImage2",
+                       dst.constrained ? pResolveImageInfo->dstImage : pResolveImageInfo->srcImage);
+        }
+        if (kept > 0) {
+            VkResolveImageInfo2 modified_info = *pResolveImageInfo;
+            modified_info.regionCount = kept;
+            modified_info.pRegions = out;
+            device_data->next_cmd_resolve_image2(commandBuffer, &modified_info);
+        }
+    } catch (...) {
+        VNTX_LOG_ERROR("Exception in vntx_CmdResolveImage2");
+        if (!src.constrained && !dst.constrained) {
+            device_data->next_cmd_resolve_image2(commandBuffer, pResolveImageInfo);
+        }
+    }
+}
+
+VKAPI_ATTR void VKAPI_CALL vntx_CmdClearColorImage(const VkCommandBuffer commandBuffer,
+                                                   const VkImage image,
+                                                   const VkImageLayout imageLayout,
+                                                   const VkClearColorValue* const pColor,
+                                                   const uint32_t rangeCount,
+                                                   const VkImageSubresourceRange* const pRanges) {
+    if (!commandBuffer) {
+        return;
+    }
+
+    auto* const device_data =
+        vntx::LayerContext::get().get_device_data_from_command_buffer(commandBuffer);
+    if (!device_data || !device_data->next_cmd_clear_color_image) {
+        return;
+    }
+
+    const auto forward = [&](const uint32_t count, const VkImageSubresourceRange* const ranges) {
+        device_data->next_cmd_clear_color_image(commandBuffer, image, imageLayout, pColor, count,
+                                                ranges);
+    };
+
+    try {
+        if (vntx::LayerContext::get().is_disabled() || rangeCount == 0 || !pRanges) {
+            forward(rangeCount, pRanges);
+            return;
+        }
+
+        PhysicalImage phys{};
+        {
+            std::shared_lock<std::shared_mutex> lock(device_data->image_mutex);
+            phys = physical_image_locked(*device_data, image);
+        }
+
+        if (!phys.constrained) {
+            forward(rangeCount, pRanges);
+            return;
+        }
+
+        RegionScratch<VkImageSubresourceRange> scratch;
+        VkImageSubresourceRange* const out = scratch.data(rangeCount);
+        bool clamped = false;
+        for (uint32_t i = 0; i < rangeCount; ++i) {
+            out[i] = pRanges[i];
+            clamped |= clamp_subresource_range(phys, out[i]);
+        }
+
+        if (clamped) {
+            static std::atomic<uint64_t> clamp_count{0};
+            note_clamp(clamp_count, "vkCmdClearColorImage", image);
+        }
+        forward(rangeCount, out);
+    } catch (...) {
+        VNTX_LOG_ERROR("Exception in vntx_CmdClearColorImage");
+    }
+}
+
 VKAPI_ATTR VkResult VKAPI_CALL vntx_CreateImageView(const VkDevice device,
                                                     const VkImageViewCreateInfo* const pCreateInfo,
                                                     const VkAllocationCallbacks* const pAllocator,
@@ -1299,20 +2224,9 @@ VKAPI_ATTR VkResult VKAPI_CALL vntx_CreateShaderModule(
                                                           pShaderModule);
         }
 
-        const size_t size_in_words = pCreateInfo->codeSize / sizeof(uint32_t);
-        const auto rewrite_result =
-            vntx::spv::rewrite_shader_bytecode(pCreateInfo->pCode, size_in_words);
-
-        if (rewrite_result.sample_instructions_found > 0) {
-            VNTX_LOG_INFO(
-                "SPIR-V rewriter detected {} texture sampling instructions (TensorCores=false)",
-                rewrite_result.sample_instructions_found);
-            VNTX_LOG_INFO(
-                "Deploying transformed SPIR-V shader module (original words={}, rewritten "
-                "words={})",
-                size_in_words, size_in_words);
-        }
-
+        // The neural inference rewriter is not wired into the pipeline yet: its output was
+        // always discarded here. Running it anyway parsed and re-emitted every shader module the
+        // application compiled, which is pure cost on the pipeline-creation path.
         return device_data->next_create_shader_module(device, pCreateInfo, pAllocator,
                                                       pShaderModule);
     } catch (...) {

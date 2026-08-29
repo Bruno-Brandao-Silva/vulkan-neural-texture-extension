@@ -108,8 +108,18 @@ void log_message(const Level level, std::format_string<Args...> fmt, Args&&... a
 
 }  // namespace vntx::log
 
-#define VNTX_LOG_TRACE(...) ::vntx::log::log_message(::vntx::log::Level::Trace, __VA_ARGS__)
-#define VNTX_LOG_DEBUG(...) ::vntx::log::log_message(::vntx::log::Level::Debug, __VA_ARGS__)
-#define VNTX_LOG_INFO(...) ::vntx::log::log_message(::vntx::log::Level::Info, __VA_ARGS__)
-#define VNTX_LOG_WARN(...) ::vntx::log::log_message(::vntx::log::Level::Warn, __VA_ARGS__)
-#define VNTX_LOG_ERROR(...) ::vntx::log::log_message(::vntx::log::Level::Error, __VA_ARGS__)
+// The level test lives in the macro rather than in log_message() so that a suppressed call never
+// formats its arguments. These sit on the per-image and per-command interception paths, where a
+// streaming engine reaches them thousands of times a frame.
+#define VNTX_LOG_AT(level_, ...)                               \
+    do {                                                       \
+        if ((level_) >= ::vntx::log::get_active_log_level()) { \
+            ::vntx::log::log_message((level_), __VA_ARGS__);   \
+        }                                                      \
+    } while (0)
+
+#define VNTX_LOG_TRACE(...) VNTX_LOG_AT(::vntx::log::Level::Trace, __VA_ARGS__)
+#define VNTX_LOG_DEBUG(...) VNTX_LOG_AT(::vntx::log::Level::Debug, __VA_ARGS__)
+#define VNTX_LOG_INFO(...) VNTX_LOG_AT(::vntx::log::Level::Info, __VA_ARGS__)
+#define VNTX_LOG_WARN(...) VNTX_LOG_AT(::vntx::log::Level::Warn, __VA_ARGS__)
+#define VNTX_LOG_ERROR(...) VNTX_LOG_AT(::vntx::log::Level::Error, __VA_ARGS__)

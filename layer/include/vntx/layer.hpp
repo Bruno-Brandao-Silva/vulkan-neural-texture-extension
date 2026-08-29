@@ -147,6 +147,15 @@ struct DeviceData {
     PFN_vkCmdCopyBufferToImage2 next_cmd_copy_buffer_to_image2{nullptr};
     PFN_vkCmdPipelineBarrier next_cmd_pipeline_barrier{nullptr};
     PFN_vkCmdPipelineBarrier2 next_cmd_pipeline_barrier2{nullptr};
+    PFN_vkCmdCopyImage next_cmd_copy_image{nullptr};
+    PFN_vkCmdCopyImage2 next_cmd_copy_image2{nullptr};
+    PFN_vkCmdCopyImageToBuffer next_cmd_copy_image_to_buffer{nullptr};
+    PFN_vkCmdCopyImageToBuffer2 next_cmd_copy_image_to_buffer2{nullptr};
+    PFN_vkCmdBlitImage next_cmd_blit_image{nullptr};
+    PFN_vkCmdBlitImage2 next_cmd_blit_image2{nullptr};
+    PFN_vkCmdResolveImage next_cmd_resolve_image{nullptr};
+    PFN_vkCmdResolveImage2 next_cmd_resolve_image2{nullptr};
+    PFN_vkCmdClearColorImage next_cmd_clear_color_image{nullptr};
     PFN_vkCreateImageView next_create_image_view{nullptr};
     PFN_vkDestroyImageView next_destroy_image_view{nullptr};
     PFN_vkCreateShaderModule next_create_shader_module{nullptr};
@@ -278,6 +287,44 @@ VKAPI_ATTR void VKAPI_CALL vntx_CmdPipelineBarrier(
 
 VKAPI_ATTR void VKAPI_CALL vntx_CmdPipelineBarrier2(VkCommandBuffer commandBuffer,
                                                     const VkDependencyInfo* pDependencyInfo);
+
+VKAPI_ATTR void VKAPI_CALL vntx_CmdCopyImage(VkCommandBuffer commandBuffer, VkImage srcImage,
+                                             VkImageLayout srcImageLayout, VkImage dstImage,
+                                             VkImageLayout dstImageLayout, uint32_t regionCount,
+                                             const VkImageCopy* pRegions);
+
+VKAPI_ATTR void VKAPI_CALL vntx_CmdCopyImage2(VkCommandBuffer commandBuffer,
+                                              const VkCopyImageInfo2* pCopyImageInfo);
+
+VKAPI_ATTR void VKAPI_CALL vntx_CmdCopyImageToBuffer(VkCommandBuffer commandBuffer,
+                                                     VkImage srcImage, VkImageLayout srcImageLayout,
+                                                     VkBuffer dstBuffer, uint32_t regionCount,
+                                                     const VkBufferImageCopy* pRegions);
+
+VKAPI_ATTR void VKAPI_CALL vntx_CmdCopyImageToBuffer2(
+    VkCommandBuffer commandBuffer, const VkCopyImageToBufferInfo2* pCopyImageToBufferInfo);
+
+VKAPI_ATTR void VKAPI_CALL vntx_CmdBlitImage(VkCommandBuffer commandBuffer, VkImage srcImage,
+                                             VkImageLayout srcImageLayout, VkImage dstImage,
+                                             VkImageLayout dstImageLayout, uint32_t regionCount,
+                                             const VkImageBlit* pRegions, VkFilter filter);
+
+VKAPI_ATTR void VKAPI_CALL vntx_CmdBlitImage2(VkCommandBuffer commandBuffer,
+                                              const VkBlitImageInfo2* pBlitImageInfo);
+
+VKAPI_ATTR void VKAPI_CALL vntx_CmdResolveImage(VkCommandBuffer commandBuffer, VkImage srcImage,
+                                                VkImageLayout srcImageLayout, VkImage dstImage,
+                                                VkImageLayout dstImageLayout, uint32_t regionCount,
+                                                const VkImageResolve* pRegions);
+
+VKAPI_ATTR void VKAPI_CALL vntx_CmdResolveImage2(VkCommandBuffer commandBuffer,
+                                                 const VkResolveImageInfo2* pResolveImageInfo);
+
+VKAPI_ATTR void VKAPI_CALL vntx_CmdClearColorImage(VkCommandBuffer commandBuffer, VkImage image,
+                                                   VkImageLayout imageLayout,
+                                                   const VkClearColorValue* pColor,
+                                                   uint32_t rangeCount,
+                                                   const VkImageSubresourceRange* pRanges);
 
 VKAPI_ATTR VkResult VKAPI_CALL vntx_CreateImageView(VkDevice device,
                                                     const VkImageViewCreateInfo* pCreateInfo,

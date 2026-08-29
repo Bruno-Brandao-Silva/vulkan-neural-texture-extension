@@ -42,6 +42,44 @@ bool is_candidate_texture(const VkImageCreateInfo& create_info, uint32_t min_dim
     return true;
 }
 
+bool is_downscale_safe(const VkImageCreateInfo& create_info) noexcept {
+    return get_downscale_rejection_reason(create_info).empty();
+}
+
+std::string get_downscale_rejection_reason(const VkImageCreateInfo& create_info) {
+    if ((create_info.usage & ~DOWNSCALE_SAFE_USAGE) != 0) {
+        return std::format("Usage 0x{:08x} exceeds downscale-safe set 0x{:08x}", create_info.usage,
+                           DOWNSCALE_SAFE_USAGE);
+    }
+
+    // Mutable/aliased/sparse/cube/2D-array-compatible images are reinterpreted or bound through
+    // paths that still carry the application's original geometry.
+    if (create_info.flags != 0) {
+        return std::format("Non-zero image create flags (0x{:08x})", create_info.flags);
+    }
+
+    if (create_info.samples > VK_SAMPLE_COUNT_1_BIT) {
+        return std::format("Multisampled image ({} samples)",
+                           static_cast<uint32_t>(create_info.samples));
+    }
+
+    if (create_info.tiling != VK_IMAGE_TILING_OPTIMAL) {
+        return std::format("Non-optimal tiling ({})", static_cast<int>(create_info.tiling));
+    }
+
+    if (create_info.sharingMode != VK_SHARING_MODE_EXCLUSIVE) {
+        return "Concurrent sharing mode across queue families";
+    }
+
+    // External memory, DRM format modifiers and explicit format lists all pin the image to a
+    // layout the layer cannot renegotiate.
+    if (create_info.pNext != nullptr) {
+        return "Extension structure chained into VkImageCreateInfo";
+    }
+
+    return "";
+}
+
 std::string get_filter_rejection_reason(const VkImageCreateInfo& create_info,
                                         uint32_t min_dimension) {
     if (create_info.imageType != VK_IMAGE_TYPE_2D) {

@@ -2,6 +2,7 @@
 
 #include <atomic>
 #include <mutex>
+#include <shared_mutex>
 #include <thread>
 #include <vector>
 
@@ -794,6 +795,19 @@ TEST(Vkd3dCompatSubresourceTest, ImageViewMutableFormatConversionAndClamping) {
     VkImage img = VK_NULL_HANDLE;
     ASSERT_EQ(vntx_CreateImage(fixture.device, &info, nullptr, &img), VK_SUCCESS);
 
+    // A mutable-format image can be reinterpreted under a format the layer never sees, so it must
+    // keep its native geometry: every mip the application asked for still exists.
+    {
+        auto* const device_data = LayerContext::get().get_device_data(fixture.device);
+        ASSERT_NE(device_data, nullptr);
+        std::shared_lock<std::shared_mutex> lock(device_data->image_mutex);
+        const auto it = device_data->candidate_textures.find(img);
+        ASSERT_NE(it, device_data->candidate_textures.end());
+        EXPECT_EQ(it->second.scale_factor, 1u);
+        EXPECT_EQ(it->second.created_extent.width, 2048u);
+        EXPECT_EQ(it->second.mip_levels, 12u);
+    }
+
     // View created with mutable format BC7_SRGB_BLOCK on tail mip 11
     VkImageViewCreateInfo view_info{};
     view_info.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
@@ -815,7 +829,66 @@ TEST(Vkd3dCompatSubresourceTest, ImageViewMutableFormatConversionAndClamping) {
         const auto& captured = g_vkd3d_view_calls[0].create_info;
         // Format preserved as BC7_SRGB_BLOCK
         EXPECT_EQ(captured.format, VK_FORMAT_BC7_SRGB_BLOCK);
-        // Base mip clamped to max_mips - 1 (10)
+        // The image was not downscaled, so mip 11 stays addressable
+        EXPECT_EQ(captured.subresourceRange.baseMipLevel, 11u);
+        EXPECT_EQ(captured.subresourceRange.levelCount, 1u);
+    }
+
+    vntx_DestroyImageView(fixture.device, view, nullptr);
+    vntx_DestroyImage(fixture.device, img, nullptr);
+}
+
+TEST(Vkd3dCompatSubresourceTest, ImageViewClampsTailMipOnDownscaledImage) {
+    Vkd3dMockFixture fixture;
+    LayerConfig cfg = get_layer_config();
+    cfg.enable_compression = true;
+    cfg.compression_scale_factor = 2;
+    set_layer_config(cfg);
+
+    VkImageCreateInfo info{};
+    info.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
+    info.imageType = VK_IMAGE_TYPE_2D;
+    info.format = VK_FORMAT_BC7_UNORM_BLOCK;
+    info.extent = {2048, 2048, 1};
+    info.mipLevels = 12;
+    info.arrayLayers = 1;
+    info.samples = VK_SAMPLE_COUNT_1_BIT;
+    info.tiling = VK_IMAGE_TILING_OPTIMAL;
+    info.usage = VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT;
+
+    VkImage img = VK_NULL_HANDLE;
+    ASSERT_EQ(vntx_CreateImage(fixture.device, &info, nullptr, &img), VK_SUCCESS);
+
+    // 2048 -> 1024 carries the full 11-mip chain a 1024x1024 image supports; no level is dropped.
+    {
+        auto* const device_data = LayerContext::get().get_device_data(fixture.device);
+        ASSERT_NE(device_data, nullptr);
+        std::shared_lock<std::shared_mutex> lock(device_data->image_mutex);
+        const auto it = device_data->candidate_textures.find(img);
+        ASSERT_NE(it, device_data->candidate_textures.end());
+        EXPECT_EQ(it->second.scale_factor, 2u);
+        EXPECT_EQ(it->second.created_extent.width, 1024u);
+        EXPECT_EQ(it->second.mip_levels, 11u);
+    }
+
+    VkImageViewCreateInfo view_info{};
+    view_info.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
+    view_info.image = img;
+    view_info.viewType = VK_IMAGE_VIEW_TYPE_2D;
+    view_info.format = VK_FORMAT_BC7_UNORM_BLOCK;
+    view_info.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+    view_info.subresourceRange.baseMipLevel = 11;
+    view_info.subresourceRange.levelCount = 1;
+    view_info.subresourceRange.baseArrayLayer = 0;
+    view_info.subresourceRange.layerCount = 1;
+
+    VkImageView view = VK_NULL_HANDLE;
+    ASSERT_EQ(vntx_CreateImageView(fixture.device, &view_info, nullptr, &view), VK_SUCCESS);
+
+    {
+        std::lock_guard<std::mutex> lock(g_vkd3d_test_mutex);
+        ASSERT_EQ(g_vkd3d_view_calls.size(), 1u);
+        const auto& captured = g_vkd3d_view_calls[0].create_info;
         EXPECT_EQ(captured.subresourceRange.baseMipLevel, 10u);
         EXPECT_EQ(captured.subresourceRange.levelCount, 1u);
     }

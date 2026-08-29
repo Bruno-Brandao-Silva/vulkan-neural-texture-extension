@@ -195,7 +195,10 @@ VKAPI_ATTR VkResult VKAPI_CALL vntx_CreateInstance(const VkInstanceCreateInfo* c
             return result;
         }
 
-        if (!vntx::LayerContext::get().is_disabled()) {
+        // Registered even while the layer is disabled: the hooks check `is_disabled()` and pass
+        // through, but without the downstream dispatch table they would have nothing to forward to
+        // and would silently swallow every call.
+        {
             auto instance_data = std::make_unique<vntx::InstanceData>();
             instance_data->instance = *pInstance;
             instance_data->next_get_instance_proc_addr = next_get_instance_proc_addr;
@@ -283,7 +286,8 @@ VKAPI_ATTR VkResult VKAPI_CALL vntx_CreateDevice(const VkPhysicalDevice physical
             return result;
         }
 
-        if (!vntx::LayerContext::get().is_disabled()) {
+        // Registered even while the layer is disabled, for the reason given in vntx_CreateInstance.
+        {
             auto device_data = std::make_unique<vntx::DeviceData>();
             device_data->device = *pDevice;
             device_data->physical_device = physicalDevice;
@@ -319,6 +323,47 @@ VKAPI_ATTR VkResult VKAPI_CALL vntx_CreateDevice(const VkPhysicalDevice physical
                     reinterpret_cast<PFN_vkCmdPipelineBarrier2>(
                         next_get_device_proc_addr(*pDevice, "vkCmdPipelineBarrier2KHR"));
             }
+            // Image-consuming transfer commands. These must be intercepted so that a physically
+            // downscaled candidate image can never be addressed with the application's original
+            // (larger) extents - an out-of-range transfer makes the DMA copy engine read or write
+            // outside the bound allocation, which faults the GPU MMU instead of failing cleanly.
+            device_data->next_cmd_copy_image = reinterpret_cast<PFN_vkCmdCopyImage>(
+                next_get_device_proc_addr(*pDevice, "vkCmdCopyImage"));
+            device_data->next_cmd_copy_image2 = reinterpret_cast<PFN_vkCmdCopyImage2>(
+                next_get_device_proc_addr(*pDevice, "vkCmdCopyImage2"));
+            if (!device_data->next_cmd_copy_image2) {
+                device_data->next_cmd_copy_image2 = reinterpret_cast<PFN_vkCmdCopyImage2>(
+                    next_get_device_proc_addr(*pDevice, "vkCmdCopyImage2KHR"));
+            }
+            device_data->next_cmd_copy_image_to_buffer =
+                reinterpret_cast<PFN_vkCmdCopyImageToBuffer>(
+                    next_get_device_proc_addr(*pDevice, "vkCmdCopyImageToBuffer"));
+            device_data->next_cmd_copy_image_to_buffer2 =
+                reinterpret_cast<PFN_vkCmdCopyImageToBuffer2>(
+                    next_get_device_proc_addr(*pDevice, "vkCmdCopyImageToBuffer2"));
+            if (!device_data->next_cmd_copy_image_to_buffer2) {
+                device_data->next_cmd_copy_image_to_buffer2 =
+                    reinterpret_cast<PFN_vkCmdCopyImageToBuffer2>(
+                        next_get_device_proc_addr(*pDevice, "vkCmdCopyImageToBuffer2KHR"));
+            }
+            device_data->next_cmd_blit_image = reinterpret_cast<PFN_vkCmdBlitImage>(
+                next_get_device_proc_addr(*pDevice, "vkCmdBlitImage"));
+            device_data->next_cmd_blit_image2 = reinterpret_cast<PFN_vkCmdBlitImage2>(
+                next_get_device_proc_addr(*pDevice, "vkCmdBlitImage2"));
+            if (!device_data->next_cmd_blit_image2) {
+                device_data->next_cmd_blit_image2 = reinterpret_cast<PFN_vkCmdBlitImage2>(
+                    next_get_device_proc_addr(*pDevice, "vkCmdBlitImage2KHR"));
+            }
+            device_data->next_cmd_resolve_image = reinterpret_cast<PFN_vkCmdResolveImage>(
+                next_get_device_proc_addr(*pDevice, "vkCmdResolveImage"));
+            device_data->next_cmd_resolve_image2 = reinterpret_cast<PFN_vkCmdResolveImage2>(
+                next_get_device_proc_addr(*pDevice, "vkCmdResolveImage2"));
+            if (!device_data->next_cmd_resolve_image2) {
+                device_data->next_cmd_resolve_image2 = reinterpret_cast<PFN_vkCmdResolveImage2>(
+                    next_get_device_proc_addr(*pDevice, "vkCmdResolveImage2KHR"));
+            }
+            device_data->next_cmd_clear_color_image = reinterpret_cast<PFN_vkCmdClearColorImage>(
+                next_get_device_proc_addr(*pDevice, "vkCmdClearColorImage"));
             device_data->next_create_image_view = reinterpret_cast<PFN_vkCreateImageView>(
                 next_get_device_proc_addr(*pDevice, "vkCreateImageView"));
             device_data->next_destroy_image_view = reinterpret_cast<PFN_vkDestroyImageView>(
@@ -412,6 +457,24 @@ VKAPI_ATTR PFN_vkVoidFunction VKAPI_CALL vntx_GetInstanceProcAddr(const VkInstan
             return reinterpret_cast<PFN_vkVoidFunction>(vntx_CmdPipelineBarrier);
         if (name == "vkCmdPipelineBarrier2" || name == "vkCmdPipelineBarrier2KHR")
             return reinterpret_cast<PFN_vkVoidFunction>(vntx_CmdPipelineBarrier2);
+        if (name == "vkCmdCopyImage")
+            return reinterpret_cast<PFN_vkVoidFunction>(vntx_CmdCopyImage);
+        if (name == "vkCmdCopyImage2" || name == "vkCmdCopyImage2KHR")
+            return reinterpret_cast<PFN_vkVoidFunction>(vntx_CmdCopyImage2);
+        if (name == "vkCmdCopyImageToBuffer")
+            return reinterpret_cast<PFN_vkVoidFunction>(vntx_CmdCopyImageToBuffer);
+        if (name == "vkCmdCopyImageToBuffer2" || name == "vkCmdCopyImageToBuffer2KHR")
+            return reinterpret_cast<PFN_vkVoidFunction>(vntx_CmdCopyImageToBuffer2);
+        if (name == "vkCmdBlitImage")
+            return reinterpret_cast<PFN_vkVoidFunction>(vntx_CmdBlitImage);
+        if (name == "vkCmdBlitImage2" || name == "vkCmdBlitImage2KHR")
+            return reinterpret_cast<PFN_vkVoidFunction>(vntx_CmdBlitImage2);
+        if (name == "vkCmdResolveImage")
+            return reinterpret_cast<PFN_vkVoidFunction>(vntx_CmdResolveImage);
+        if (name == "vkCmdResolveImage2" || name == "vkCmdResolveImage2KHR")
+            return reinterpret_cast<PFN_vkVoidFunction>(vntx_CmdResolveImage2);
+        if (name == "vkCmdClearColorImage")
+            return reinterpret_cast<PFN_vkVoidFunction>(vntx_CmdClearColorImage);
         if (name == "vkCreateImageView")
             return reinterpret_cast<PFN_vkVoidFunction>(vntx_CreateImageView);
         if (name == "vkDestroyImageView")
@@ -443,46 +506,83 @@ VKAPI_ATTR PFN_vkVoidFunction VKAPI_CALL vntx_GetDeviceProcAddr(const VkDevice d
     try {
         const std::string_view name(pName);
 
+        const auto* const device_data = (device != VK_NULL_HANDLE)
+                                            ? vntx::LayerContext::get().get_device_data(device)
+                                            : nullptr;
+        const PFN_vkGetDeviceProcAddr next_proc_addr =
+            device_data ? device_data->next_get_device_proc_addr : nullptr;
+
+        // A layer must never manufacture an entry point the driver below it does not expose.
+        // Translation layers such as VKD3D-Proton and DXVK treat a non-null result as a capability
+        // probe, and a hook with nothing to forward to would silently swallow the command.
+        // Without a device there is nothing to probe against, and no command can be issued through
+        // the result either, so the hook is reported as before.
+        const auto hook = [&](PFN_vkVoidFunction fn) -> PFN_vkVoidFunction {
+            if (device == VK_NULL_HANDLE) {
+                return fn;
+            }
+            if (!next_proc_addr || !next_proc_addr(device, pName)) {
+                return nullptr;
+            }
+            return fn;
+        };
+
         if (name == "vkGetDeviceProcAddr")
             return reinterpret_cast<PFN_vkVoidFunction>(vntx_GetDeviceProcAddr);
         if (name == "vkDestroyDevice")
             return reinterpret_cast<PFN_vkVoidFunction>(vntx_DestroyDevice);
-        if (name == "vkCreateImage") return reinterpret_cast<PFN_vkVoidFunction>(vntx_CreateImage);
+        if (name == "vkCreateImage")
+            return hook(reinterpret_cast<PFN_vkVoidFunction>(vntx_CreateImage));
         if (name == "vkDestroyImage")
-            return reinterpret_cast<PFN_vkVoidFunction>(vntx_DestroyImage);
+            return hook(reinterpret_cast<PFN_vkVoidFunction>(vntx_DestroyImage));
         if (name == "vkGetImageMemoryRequirements")
-            return reinterpret_cast<PFN_vkVoidFunction>(vntx_GetImageMemoryRequirements);
+            return hook(reinterpret_cast<PFN_vkVoidFunction>(vntx_GetImageMemoryRequirements));
         if (name == "vkGetImageMemoryRequirements2")
-            return reinterpret_cast<PFN_vkVoidFunction>(vntx_GetImageMemoryRequirements2);
+            return hook(reinterpret_cast<PFN_vkVoidFunction>(vntx_GetImageMemoryRequirements2));
         if (name == "vkBindImageMemory")
-            return reinterpret_cast<PFN_vkVoidFunction>(vntx_BindImageMemory);
+            return hook(reinterpret_cast<PFN_vkVoidFunction>(vntx_BindImageMemory));
         if (name == "vkBindImageMemory2")
-            return reinterpret_cast<PFN_vkVoidFunction>(vntx_BindImageMemory2);
+            return hook(reinterpret_cast<PFN_vkVoidFunction>(vntx_BindImageMemory2));
         if (name == "vkCmdCopyBufferToImage")
-            return reinterpret_cast<PFN_vkVoidFunction>(vntx_CmdCopyBufferToImage);
+            return hook(reinterpret_cast<PFN_vkVoidFunction>(vntx_CmdCopyBufferToImage));
         if (name == "vkCmdCopyBufferToImage2")
-            return reinterpret_cast<PFN_vkVoidFunction>(vntx_CmdCopyBufferToImage2);
+            return hook(reinterpret_cast<PFN_vkVoidFunction>(vntx_CmdCopyBufferToImage2));
         if (name == "vkCmdPipelineBarrier")
-            return reinterpret_cast<PFN_vkVoidFunction>(vntx_CmdPipelineBarrier);
+            return hook(reinterpret_cast<PFN_vkVoidFunction>(vntx_CmdPipelineBarrier));
         if (name == "vkCmdPipelineBarrier2" || name == "vkCmdPipelineBarrier2KHR")
-            return reinterpret_cast<PFN_vkVoidFunction>(vntx_CmdPipelineBarrier2);
+            return hook(reinterpret_cast<PFN_vkVoidFunction>(vntx_CmdPipelineBarrier2));
+        if (name == "vkCmdCopyImage")
+            return hook(reinterpret_cast<PFN_vkVoidFunction>(vntx_CmdCopyImage));
+        if (name == "vkCmdCopyImage2" || name == "vkCmdCopyImage2KHR")
+            return hook(reinterpret_cast<PFN_vkVoidFunction>(vntx_CmdCopyImage2));
+        if (name == "vkCmdCopyImageToBuffer")
+            return hook(reinterpret_cast<PFN_vkVoidFunction>(vntx_CmdCopyImageToBuffer));
+        if (name == "vkCmdCopyImageToBuffer2" || name == "vkCmdCopyImageToBuffer2KHR")
+            return hook(reinterpret_cast<PFN_vkVoidFunction>(vntx_CmdCopyImageToBuffer2));
+        if (name == "vkCmdBlitImage")
+            return hook(reinterpret_cast<PFN_vkVoidFunction>(vntx_CmdBlitImage));
+        if (name == "vkCmdBlitImage2" || name == "vkCmdBlitImage2KHR")
+            return hook(reinterpret_cast<PFN_vkVoidFunction>(vntx_CmdBlitImage2));
+        if (name == "vkCmdResolveImage")
+            return hook(reinterpret_cast<PFN_vkVoidFunction>(vntx_CmdResolveImage));
+        if (name == "vkCmdResolveImage2" || name == "vkCmdResolveImage2KHR")
+            return hook(reinterpret_cast<PFN_vkVoidFunction>(vntx_CmdResolveImage2));
+        if (name == "vkCmdClearColorImage")
+            return hook(reinterpret_cast<PFN_vkVoidFunction>(vntx_CmdClearColorImage));
         if (name == "vkCreateImageView")
-            return reinterpret_cast<PFN_vkVoidFunction>(vntx_CreateImageView);
+            return hook(reinterpret_cast<PFN_vkVoidFunction>(vntx_CreateImageView));
         if (name == "vkDestroyImageView")
-            return reinterpret_cast<PFN_vkVoidFunction>(vntx_DestroyImageView);
+            return hook(reinterpret_cast<PFN_vkVoidFunction>(vntx_DestroyImageView));
         if (name == "vkCreateShaderModule")
-            return reinterpret_cast<PFN_vkVoidFunction>(vntx_CreateShaderModule);
+            return hook(reinterpret_cast<PFN_vkVoidFunction>(vntx_CreateShaderModule));
         if (name == "vkDestroyShaderModule")
-            return reinterpret_cast<PFN_vkVoidFunction>(vntx_DestroyShaderModule);
+            return hook(reinterpret_cast<PFN_vkVoidFunction>(vntx_DestroyShaderModule));
 
-        if (device != VK_NULL_HANDLE) {
-            const auto* const device_data = vntx::LayerContext::get().get_device_data(device);
-            if (device_data && device_data->next_get_device_proc_addr) {
-                // Pass through Swapchain, Present (vkQueuePresentKHR, vkCreateSwapchainKHR), and
-                // unintercepted calls directly to downstream dispatch chain for overlay
-                // compatibility (MangoHud, Steam Overlay, OBS).
-                return device_data->next_get_device_proc_addr(device, pName);
-            }
+        if (next_proc_addr) {
+            // Pass through Swapchain, Present (vkQueuePresentKHR, vkCreateSwapchainKHR), and
+            // unintercepted calls directly to downstream dispatch chain for overlay
+            // compatibility (MangoHud, Steam Overlay, OBS).
+            return next_proc_addr(device, pName);
         }
     } catch (...) {
         // Exception-safe fallback
