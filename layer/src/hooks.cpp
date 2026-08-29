@@ -57,6 +57,14 @@ VKAPI_ATTR VkResult VKAPI_CALL vntx_CreateImage(const VkDevice device,
                 modified_info.extent.height =
                     std::max(1u, pCreateInfo->extent.height / scale_factor);
 
+                // Ensure block-compressed formats remain 4x4 aligned at mip 0
+                if (vntx::is_supported_texture_format(pCreateInfo->format)) {
+                    modified_info.extent.width =
+                        std::max(4u, ((modified_info.extent.width + 3u) / 4u) * 4u);
+                    modified_info.extent.height =
+                        std::max(4u, ((modified_info.extent.height + 3u) / 4u) * 4u);
+                }
+
                 if (modified_info.mipLevels > 1) {
                     uint32_t max_mips = 1;
                     uint32_t dim =
@@ -95,8 +103,42 @@ VKAPI_ATTR VkResult VKAPI_CALL vntx_CreateImage(const VkDevice device,
                            vntx::get_filter_rejection_reason(*pCreateInfo));
         }
 
-        const VkResult result =
+        VkResult result =
             device_data->next_create_image(device, &modified_info, pAllocator, pImage);
+
+        // Fallback: If modified physical creation fails, retry native creation
+        if (result != VK_SUCCESS && is_candidate && scale_factor > 1) {
+            VNTX_LOG_WARN(
+                "vkCreateImage failed (result={}) with modified candidate parameters; falling back "
+                "to native creation",
+                static_cast<int>(result));
+            result = device_data->next_create_image(device, pCreateInfo, pAllocator, pImage);
+            if (result == VK_SUCCESS && *pImage != VK_NULL_HANDLE) {
+                vntx::CandidateTextureInfo fallback_info{};
+                fallback_info.extent = pCreateInfo->extent;
+                fallback_info.created_extent = pCreateInfo->extent;
+                fallback_info.scale_factor = 1;
+                fallback_info.format = pCreateInfo->format;
+                fallback_info.mip_levels = pCreateInfo->mipLevels;
+                fallback_info.array_layers = pCreateInfo->arrayLayers;
+                fallback_info.usage = pCreateInfo->usage;
+                fallback_info.native_size_bytes = native_size_bytes;
+                fallback_info.ntc_size_bytes = ntc_size_bytes;
+                fallback_info.downsized_memory_size = 0;
+                fallback_info.bound_memory = VK_NULL_HANDLE;
+                fallback_info.bound_offset = 0;
+                fallback_info.texture_hash = 0;
+                fallback_info.alignment = 0;
+                fallback_info.memory_type_bits = 0;
+                fallback_info.is_bound = false;
+                fallback_info.fallback_triggered = true;
+
+                std::unique_lock<std::shared_mutex> lock(device_data->image_mutex);
+                device_data->candidate_textures[*pImage] = fallback_info;
+                device_data->candidate_images.insert(*pImage);
+                return result;
+            }
+        }
 
         if (result == VK_SUCCESS && is_candidate && *pImage != VK_NULL_HANDLE) {
             vntx::CandidateTextureInfo info{};
@@ -116,6 +158,7 @@ VKAPI_ATTR VkResult VKAPI_CALL vntx_CreateImage(const VkDevice device,
             info.alignment = 0;
             info.memory_type_bits = 0;
             info.is_bound = false;
+            info.fallback_triggered = false;
 
             std::unique_lock<std::shared_mutex> lock(device_data->image_mutex);
             device_data->candidate_textures[*pImage] = info;
@@ -129,8 +172,7 @@ VKAPI_ATTR VkResult VKAPI_CALL vntx_CreateImage(const VkDevice device,
 
         return result;
     } catch (...) {
-        VNTX_LOG_ERROR("Exception in vntx_CreateImage, deactivating layer");
-        vntx::LayerContext::get().disable();
+        VNTX_LOG_ERROR("Exception in vntx_CreateImage, attempting native fallback");
         auto* const device_data = vntx::LayerContext::get().get_device_data(device);
         if (device_data && device_data->next_create_image) {
             return device_data->next_create_image(device, pCreateInfo, pAllocator, pImage);
@@ -151,7 +193,7 @@ VKAPI_ATTR void VKAPI_CALL vntx_DestroyImage(const VkDevice device, const VkImag
             return;
         }
 
-        if (image != VK_NULL_HANDLE && !vntx::LayerContext::get().is_disabled()) {
+        if (image != VK_NULL_HANDLE) {
             std::unique_lock<std::shared_mutex> lock(device_data->image_mutex);
             device_data->candidate_textures.erase(image);
             device_data->candidate_images.erase(image);
@@ -186,25 +228,45 @@ VKAPI_ATTR void VKAPI_CALL vntx_GetImageMemoryRequirements(
 
         uint64_t ntc_size = 0;
         bool is_candidate = false;
+        bool fallback = false;
         {
             std::shared_lock<std::shared_mutex> lock(device_data->image_mutex);
             const auto it = device_data->candidate_textures.find(image);
             if (it != device_data->candidate_textures.end()) {
                 is_candidate = true;
+                fallback = it->second.fallback_triggered;
                 ntc_size = it->second.ntc_size_bytes;
             }
         }
 
-        if (is_candidate && ntc_size > 0 && vntx::get_layer_config().downsize_vram_allocations) {
-            const VkDeviceSize original_driver_size = pMemoryRequirements->size;
+        if (is_candidate) {
+            const VkDeviceSize driver_size = pMemoryRequirements->size;
             const VkDeviceSize driver_alignment = pMemoryRequirements->alignment;
+            const uint32_t memory_type_bits = pMemoryRequirements->memoryTypeBits;
 
-            const VkDeviceSize downsized_size =
-                vntx::align_memory_size(static_cast<VkDeviceSize>(ntc_size), driver_alignment);
+            if (!fallback && ntc_size > 0 && vntx::get_layer_config().downsize_vram_allocations) {
+                const VkDeviceSize downsized_size =
+                    vntx::align_memory_size(static_cast<VkDeviceSize>(ntc_size), driver_alignment);
 
-            if (downsized_size < original_driver_size) {
-                pMemoryRequirements->size =
-                    std::max(driver_alignment > 0 ? driver_alignment : 1, downsized_size);
+                if (downsized_size < driver_size) {
+                    pMemoryRequirements->size =
+                        std::max(driver_alignment > 0 ? driver_alignment : 1, downsized_size);
+                }
+                // Strictly preserve driver alignment and memoryTypeBits
+                pMemoryRequirements->alignment = driver_alignment;
+                pMemoryRequirements->memoryTypeBits = memory_type_bits;
+
+                VNTX_LOG_DEBUG(
+                    "Downsized memory requirements for candidate image {}: driver_size={} -> "
+                    "downsized_size={} (alignment={}, memoryTypeBits=0x{:08x})",
+                    static_cast<void*>(image), driver_size, pMemoryRequirements->size,
+                    driver_alignment, memory_type_bits);
+            } else {
+                VNTX_LOG_DEBUG(
+                    "Preserving native driver memory requirements for image {}: size={}, "
+                    "alignment={}, memoryTypeBits=0x{:08x}",
+                    static_cast<void*>(image), pMemoryRequirements->size,
+                    pMemoryRequirements->alignment, pMemoryRequirements->memoryTypeBits);
             }
 
             {
@@ -213,15 +275,9 @@ VKAPI_ATTR void VKAPI_CALL vntx_GetImageMemoryRequirements(
                 if (it != device_data->candidate_textures.end()) {
                     it->second.downsized_memory_size = pMemoryRequirements->size;
                     it->second.alignment = driver_alignment;
-                    it->second.memory_type_bits = pMemoryRequirements->memoryTypeBits;
+                    it->second.memory_type_bits = memory_type_bits;
                 }
             }
-
-            VNTX_LOG_DEBUG(
-                "Downsized memory requirements for candidate image {}: driver_size={} -> "
-                "downsized_size={} (alignment={}, memoryTypeBits=0x{:08x})",
-                static_cast<void*>(image), original_driver_size, pMemoryRequirements->size,
-                driver_alignment, pMemoryRequirements->memoryTypeBits);
         }
     } catch (...) {
         // Safe pass-through
@@ -251,25 +307,48 @@ VKAPI_ATTR void VKAPI_CALL vntx_GetImageMemoryRequirements2(
         const VkImage image = pInfo->image;
         uint64_t ntc_size = 0;
         bool is_candidate = false;
+        bool fallback = false;
         {
             std::shared_lock<std::shared_mutex> lock(device_data->image_mutex);
             const auto it = device_data->candidate_textures.find(image);
             if (it != device_data->candidate_textures.end()) {
                 is_candidate = true;
+                fallback = it->second.fallback_triggered;
                 ntc_size = it->second.ntc_size_bytes;
             }
         }
 
-        if (is_candidate && ntc_size > 0 && vntx::get_layer_config().downsize_vram_allocations) {
-            const VkDeviceSize original_driver_size = pMemoryRequirements->memoryRequirements.size;
+        if (is_candidate) {
+            const VkDeviceSize driver_size = pMemoryRequirements->memoryRequirements.size;
             const VkDeviceSize driver_alignment = pMemoryRequirements->memoryRequirements.alignment;
+            const uint32_t memory_type_bits =
+                pMemoryRequirements->memoryRequirements.memoryTypeBits;
 
-            const VkDeviceSize downsized_size =
-                vntx::align_memory_size(static_cast<VkDeviceSize>(ntc_size), driver_alignment);
+            if (!fallback && ntc_size > 0 && vntx::get_layer_config().downsize_vram_allocations) {
+                const VkDeviceSize downsized_size =
+                    vntx::align_memory_size(static_cast<VkDeviceSize>(ntc_size), driver_alignment);
 
-            if (downsized_size < original_driver_size) {
-                pMemoryRequirements->memoryRequirements.size =
-                    std::max(driver_alignment > 0 ? driver_alignment : 1, downsized_size);
+                if (downsized_size < driver_size) {
+                    pMemoryRequirements->memoryRequirements.size =
+                        std::max(driver_alignment > 0 ? driver_alignment : 1, downsized_size);
+                }
+                // Strictly preserve driver alignment and memoryTypeBits
+                pMemoryRequirements->memoryRequirements.alignment = driver_alignment;
+                pMemoryRequirements->memoryRequirements.memoryTypeBits = memory_type_bits;
+
+                VNTX_LOG_DEBUG(
+                    "Downsized memory requirements (v2) for candidate image {}: driver_size={} -> "
+                    "downsized_size={} (alignment={}, memoryTypeBits=0x{:08x})",
+                    static_cast<void*>(image), driver_size,
+                    pMemoryRequirements->memoryRequirements.size, driver_alignment,
+                    memory_type_bits);
+            } else {
+                VNTX_LOG_DEBUG(
+                    "Preserving native driver memory requirements (v2) for image {}: size={}, "
+                    "alignment={}, memoryTypeBits=0x{:08x}",
+                    static_cast<void*>(image), pMemoryRequirements->memoryRequirements.size,
+                    pMemoryRequirements->memoryRequirements.alignment,
+                    pMemoryRequirements->memoryRequirements.memoryTypeBits);
             }
 
             {
@@ -278,17 +357,9 @@ VKAPI_ATTR void VKAPI_CALL vntx_GetImageMemoryRequirements2(
                 if (it != device_data->candidate_textures.end()) {
                     it->second.downsized_memory_size = pMemoryRequirements->memoryRequirements.size;
                     it->second.alignment = driver_alignment;
-                    it->second.memory_type_bits =
-                        pMemoryRequirements->memoryRequirements.memoryTypeBits;
+                    it->second.memory_type_bits = memory_type_bits;
                 }
             }
-
-            VNTX_LOG_DEBUG(
-                "Downsized memory requirements (v2) for candidate image {}: driver_size={} -> "
-                "downsized_size={} (alignment={}, memoryTypeBits=0x{:08x})",
-                static_cast<void*>(image), original_driver_size,
-                pMemoryRequirements->memoryRequirements.size, driver_alignment,
-                pMemoryRequirements->memoryRequirements.memoryTypeBits);
         }
     } catch (...) {
         // Safe pass-through
@@ -308,28 +379,80 @@ VKAPI_ATTR VkResult VKAPI_CALL vntx_BindImageMemory(const VkDevice device, const
             return VK_ERROR_INITIALIZATION_FAILED;
         }
 
-        if (vntx::LayerContext::get().is_disabled()) {
+        if (vntx::LayerContext::get().is_disabled() || image == VK_NULL_HANDLE) {
             return device_data->next_bind_image_memory(device, image, memory, memoryOffset);
         }
 
-        if (image != VK_NULL_HANDLE) {
-            std::unique_lock<std::shared_mutex> lock(device_data->image_mutex);
+        bool is_candidate = false;
+        bool fallback_trigger = false;
+        VkDeviceSize required_alignment = 0;
+        VkDeviceSize downsized_size = 0;
+
+        {
+            std::shared_lock<std::shared_mutex> lock(device_data->image_mutex);
             auto it = device_data->candidate_textures.find(image);
             if (it != device_data->candidate_textures.end()) {
-                it->second.bound_memory = memory;
-                it->second.bound_offset = memoryOffset;
-                it->second.is_bound = true;
-                device_data->active_ntc_images.insert(image);
-
-                VNTX_LOG_INFO(
-                    "Bound downsized device memory for candidate NTC image {}: memory={} offset={} "
-                    "(downsized_size={} bytes)",
-                    static_cast<void*>(image), static_cast<void*>(memory), memoryOffset,
-                    it->second.downsized_memory_size);
+                is_candidate = true;
+                if (!it->second.fallback_triggered) {
+                    required_alignment = it->second.alignment;
+                    downsized_size = it->second.downsized_memory_size;
+                    if (memory == VK_NULL_HANDLE) {
+                        VNTX_LOG_WARN(
+                            "BindImageMemory called with VK_NULL_HANDLE memory for candidate image "
+                            "{} - marking fallback",
+                            static_cast<void*>(image));
+                        fallback_trigger = true;
+                    } else if (required_alignment > 0 && (memoryOffset % required_alignment != 0)) {
+                        VNTX_LOG_WARN(
+                            "BindImageMemory offset {} not aligned to required alignment {} for "
+                            "image {} - marking fallback",
+                            memoryOffset, required_alignment, static_cast<void*>(image));
+                        fallback_trigger = true;
+                    }
+                }
             }
         }
 
-        return device_data->next_bind_image_memory(device, image, memory, memoryOffset);
+        if (fallback_trigger) {
+            std::unique_lock<std::shared_mutex> lock(device_data->image_mutex);
+            auto it = device_data->candidate_textures.find(image);
+            if (it != device_data->candidate_textures.end()) {
+                it->second.fallback_triggered = true;
+            }
+        }
+
+        const VkResult result =
+            device_data->next_bind_image_memory(device, image, memory, memoryOffset);
+
+        if (is_candidate) {
+            std::unique_lock<std::shared_mutex> lock(device_data->image_mutex);
+            auto it = device_data->candidate_textures.find(image);
+            if (it != device_data->candidate_textures.end()) {
+                if (result == VK_SUCCESS && !it->second.fallback_triggered &&
+                    memory != VK_NULL_HANDLE) {
+                    it->second.bound_memory = memory;
+                    it->second.bound_offset = memoryOffset;
+                    it->second.is_bound = true;
+                    device_data->active_ntc_images.insert(image);
+
+                    VNTX_LOG_INFO(
+                        "Bound device memory for candidate NTC image {}: memory={} offset={} "
+                        "(downsized_size={} bytes)",
+                        static_cast<void*>(image), static_cast<void*>(memory), memoryOffset,
+                        downsized_size);
+                } else if (result != VK_SUCCESS) {
+                    VNTX_LOG_WARN(
+                        "vkBindImageMemory failed (result={}) for candidate image {} - marking "
+                        "fallback",
+                        static_cast<int>(result), static_cast<void*>(image));
+                    it->second.fallback_triggered = true;
+                    it->second.is_bound = false;
+                    device_data->active_ntc_images.erase(image);
+                }
+            }
+        }
+
+        return result;
     } catch (...) {
         auto* const device_data = vntx::LayerContext::get().get_device_data(device);
         if (device_data && device_data->next_bind_image_memory) {
@@ -364,22 +487,65 @@ vntx_BindImageMemory2(const VkDevice device, const uint32_t bindInfoCount,
                     continue;
                 }
                 auto it = device_data->candidate_textures.find(bind_info.image);
-                if (it != device_data->candidate_textures.end()) {
-                    it->second.bound_memory = bind_info.memory;
-                    it->second.bound_offset = bind_info.memoryOffset;
-                    it->second.is_bound = true;
-                    device_data->active_ntc_images.insert(bind_info.image);
-
-                    VNTX_LOG_INFO(
-                        "Bound downsized device memory (v2) for candidate NTC image {}: memory={} "
-                        "offset={} (downsized_size={} bytes)",
-                        static_cast<void*>(bind_info.image), static_cast<void*>(bind_info.memory),
-                        bind_info.memoryOffset, it->second.downsized_memory_size);
+                if (it != device_data->candidate_textures.end() && !it->second.fallback_triggered) {
+                    if (bind_info.memory == VK_NULL_HANDLE) {
+                        VNTX_LOG_WARN(
+                            "BindImageMemory2 called with VK_NULL_HANDLE memory for candidate "
+                            "image {} - marking fallback",
+                            static_cast<void*>(bind_info.image));
+                        it->second.fallback_triggered = true;
+                    } else if (it->second.alignment > 0 &&
+                               (bind_info.memoryOffset % it->second.alignment != 0)) {
+                        VNTX_LOG_WARN(
+                            "BindImageMemory2 offset {} not aligned to required alignment {} "
+                            "for image {} - marking fallback",
+                            bind_info.memoryOffset, it->second.alignment,
+                            static_cast<void*>(bind_info.image));
+                        it->second.fallback_triggered = true;
+                    }
                 }
             }
         }
 
-        return device_data->next_bind_image_memory2(device, bindInfoCount, pBindInfos);
+        const VkResult result =
+            device_data->next_bind_image_memory2(device, bindInfoCount, pBindInfos);
+
+        {
+            std::unique_lock<std::shared_mutex> lock(device_data->image_mutex);
+            for (uint32_t i = 0; i < bindInfoCount; ++i) {
+                const auto& bind_info = pBindInfos[i];
+                if (bind_info.image == VK_NULL_HANDLE) {
+                    continue;
+                }
+                auto it = device_data->candidate_textures.find(bind_info.image);
+                if (it != device_data->candidate_textures.end()) {
+                    if (result == VK_SUCCESS && !it->second.fallback_triggered &&
+                        bind_info.memory != VK_NULL_HANDLE) {
+                        it->second.bound_memory = bind_info.memory;
+                        it->second.bound_offset = bind_info.memoryOffset;
+                        it->second.is_bound = true;
+                        device_data->active_ntc_images.insert(bind_info.image);
+
+                        VNTX_LOG_INFO(
+                            "Bound device memory (v2) for candidate NTC image {}: memory={} "
+                            "offset={} (downsized_size={} bytes)",
+                            static_cast<void*>(bind_info.image),
+                            static_cast<void*>(bind_info.memory), bind_info.memoryOffset,
+                            it->second.downsized_memory_size);
+                    } else if (result != VK_SUCCESS) {
+                        VNTX_LOG_WARN(
+                            "vkBindImageMemory2 failed (result={}) for candidate image {} - "
+                            "marking fallback",
+                            static_cast<int>(result), static_cast<void*>(bind_info.image));
+                        it->second.fallback_triggered = true;
+                        it->second.is_bound = false;
+                        device_data->active_ntc_images.erase(bind_info.image);
+                    }
+                }
+            }
+        }
+
+        return result;
     } catch (...) {
         auto* const device_data = vntx::LayerContext::get().get_device_data(device);
         if (device_data && device_data->next_bind_image_memory2) {
@@ -434,63 +600,120 @@ VKAPI_ATTR void VKAPI_CALL vntx_CmdCopyBufferToImage(const VkCommandBuffer comma
         // 2. Format validation check
         if (!vntx::is_supported_texture_format(info.format)) {
             VNTX_LOG_WARN(
-                "Candidate image {} has unsupported format ({}) for NTC transcoding - triggering "
-                "pass-through fallback",
+                "Candidate image {} has unsupported format ({}) for NTC transcoding - marking "
+                "fallback",
                 static_cast<void*>(dstImage), static_cast<uint32_t>(info.format));
-            device_data->next_cmd_copy_buffer_to_image(commandBuffer, srcBuffer, dstImage,
-                                                       dstImageLayout, regionCount, pRegions);
-            return;
+            {
+                std::unique_lock<std::shared_mutex> lock(device_data->image_mutex);
+                auto it = device_data->candidate_textures.find(dstImage);
+                if (it != device_data->candidate_textures.end()) {
+                    it->second.fallback_triggered = true;
+                }
+            }
         }
 
         // 3. Anti-stutter latency guardrail: Measure copy preparation duration
         const vntx::TranscodingLatencyGuard latency_guard;
 
-        // 4. Adapt copy parameters & normalize subresource regions
-        std::vector<VkBufferImageCopy> adjusted_regions;
-        adjusted_regions.reserve(regionCount);
+        // 4. Adapt copy parameters & normalize subresource regions (stack buffer for <= 8 regions)
+        constexpr size_t STACK_REGIONS_CAPACITY = 8;
+        VkBufferImageCopy stack_regions[STACK_REGIONS_CAPACITY];
+        std::vector<VkBufferImageCopy> heap_regions;
+        VkBufferImageCopy* out_regions = stack_regions;
+
+        if (regionCount > STACK_REGIONS_CAPACITY) {
+            heap_regions.resize(regionCount);
+            out_regions = heap_regions.data();
+        }
 
         for (uint32_t i = 0; i < regionCount; ++i) {
             VkBufferImageCopy region = pRegions[i];
-            if (info.scale_factor > 1) {
-                const uint32_t mip =
-                    std::min(info.mip_levels - 1, region.imageSubresource.mipLevel);
-                region.imageSubresource.mipLevel = mip;
+            const uint32_t max_mips = info.mip_levels;
+            const uint32_t mip =
+                std::min(max_mips > 0 ? (max_mips - 1) : 0u, region.imageSubresource.mipLevel);
+            region.imageSubresource.mipLevel = mip;
 
+            if (info.array_layers > 0) {
+                if (region.imageSubresource.baseArrayLayer >= info.array_layers) {
+                    region.imageSubresource.baseArrayLayer = info.array_layers - 1;
+                    region.imageSubresource.layerCount = 1;
+                } else if (region.imageSubresource.layerCount == VK_REMAINING_ARRAY_LAYERS ||
+                           region.imageSubresource.baseArrayLayer +
+                                   region.imageSubresource.layerCount >
+                               info.array_layers) {
+                    region.imageSubresource.layerCount =
+                        info.array_layers - region.imageSubresource.baseArrayLayer;
+                }
+                if (region.imageSubresource.layerCount == 0) {
+                    region.imageSubresource.layerCount = 1;
+                }
+            }
+
+            if (info.scale_factor > 1) {
                 const uint32_t dst_mip_w = std::max(1u, info.created_extent.width >> mip);
                 const uint32_t dst_mip_h = std::max(1u, info.created_extent.height >> mip);
 
                 // Source buffer pitch must match the original extent width if not explicitly
-                // specified
+                // specified, and block-compressed formats require pitch to be block-aligned or 0
                 if (region.bufferRowLength == 0) {
-                    region.bufferRowLength = region.imageExtent.width;
+                    if (region.imageExtent.width >= 4) {
+                        region.bufferRowLength = ((region.imageExtent.width + 3u) / 4u) * 4u;
+                    }
                 }
                 if (region.bufferImageHeight == 0) {
-                    region.bufferImageHeight = region.imageExtent.height;
+                    if (region.imageExtent.height >= 4) {
+                        region.bufferImageHeight = ((region.imageExtent.height + 3u) / 4u) * 4u;
+                    }
                 }
 
-                const uint32_t scaled_w =
-                    std::max(1u, region.imageExtent.width / info.scale_factor);
-                const uint32_t scaled_h =
-                    std::max(1u, region.imageExtent.height / info.scale_factor);
-                const int32_t scaled_ox =
-                    region.imageOffset.x / static_cast<int32_t>(info.scale_factor);
-                const int32_t scaled_oy =
-                    region.imageOffset.y / static_cast<int32_t>(info.scale_factor);
+                // Block-compressed formats require 4x4 alignment
+                if (dst_mip_w >= 4) {
+                    int32_t scaled_ox =
+                        region.imageOffset.x / static_cast<int32_t>(info.scale_factor);
+                    scaled_ox = (scaled_ox / 4) * 4;
+                    const int32_t max_ox =
+                        ((static_cast<int32_t>(dst_mip_w) - 4) / 4) * 4;
+                    region.imageOffset.x = std::clamp(scaled_ox, 0, max_ox);
 
-                region.imageOffset.x =
-                    std::clamp(scaled_ox, 0, static_cast<int32_t>(dst_mip_w - 1));
-                region.imageOffset.y =
-                    std::clamp(scaled_oy, 0, static_cast<int32_t>(dst_mip_h - 1));
+                    uint32_t scaled_w =
+                        std::max(1u, region.imageExtent.width / info.scale_factor);
+                    scaled_w = ((scaled_w + 3u) / 4u) * 4u;
+                    if (static_cast<uint32_t>(region.imageOffset.x) + scaled_w > dst_mip_w) {
+                        scaled_w = dst_mip_w - static_cast<uint32_t>(region.imageOffset.x);
+                    }
+                    region.imageExtent.width = scaled_w;
+                } else {
+                    region.imageOffset.x = 0;
+                    region.imageExtent.width = dst_mip_w;
+                }
 
-                region.imageExtent.width =
-                    std::min(scaled_w, dst_mip_w - static_cast<uint32_t>(region.imageOffset.x));
-                region.imageExtent.height =
-                    std::min(scaled_h, dst_mip_h - static_cast<uint32_t>(region.imageOffset.y));
+                if (dst_mip_h >= 4) {
+                    int32_t scaled_oy =
+                        region.imageOffset.y / static_cast<int32_t>(info.scale_factor);
+                    scaled_oy = (scaled_oy / 4) * 4;
+                    const int32_t max_oy =
+                        ((static_cast<int32_t>(dst_mip_h) - 4) / 4) * 4;
+                    region.imageOffset.y = std::clamp(scaled_oy, 0, max_oy);
+
+                    uint32_t scaled_h =
+                        std::max(1u, region.imageExtent.height / info.scale_factor);
+                    scaled_h = ((scaled_h + 3u) / 4u) * 4u;
+                    if (static_cast<uint32_t>(region.imageOffset.y) + scaled_h > dst_mip_h) {
+                        scaled_h = dst_mip_h - static_cast<uint32_t>(region.imageOffset.y);
+                    }
+                    region.imageExtent.height = scaled_h;
+                } else {
+                    region.imageOffset.y = 0;
+                    region.imageExtent.height = dst_mip_h;
+                }
+
+                region.imageOffset.z = 0;
+                region.imageExtent.depth = std::max(1u, region.imageExtent.depth);
             }
             if (region.imageSubresource.aspectMask == 0) {
                 region.imageSubresource.aspectMask = DEFAULT_COLOR_ASPECT;
             }
-            adjusted_regions.push_back(region);
+            out_regions[i] = region;
         }
 
         const double max_budget = vntx::get_layer_config().max_latency_ms;
@@ -503,19 +726,16 @@ VKAPI_ATTR void VKAPI_CALL vntx_CmdCopyBufferToImage(const VkCommandBuffer comma
                 "latency={:.3f}ms <= "
                 "{:.1f}ms)",
                 static_cast<void*>(dstImage), elapsed_ms, max_budget);
-
-            device_data->next_cmd_copy_buffer_to_image(
-                commandBuffer, srcBuffer, dstImage, dstImageLayout,
-                static_cast<uint32_t>(adjusted_regions.size()), adjusted_regions.data());
         } else {
             // Latency budget exceeded: Graceful fallback pass-through
             VNTX_LOG_WARN(
-                "Transcoding budget exceeded ({:.3f}ms > {:.1f}ms) for image {} - triggering "
-                "pass-through",
+                "Transcoding budget exceeded ({:.3f}ms > {:.1f}ms) for image {} - fallback "
+                "using scaled regions",
                 elapsed_ms, max_budget, static_cast<void*>(dstImage));
-            device_data->next_cmd_copy_buffer_to_image(commandBuffer, srcBuffer, dstImage,
-                                                       dstImageLayout, regionCount, pRegions);
         }
+
+        device_data->next_cmd_copy_buffer_to_image(commandBuffer, srcBuffer, dstImage,
+                                                   dstImageLayout, regionCount, out_regions);
     } catch (...) {
         VNTX_LOG_ERROR("Exception in vntx_CmdCopyBufferToImage, triggering fallback");
         auto* const device_data =
@@ -569,64 +789,122 @@ vntx_CmdCopyBufferToImage2(const VkCommandBuffer commandBuffer,
         if (!vntx::is_supported_texture_format(info.format)) {
             VNTX_LOG_WARN(
                 "Candidate image {} has unsupported format ({}) for NTC transcoding (v2) - "
-                "triggering pass-through fallback",
+                "marking fallback",
                 static_cast<void*>(dstImage), static_cast<uint32_t>(info.format));
-            device_data->next_cmd_copy_buffer_to_image2(commandBuffer, pCopyBufferToImageInfo);
-            return;
+            {
+                std::unique_lock<std::shared_mutex> lock(device_data->image_mutex);
+                auto it = device_data->candidate_textures.find(dstImage);
+                if (it != device_data->candidate_textures.end()) {
+                    it->second.fallback_triggered = true;
+                }
+            }
         }
 
         // 3. Anti-stutter latency guardrail: Measure copy preparation duration
         const vntx::TranscodingLatencyGuard latency_guard;
 
-        // 4. Adapt copy parameters & normalize subresource regions
-        std::vector<VkBufferImageCopy2> adjusted_regions;
-        adjusted_regions.reserve(pCopyBufferToImageInfo->regionCount);
+        // 4. Adapt copy parameters & normalize subresource regions (stack buffer for <= 8 regions)
+        constexpr size_t STACK_REGIONS_CAPACITY = 8;
+        VkBufferImageCopy2 stack_regions[STACK_REGIONS_CAPACITY];
+        std::vector<VkBufferImageCopy2> heap_regions;
+        VkBufferImageCopy2* out_regions = stack_regions;
+
+        if (pCopyBufferToImageInfo->regionCount > STACK_REGIONS_CAPACITY) {
+            heap_regions.resize(pCopyBufferToImageInfo->regionCount);
+            out_regions = heap_regions.data();
+        }
 
         for (uint32_t i = 0; i < pCopyBufferToImageInfo->regionCount; ++i) {
             VkBufferImageCopy2 region = pCopyBufferToImageInfo->pRegions[i];
-            if (info.scale_factor > 1) {
-                const uint32_t mip =
-                    std::min(info.mip_levels - 1, region.imageSubresource.mipLevel);
-                region.imageSubresource.mipLevel = mip;
+            const uint32_t max_mips = info.mip_levels;
+            const uint32_t mip =
+                std::min(max_mips > 0 ? (max_mips - 1) : 0u, region.imageSubresource.mipLevel);
+            region.imageSubresource.mipLevel = mip;
 
+            if (info.array_layers > 0) {
+                if (region.imageSubresource.baseArrayLayer >= info.array_layers) {
+                    region.imageSubresource.baseArrayLayer = info.array_layers - 1;
+                    region.imageSubresource.layerCount = 1;
+                } else if (region.imageSubresource.layerCount == VK_REMAINING_ARRAY_LAYERS ||
+                           region.imageSubresource.baseArrayLayer +
+                                   region.imageSubresource.layerCount >
+                               info.array_layers) {
+                    region.imageSubresource.layerCount =
+                        info.array_layers - region.imageSubresource.baseArrayLayer;
+                }
+                if (region.imageSubresource.layerCount == 0) {
+                    region.imageSubresource.layerCount = 1;
+                }
+            }
+
+            if (info.scale_factor > 1) {
                 const uint32_t dst_mip_w = std::max(1u, info.created_extent.width >> mip);
                 const uint32_t dst_mip_h = std::max(1u, info.created_extent.height >> mip);
 
                 if (region.bufferRowLength == 0) {
-                    region.bufferRowLength = region.imageExtent.width;
+                    if (region.imageExtent.width >= 4) {
+                        region.bufferRowLength = ((region.imageExtent.width + 3u) / 4u) * 4u;
+                    }
                 }
                 if (region.bufferImageHeight == 0) {
-                    region.bufferImageHeight = region.imageExtent.height;
+                    if (region.imageExtent.height >= 4) {
+                        region.bufferImageHeight = ((region.imageExtent.height + 3u) / 4u) * 4u;
+                    }
                 }
 
-                const uint32_t scaled_w =
-                    std::max(1u, region.imageExtent.width / info.scale_factor);
-                const uint32_t scaled_h =
-                    std::max(1u, region.imageExtent.height / info.scale_factor);
-                const int32_t scaled_ox =
-                    region.imageOffset.x / static_cast<int32_t>(info.scale_factor);
-                const int32_t scaled_oy =
-                    region.imageOffset.y / static_cast<int32_t>(info.scale_factor);
+                // Block-compressed formats require 4x4 alignment
+                if (dst_mip_w >= 4) {
+                    int32_t scaled_ox =
+                        region.imageOffset.x / static_cast<int32_t>(info.scale_factor);
+                    scaled_ox = (scaled_ox / 4) * 4;
+                    const int32_t max_ox =
+                        ((static_cast<int32_t>(dst_mip_w) - 4) / 4) * 4;
+                    region.imageOffset.x = std::clamp(scaled_ox, 0, max_ox);
 
-                region.imageOffset.x =
-                    std::clamp(scaled_ox, 0, static_cast<int32_t>(dst_mip_w - 1));
-                region.imageOffset.y =
-                    std::clamp(scaled_oy, 0, static_cast<int32_t>(dst_mip_h - 1));
+                    uint32_t scaled_w =
+                        std::max(1u, region.imageExtent.width / info.scale_factor);
+                    scaled_w = ((scaled_w + 3u) / 4u) * 4u;
+                    if (static_cast<uint32_t>(region.imageOffset.x) + scaled_w > dst_mip_w) {
+                        scaled_w = dst_mip_w - static_cast<uint32_t>(region.imageOffset.x);
+                    }
+                    region.imageExtent.width = scaled_w;
+                } else {
+                    region.imageOffset.x = 0;
+                    region.imageExtent.width = dst_mip_w;
+                }
 
-                region.imageExtent.width =
-                    std::min(scaled_w, dst_mip_w - static_cast<uint32_t>(region.imageOffset.x));
-                region.imageExtent.height =
-                    std::min(scaled_h, dst_mip_h - static_cast<uint32_t>(region.imageOffset.y));
+                if (dst_mip_h >= 4) {
+                    int32_t scaled_oy =
+                        region.imageOffset.y / static_cast<int32_t>(info.scale_factor);
+                    scaled_oy = (scaled_oy / 4) * 4;
+                    const int32_t max_oy =
+                        ((static_cast<int32_t>(dst_mip_h) - 4) / 4) * 4;
+                    region.imageOffset.y = std::clamp(scaled_oy, 0, max_oy);
+
+                    uint32_t scaled_h =
+                        std::max(1u, region.imageExtent.height / info.scale_factor);
+                    scaled_h = ((scaled_h + 3u) / 4u) * 4u;
+                    if (static_cast<uint32_t>(region.imageOffset.y) + scaled_h > dst_mip_h) {
+                        scaled_h = dst_mip_h - static_cast<uint32_t>(region.imageOffset.y);
+                    }
+                    region.imageExtent.height = scaled_h;
+                } else {
+                    region.imageOffset.y = 0;
+                    region.imageExtent.height = dst_mip_h;
+                }
+
+                region.imageOffset.z = 0;
+                region.imageExtent.depth = std::max(1u, region.imageExtent.depth);
             }
             if (region.imageSubresource.aspectMask == 0) {
                 region.imageSubresource.aspectMask = DEFAULT_COLOR_ASPECT;
             }
-            adjusted_regions.push_back(region);
+            out_regions[i] = region;
         }
 
         VkCopyBufferToImageInfo2 modified_info = *pCopyBufferToImageInfo;
-        modified_info.pRegions = adjusted_regions.data();
-        modified_info.regionCount = static_cast<uint32_t>(adjusted_regions.size());
+        modified_info.pRegions = out_regions;
+        modified_info.regionCount = pCopyBufferToImageInfo->regionCount;
 
         const double max_budget = vntx::get_layer_config().max_latency_ms;
         const double elapsed_ms = latency_guard.elapsed_ms();
@@ -638,16 +916,15 @@ vntx_CmdCopyBufferToImage2(const VkCommandBuffer commandBuffer,
                 "latency={:.3f}ms <= "
                 "{:.1f}ms)",
                 static_cast<void*>(dstImage), elapsed_ms, max_budget);
-
-            device_data->next_cmd_copy_buffer_to_image2(commandBuffer, &modified_info);
         } else {
             // Latency budget exceeded: Graceful fallback pass-through
             VNTX_LOG_WARN(
-                "Transcoding budget exceeded (v2) ({:.3f}ms > {:.1f}ms) for image {} - triggering "
-                "pass-through",
+                "Transcoding budget exceeded (v2) ({:.3f}ms > {:.1f}ms) for image {} - fallback "
+                "using scaled regions",
                 elapsed_ms, max_budget, static_cast<void*>(dstImage));
-            device_data->next_cmd_copy_buffer_to_image2(commandBuffer, pCopyBufferToImageInfo);
         }
+
+        device_data->next_cmd_copy_buffer_to_image2(commandBuffer, &modified_info);
     } catch (...) {
         VNTX_LOG_ERROR("Exception in vntx_CmdCopyBufferToImage2, triggering fallback");
         auto* const device_data =
@@ -686,37 +963,80 @@ VKAPI_ATTR void VKAPI_CALL vntx_CmdPipelineBarrier(
             return;
         }
 
-        std::vector<VkImageMemoryBarrier> adjusted_barriers(
-            pImageMemoryBarriers, pImageMemoryBarriers + imageMemoryBarrierCount);
+        constexpr size_t STACK_BARRIERS_CAPACITY = 8;
+        VkImageMemoryBarrier stack_barriers[STACK_BARRIERS_CAPACITY];
+        std::vector<VkImageMemoryBarrier> heap_barriers;
+        VkImageMemoryBarrier* out_barriers = stack_barriers;
+
+        if (imageMemoryBarrierCount > STACK_BARRIERS_CAPACITY) {
+            heap_barriers.assign(pImageMemoryBarriers,
+                                 pImageMemoryBarriers + imageMemoryBarrierCount);
+            out_barriers = heap_barriers.data();
+        } else {
+            std::copy(pImageMemoryBarriers, pImageMemoryBarriers + imageMemoryBarrierCount,
+                      stack_barriers);
+        }
 
         {
             std::shared_lock<std::shared_mutex> lock(device_data->image_mutex);
-            for (auto& barrier : adjusted_barriers) {
+            for (uint32_t i = 0; i < imageMemoryBarrierCount; ++i) {
+                auto& barrier = out_barriers[i];
                 if (barrier.image != VK_NULL_HANDLE) {
                     const auto it = device_data->candidate_textures.find(barrier.image);
-                    if (it != device_data->candidate_textures.end() &&
-                        it->second.scale_factor > 1) {
+                    if (it != device_data->candidate_textures.end()) {
                         const uint32_t max_mips = it->second.mip_levels;
-                        if (barrier.subresourceRange.levelCount != VK_REMAINING_MIP_LEVELS) {
-                            if (barrier.subresourceRange.baseMipLevel >= max_mips) {
-                                barrier.subresourceRange.baseMipLevel = std::max(0u, max_mips - 1);
+                        if (barrier.subresourceRange.baseMipLevel >= max_mips) {
+                            barrier.subresourceRange.baseMipLevel =
+                                max_mips > 0 ? (max_mips - 1) : 0;
+                            if (barrier.subresourceRange.levelCount != VK_REMAINING_MIP_LEVELS) {
                                 barrier.subresourceRange.levelCount = 1;
-                            } else if (barrier.subresourceRange.baseMipLevel +
+                            }
+                        } else if (barrier.subresourceRange.levelCount != VK_REMAINING_MIP_LEVELS &&
+                                   barrier.subresourceRange.baseMipLevel +
                                            barrier.subresourceRange.levelCount >
                                        max_mips) {
-                                barrier.subresourceRange.levelCount =
-                                    max_mips - barrier.subresourceRange.baseMipLevel;
+                            barrier.subresourceRange.levelCount =
+                                max_mips - barrier.subresourceRange.baseMipLevel;
+                        }
+
+                        if (barrier.subresourceRange.levelCount == 0) {
+                            barrier.subresourceRange.levelCount = 1;
+                        }
+
+                        if (it->second.array_layers > 0) {
+                            if (barrier.subresourceRange.baseArrayLayer >= it->second.array_layers) {
+                                barrier.subresourceRange.baseArrayLayer =
+                                    it->second.array_layers - 1;
+                                if (barrier.subresourceRange.layerCount !=
+                                    VK_REMAINING_ARRAY_LAYERS) {
+                                    barrier.subresourceRange.layerCount = 1;
+                                }
+                            } else if (barrier.subresourceRange.layerCount !=
+                                           VK_REMAINING_ARRAY_LAYERS &&
+                                       barrier.subresourceRange.baseArrayLayer +
+                                               barrier.subresourceRange.layerCount >
+                                           it->second.array_layers) {
+                                barrier.subresourceRange.layerCount =
+                                    it->second.array_layers -
+                                    barrier.subresourceRange.baseArrayLayer;
                             }
+                            if (barrier.subresourceRange.layerCount == 0) {
+                                barrier.subresourceRange.layerCount = 1;
+                            }
+                        }
+
+                        if (barrier.subresourceRange.aspectMask == 0) {
+                            barrier.subresourceRange.aspectMask = DEFAULT_COLOR_ASPECT;
                         }
                     }
                 }
             }
         }
 
-        device_data->next_cmd_pipeline_barrier(commandBuffer, srcStageMask, dstStageMask,
-                                               dependencyFlags, memoryBarrierCount, pMemoryBarriers,
-                                               bufferMemoryBarrierCount, pBufferMemoryBarriers,
-                                               imageMemoryBarrierCount, adjusted_barriers.data());
+        device_data->next_cmd_pipeline_barrier(
+            commandBuffer, srcStageMask, dstStageMask, dependencyFlags, memoryBarrierCount,
+            pMemoryBarriers, bufferMemoryBarrierCount, pBufferMemoryBarriers,
+            imageMemoryBarrierCount, out_barriers);
     } catch (...) {
         auto* const device_data =
             vntx::LayerContext::get().get_device_data_from_command_buffer(commandBuffer);
@@ -749,28 +1069,73 @@ VKAPI_ATTR void VKAPI_CALL vntx_CmdPipelineBarrier2(const VkCommandBuffer comman
             return;
         }
 
-        std::vector<VkImageMemoryBarrier2> adjusted_barriers(
-            pDependencyInfo->pImageMemoryBarriers,
-            pDependencyInfo->pImageMemoryBarriers + pDependencyInfo->imageMemoryBarrierCount);
+        constexpr size_t STACK_BARRIERS_CAPACITY = 8;
+        VkImageMemoryBarrier2 stack_barriers[STACK_BARRIERS_CAPACITY];
+        std::vector<VkImageMemoryBarrier2> heap_barriers;
+        VkImageMemoryBarrier2* out_barriers = stack_barriers;
+
+        if (pDependencyInfo->imageMemoryBarrierCount > STACK_BARRIERS_CAPACITY) {
+            heap_barriers.assign(
+                pDependencyInfo->pImageMemoryBarriers,
+                pDependencyInfo->pImageMemoryBarriers + pDependencyInfo->imageMemoryBarrierCount);
+            out_barriers = heap_barriers.data();
+        } else {
+            std::copy(
+                pDependencyInfo->pImageMemoryBarriers,
+                pDependencyInfo->pImageMemoryBarriers + pDependencyInfo->imageMemoryBarrierCount,
+                stack_barriers);
+        }
 
         {
             std::shared_lock<std::shared_mutex> lock(device_data->image_mutex);
-            for (auto& barrier : adjusted_barriers) {
+            for (uint32_t i = 0; i < pDependencyInfo->imageMemoryBarrierCount; ++i) {
+                auto& barrier = out_barriers[i];
                 if (barrier.image != VK_NULL_HANDLE) {
                     const auto it = device_data->candidate_textures.find(barrier.image);
-                    if (it != device_data->candidate_textures.end() &&
-                        it->second.scale_factor > 1) {
+                    if (it != device_data->candidate_textures.end()) {
                         const uint32_t max_mips = it->second.mip_levels;
-                        if (barrier.subresourceRange.levelCount != VK_REMAINING_MIP_LEVELS) {
-                            if (barrier.subresourceRange.baseMipLevel >= max_mips) {
-                                barrier.subresourceRange.baseMipLevel = std::max(0u, max_mips - 1);
+                        if (barrier.subresourceRange.baseMipLevel >= max_mips) {
+                            barrier.subresourceRange.baseMipLevel =
+                                max_mips > 0 ? (max_mips - 1) : 0;
+                            if (barrier.subresourceRange.levelCount != VK_REMAINING_MIP_LEVELS) {
                                 barrier.subresourceRange.levelCount = 1;
-                            } else if (barrier.subresourceRange.baseMipLevel +
+                            }
+                        } else if (barrier.subresourceRange.levelCount != VK_REMAINING_MIP_LEVELS &&
+                                   barrier.subresourceRange.baseMipLevel +
                                            barrier.subresourceRange.levelCount >
                                        max_mips) {
-                                barrier.subresourceRange.levelCount =
-                                    max_mips - barrier.subresourceRange.baseMipLevel;
+                            barrier.subresourceRange.levelCount =
+                                max_mips - barrier.subresourceRange.baseMipLevel;
+                        }
+
+                        if (barrier.subresourceRange.levelCount == 0) {
+                            barrier.subresourceRange.levelCount = 1;
+                        }
+
+                        if (it->second.array_layers > 0) {
+                            if (barrier.subresourceRange.baseArrayLayer >= it->second.array_layers) {
+                                barrier.subresourceRange.baseArrayLayer =
+                                    it->second.array_layers - 1;
+                                if (barrier.subresourceRange.layerCount !=
+                                    VK_REMAINING_ARRAY_LAYERS) {
+                                    barrier.subresourceRange.layerCount = 1;
+                                }
+                            } else if (barrier.subresourceRange.layerCount !=
+                                           VK_REMAINING_ARRAY_LAYERS &&
+                                       barrier.subresourceRange.baseArrayLayer +
+                                               barrier.subresourceRange.layerCount >
+                                           it->second.array_layers) {
+                                barrier.subresourceRange.layerCount =
+                                    it->second.array_layers -
+                                    barrier.subresourceRange.baseArrayLayer;
                             }
+                            if (barrier.subresourceRange.layerCount == 0) {
+                                barrier.subresourceRange.layerCount = 1;
+                            }
+                        }
+
+                        if (barrier.subresourceRange.aspectMask == 0) {
+                            barrier.subresourceRange.aspectMask = DEFAULT_COLOR_ASPECT;
                         }
                     }
                 }
@@ -778,7 +1143,7 @@ VKAPI_ATTR void VKAPI_CALL vntx_CmdPipelineBarrier2(const VkCommandBuffer comman
         }
 
         VkDependencyInfo modified_dep_info = *pDependencyInfo;
-        modified_dep_info.pImageMemoryBarriers = adjusted_barriers.data();
+        modified_dep_info.pImageMemoryBarriers = out_barriers;
         device_data->next_cmd_pipeline_barrier2(commandBuffer, &modified_dep_info);
     } catch (...) {
         auto* const device_data =
@@ -818,25 +1183,84 @@ VKAPI_ATTR VkResult VKAPI_CALL vntx_CreateImageView(const VkDevice device,
             }
         }
 
-        if (!is_candidate || info.scale_factor <= 1) {
+        if (!is_candidate) {
             return device_data->next_create_image_view(device, pCreateInfo, pAllocator, pView);
         }
 
         VkImageViewCreateInfo modified_info = *pCreateInfo;
-        if (modified_info.subresourceRange.levelCount != VK_REMAINING_MIP_LEVELS) {
-            if (modified_info.subresourceRange.baseMipLevel >= info.mip_levels) {
-                modified_info.subresourceRange.baseMipLevel = std::max(0u, info.mip_levels - 1);
+
+        // Image view format compatibility (e.g. mutable formats / sRGB reinterpretation)
+        if (modified_info.format == VK_FORMAT_UNDEFINED) {
+            modified_info.format = info.format;
+        }
+
+        const uint32_t max_mips = info.mip_levels;
+        if (modified_info.subresourceRange.baseMipLevel >= max_mips) {
+            modified_info.subresourceRange.baseMipLevel = max_mips > 0 ? (max_mips - 1) : 0;
+            if (modified_info.subresourceRange.levelCount != VK_REMAINING_MIP_LEVELS) {
                 modified_info.subresourceRange.levelCount = 1;
-            } else if (modified_info.subresourceRange.baseMipLevel +
+            }
+        } else if (modified_info.subresourceRange.levelCount != VK_REMAINING_MIP_LEVELS &&
+                   modified_info.subresourceRange.baseMipLevel +
                            modified_info.subresourceRange.levelCount >
-                       info.mip_levels) {
-                modified_info.subresourceRange.levelCount =
-                    info.mip_levels - modified_info.subresourceRange.baseMipLevel;
+                       max_mips) {
+            modified_info.subresourceRange.levelCount =
+                max_mips - modified_info.subresourceRange.baseMipLevel;
+        }
+
+        if (modified_info.subresourceRange.levelCount == 0) {
+            modified_info.subresourceRange.levelCount = 1;
+        }
+
+        if (info.array_layers > 0) {
+            if (modified_info.subresourceRange.baseArrayLayer >= info.array_layers) {
+                modified_info.subresourceRange.baseArrayLayer = info.array_layers - 1;
+                if (modified_info.subresourceRange.layerCount != VK_REMAINING_ARRAY_LAYERS) {
+                    modified_info.subresourceRange.layerCount = 1;
+                }
+            } else if (modified_info.subresourceRange.layerCount != VK_REMAINING_ARRAY_LAYERS &&
+                       modified_info.subresourceRange.baseArrayLayer +
+                               modified_info.subresourceRange.layerCount >
+                           info.array_layers) {
+                modified_info.subresourceRange.layerCount =
+                    info.array_layers - modified_info.subresourceRange.baseArrayLayer;
+            }
+            if (modified_info.subresourceRange.layerCount == 0) {
+                modified_info.subresourceRange.layerCount = 1;
             }
         }
 
-        return device_data->next_create_image_view(device, &modified_info, pAllocator, pView);
+        if (modified_info.subresourceRange.aspectMask == 0) {
+            modified_info.subresourceRange.aspectMask = DEFAULT_COLOR_ASPECT;
+        }
+
+        const VkResult res =
+            device_data->next_create_image_view(device, &modified_info, pAllocator, pView);
+        if (res != VK_SUCCESS) {
+            VNTX_LOG_WARN(
+                "vkCreateImageView failed (result={}) with modified subresource range; retrying "
+                "with original parameters and marking fallback",
+                static_cast<int>(res));
+            {
+                std::unique_lock<std::shared_mutex> lock(device_data->image_mutex);
+                auto it = device_data->candidate_textures.find(pCreateInfo->image);
+                if (it != device_data->candidate_textures.end()) {
+                    it->second.fallback_triggered = true;
+                }
+            }
+            const VkResult retry_res =
+                device_data->next_create_image_view(device, pCreateInfo, pAllocator, pView);
+            if (retry_res != VK_SUCCESS) {
+                VNTX_LOG_WARN(
+                    "vkCreateImageView retry with original parameters also failed (result={}) for "
+                    "image {}",
+                    static_cast<int>(retry_res), static_cast<void*>(pCreateInfo->image));
+            }
+            return retry_res;
+        }
+        return res;
     } catch (...) {
+        VNTX_LOG_ERROR("Exception in vntx_CreateImageView, attempting native fallback");
         auto* const device_data = vntx::LayerContext::get().get_device_data(device);
         if (device_data && device_data->next_create_image_view) {
             return device_data->next_create_image_view(device, pCreateInfo, pAllocator, pView);
@@ -898,8 +1322,8 @@ VKAPI_ATTR VkResult VKAPI_CALL vntx_CreateShaderModule(
         return device_data->next_create_shader_module(device, pCreateInfo, pAllocator,
                                                       pShaderModule);
     } catch (...) {
-        VNTX_LOG_ERROR("Exception in vntx_CreateShaderModule, deactivating layer");
-        vntx::LayerContext::get().disable();
+        VNTX_LOG_ERROR(
+            "Exception in vntx_CreateShaderModule, falling back to unmodified shader module");
         auto* const device_data = vntx::LayerContext::get().get_device_data(device);
         if (device_data && device_data->next_create_shader_module) {
             return device_data->next_create_shader_module(device, pCreateInfo, pAllocator,

@@ -13,6 +13,7 @@ add_executable(ntc_headless_test
     headless/test_challenger_m1.cpp
     headless/test_challenger_m2.cpp
     headless/test_challenger_m3.cpp
+    headless/test_vkd3d_compat.cpp
 )
 
 target_include_directories(ntc_headless_test

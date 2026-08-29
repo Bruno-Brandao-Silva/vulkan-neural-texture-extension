@@ -273,3 +273,25 @@ TEST(FilterTest, DynamicLatencyBudget25ms) {
     // Reset back to default
     set_layer_config(LayerConfig{});
 }
+
+TEST(FilterTest, RejectsMultiPlanarYCbCrAndAstcFormats) {
+    const std::vector<VkFormat> non_bc_formats = {
+        VK_FORMAT_G8_B8R8_2PLANE_420_UNORM,
+        VK_FORMAT_G8_B8_R8_3PLANE_420_UNORM,
+        VK_FORMAT_G16_B16R16_2PLANE_420_UNORM,
+        VK_FORMAT_ASTC_4x4_UNORM_BLOCK,
+        VK_FORMAT_ASTC_8x8_UNORM_BLOCK,
+        VK_FORMAT_ETC2_R8G8B8_UNORM_BLOCK,
+        VK_FORMAT_ETC2_R8G8B8A8_UNORM_BLOCK,
+        VK_FORMAT_EAC_R11_UNORM_BLOCK,
+    };
+
+    for (const auto format : non_bc_formats) {
+        auto info = make_default_create_info(2048, 2048);
+        info.format = format;
+        EXPECT_FALSE(is_candidate_texture(info))
+            << "Should reject non-BC format " << static_cast<int>(format);
+        EXPECT_FALSE(get_filter_rejection_reason(info).empty());
+    }
+}
+
