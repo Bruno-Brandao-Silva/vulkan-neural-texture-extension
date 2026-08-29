@@ -430,6 +430,99 @@ TEST(TransferClampTest, CopyImageNeverLeavesThePhysicalImageAcrossTheMipChain) {
     }
 }
 
+TEST(TransferClampTest, StaysInsidePhysicalImageForEveryShapeTheGameCreated) {
+    // The distinct texture shapes The Witcher 3 Next-Gen created in one session. Non-square and
+    // non-power-of-two extents are where per-axis clamping arithmetic goes wrong, and a wrong
+    // clamp is a GPU fault rather than a failed call.
+    struct Shape {
+        uint32_t w;
+        uint32_t h;
+    };
+    static constexpr Shape SHAPES[] = {
+        {128, 128},   {128, 256},   {128, 512},   {188, 136},   {256, 128},   {256, 256},
+        {256, 512},   {256, 1024},  {256, 2048},  {364, 132},   {400, 1080},  {512, 128},
+        {512, 256},   {512, 512},   {512, 1024},  {512, 2048},  {896, 128},   {968, 704},
+        {976, 1012},  {984, 960},   {988, 396},   {988, 444},   {988, 448},   {988, 460},
+        {992, 780},   {1008, 508},  {1020, 1016}, {1024, 184},  {1024, 256},  {1024, 432},
+        {1024, 460},  {1024, 468},  {1024, 512},  {1024, 624},  {1024, 928},  {1024, 996},
+        {1024, 1004}, {1024, 1012}, {1024, 1024}, {1024, 2048}, {1024, 4096}, {1268, 560},
+        {1376, 316},  {1404, 688},  {1420, 620},  {1548, 752},  {2048, 1024}, {2048, 2048},
+        {2048, 4096}, {2828, 1024},
+    };
+
+    ClampMockFixture fixture;
+    LayerConfig cfg = get_layer_config();
+    cfg.enable_compression = true;
+    cfg.compression_scale_factor = 2;
+    cfg.min_resolution_threshold = 128;
+    set_layer_config(cfg);
+
+    auto* const device_data = LayerContext::get().get_device_data(fixture.device);
+    ASSERT_NE(device_data, nullptr);
+
+    for (const auto shape : SHAPES) {
+        uint32_t mips = 1;
+        for (uint32_t d = std::max(shape.w, shape.h); d > 1; d >>= 1) {
+            ++mips;
+        }
+
+        // Let the layer apply its own sizing rules rather than restating them here.
+        VkImageCreateInfo info = base_candidate_info();
+        info.extent = {shape.w, shape.h, 1};
+        info.mipLevels = mips;
+
+        VkImage dst = VK_NULL_HANDLE;
+        ASSERT_EQ(vntx_CreateImage(fixture.device, &info, nullptr, &dst), VK_SUCCESS);
+
+        VkExtent3D physical{};
+        uint32_t physical_mips = 0;
+        {
+            std::shared_lock<std::shared_mutex> lock(device_data->image_mutex);
+            const auto it = device_data->candidate_textures.find(dst);
+            ASSERT_NE(it, device_data->candidate_textures.end());
+            physical = it->second.created_extent;
+            physical_mips = it->second.mip_levels;
+        }
+
+        const auto src = reinterpret_cast<VkImage>(0x1111);
+        for (uint32_t mip = 0; mip < mips; ++mip) {
+            reset_clamp_records();
+
+            // The application addresses the mip chain of the size it asked for.
+            VkImageCopy region{};
+            region.srcSubresource = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 0, 1};
+            region.dstSubresource = {VK_IMAGE_ASPECT_COLOR_BIT, mip, 0, 1};
+            region.extent = {mip_dim(shape.w, mip), mip_dim(shape.h, mip), 1};
+
+            vntx_CmdCopyImage(fixture.cmd_buffer, src, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, dst,
+                              VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &region);
+
+            std::lock_guard<std::mutex> lock(g_clamp_test_mutex);
+            for (const auto& out : g_copy_image_regions) {
+                const uint32_t level = out.dstSubresource.mipLevel;
+                ASSERT_LT(level, physical_mips) << shape.w << "x" << shape.h << " mip " << mip;
+
+                const uint32_t bound_w = mip_dim(physical.width, level);
+                const uint32_t bound_h = mip_dim(physical.height, level);
+                ASSERT_GE(out.dstOffset.x, 0);
+                ASSERT_GE(out.dstOffset.y, 0);
+
+                const uint32_t end_x = static_cast<uint32_t>(out.dstOffset.x) + out.extent.width;
+                const uint32_t end_y = static_cast<uint32_t>(out.dstOffset.y) + out.extent.height;
+                ASSERT_LE(end_x, bound_w) << shape.w << "x" << shape.h << " mip " << mip;
+                ASSERT_LE(end_y, bound_h) << shape.w << "x" << shape.h << " mip " << mip;
+
+                ASSERT_TRUE(out.extent.width % 4u == 0u || end_x == bound_w)
+                    << shape.w << "x" << shape.h << " mip " << mip << " w=" << out.extent.width;
+                ASSERT_TRUE(out.extent.height % 4u == 0u || end_y == bound_h)
+                    << shape.w << "x" << shape.h << " mip " << mip << " h=" << out.extent.height;
+            }
+        }
+
+        vntx_DestroyImage(fixture.device, dst, nullptr);
+    }
+}
+
 // =========================================================================
 // Suite 3: the remaining transfer entry points
 // =========================================================================

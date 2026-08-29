@@ -56,6 +56,17 @@ for case_index in 0 1 2 3 4; do
         "${WORK}/repro" LAYER new "${case_index}" || failures=$((failures + 1))
 done
 
+echo
+echo "--- every distinct texture shape the game created, whole mip chain each ---"
+g++ -std=c++20 -O1 -o "${WORK}/sweep" "$(dirname "${BASH_SOURCE[0]}")/real_shape_sweep.cpp" \
+    -lvulkan || exit 2
+env DISABLE_VNTX=1 \
+    VK_LAYER_PATH="${WORK}" \
+    VNTX_SCALE_FACTOR=2 \
+    VNTX_LOG_LEVEL=warn \
+    VNTX_LOG_FILE="${WORK}/vntx.log" \
+    "${WORK}/sweep" new 0 || failures=$((failures + 1))
+
 sleep 4
 after="$(xid_count)"
 echo
