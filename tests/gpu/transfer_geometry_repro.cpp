@@ -15,13 +15,13 @@
 #include <string>
 #include <vector>
 
-#define CHECK(expr)                                                              \
-    do {                                                                         \
-        const VkResult r_ = (expr);                                              \
-        if (r_ != VK_SUCCESS) {                                                  \
+#define CHECK(expr)                                                                  \
+    do {                                                                             \
+        const VkResult r_ = (expr);                                                  \
+        if (r_ != VK_SUCCESS) {                                                      \
             std::printf("  FATAL %s -> VkResult %d\n", #expr, static_cast<int>(r_)); \
-            return 2;                                                            \
-        }                                                                        \
+            return 2;                                                                \
+        }                                                                            \
     } while (0)
 
 namespace {
@@ -184,10 +184,10 @@ int main(int argc, char** argv) {
     struct Case {
         const char* name;
         VkImageUsageFlags usage;
-        uint32_t request_mips;   // what the application asks vkCreateImage for
-        uint32_t copy_mip;       // which mip the copy addresses
-        uint32_t copy_dim;       // extent at that mip, from the application's point of view
-        bool whole_chain;        // copy every mip in one command
+        uint32_t request_mips;  // what the application asks vkCreateImage for
+        uint32_t copy_mip;      // which mip the copy addresses
+        uint32_t copy_dim;      // extent at that mip, from the application's point of view
+        bool whole_chain;       // copy every mip in one command
     };
     const Case cases[] = {
         {"mip0 full extent", VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT, 12, 0,
@@ -198,8 +198,8 @@ int main(int argc, char** argv) {
          12, 0, 2048, false},
         {"tail mip beyond physical chain",
          VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT, 12, 11, 4, false},
-        {"mip 1 of a 2-mip texture",
-         VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT, 2, 1, 1024, false},
+        {"mip 1 of a 2-mip texture", VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT,
+         2, 1, 1024, false},
         {"whole mip chain in one command",
          VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT, 12, 0, 2048, true},
     };
@@ -262,8 +262,8 @@ int main(int argc, char** argv) {
             regions.push_back(r);
         }
         vkCmdCopyImage(cmd, src.handle, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, dst.handle,
-                       VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
-                       static_cast<uint32_t>(regions.size()), regions.data());
+                       VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, static_cast<uint32_t>(regions.size()),
+                       regions.data());
         CHECK(vkEndCommandBuffer(cmd));
 
         VkFenceCreateInfo fci{};

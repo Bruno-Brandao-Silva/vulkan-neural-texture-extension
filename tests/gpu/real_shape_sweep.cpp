@@ -17,7 +17,11 @@ VkQueue g_queue = VK_NULL_HANDLE;
 uint32_t g_qf = 0;
 VkPhysicalDeviceMemoryProperties g_mem{};
 
-struct Image { VkImage handle{}; VkDeviceMemory memory{}; VkDeviceSize allocated{}; };
+struct Image {
+    VkImage handle{};
+    VkDeviceMemory memory{};
+    VkDeviceSize allocated{};
+};
 
 int device_local_type(uint32_t bits) {
     for (uint32_t i = 0; i < g_mem.memoryTypeCount; ++i)
@@ -69,7 +73,10 @@ void barrier(VkCommandBuffer cmd, VkImage img, VkImageLayout to, VkAccessFlags a
 
 uint32_t full_mips(uint32_t w, uint32_t h) {
     uint32_t n = 1, d = (w > h) ? w : h;
-    while (d > 1) { d >>= 1; ++n; }
+    while (d > 1) {
+        d >>= 1;
+        ++n;
+    }
     return n;
 }
 }  // namespace
@@ -97,7 +104,10 @@ int main(int argc, char** argv) {
     for (auto d : devs) {
         VkPhysicalDeviceProperties p{};
         vkGetPhysicalDeviceProperties(d, &p);
-        if (std::strstr(p.deviceName, "NVIDIA")) { g_phys = d; break; }
+        if (std::strstr(p.deviceName, "NVIDIA")) {
+            g_phys = d;
+            break;
+        }
     }
     if (!g_phys) return 3;
     vkGetPhysicalDeviceMemoryProperties(g_phys, &g_mem);
@@ -107,27 +117,37 @@ int main(int argc, char** argv) {
     std::vector<VkQueueFamilyProperties> qfs(qn);
     vkGetPhysicalDeviceQueueFamilyProperties(g_phys, &qn, qfs.data());
     for (uint32_t i = 0; i < qn; ++i)
-        if (qfs[i].queueFlags & VK_QUEUE_GRAPHICS_BIT) { g_qf = i; break; }
+        if (qfs[i].queueFlags & VK_QUEUE_GRAPHICS_BIT) {
+            g_qf = i;
+            break;
+        }
 
     const float prio = 1.0f;
     VkDeviceQueueCreateInfo dq{};
     dq.sType = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO;
-    dq.queueFamilyIndex = g_qf; dq.queueCount = 1; dq.pQueuePriorities = &prio;
+    dq.queueFamilyIndex = g_qf;
+    dq.queueCount = 1;
+    dq.pQueuePriorities = &prio;
     VkDeviceCreateInfo dc{};
     dc.sType = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO;
-    dc.queueCreateInfoCount = 1; dc.pQueueCreateInfos = &dq;
+    dc.queueCreateInfoCount = 1;
+    dc.pQueueCreateInfos = &dq;
     if (vkCreateDevice(g_phys, &dc, nullptr, &g_device) != VK_SUCCESS) return 2;
     vkGetDeviceQueue(g_device, g_qf, 0, &g_queue);
 
-    struct Shape { uint32_t w, h; };
+    struct Shape {
+        uint32_t w, h;
+    };
     const Shape shapes[] = {
-        {128,128},{128,256},{128,512},{188,136},{256,128},{256,256},{256,512},{256,1024},
-        {256,2048},{364,132},{400,1080},{512,128},{512,256},{512,512},{512,1024},{512,2048},
-        {896,128},{968,704},{976,1012},{984,960},{988,396},{988,444},{988,448},{988,460},
-        {992,780},{1008,508},{1020,1016},{1024,184},{1024,256},{1024,432},{1024,460},{1024,468},
-        {1024,512},{1024,624},{1024,928},{1024,996},{1024,1004},{1024,1012},{1024,1024},
-        {1024,2048},{1024,4096},{1268,560},{1376,316},{1404,688},{1420,620},{1548,752},
-        {2048,1024},{2048,2048},{2048,4096},{2828,1024},
+        {128, 128},   {128, 256},   {128, 512},   {188, 136},   {256, 128},   {256, 256},
+        {256, 512},   {256, 1024},  {256, 2048},  {364, 132},   {400, 1080},  {512, 128},
+        {512, 256},   {512, 512},   {512, 1024},  {512, 2048},  {896, 128},   {968, 704},
+        {976, 1012},  {984, 960},   {988, 396},   {988, 444},   {988, 448},   {988, 460},
+        {992, 780},   {1008, 508},  {1020, 1016}, {1024, 184},  {1024, 256},  {1024, 432},
+        {1024, 460},  {1024, 468},  {1024, 512},  {1024, 624},  {1024, 928},  {1024, 996},
+        {1024, 1004}, {1024, 1012}, {1024, 1024}, {1024, 2048}, {1024, 4096}, {1268, 560},
+        {1376, 316},  {1404, 688},  {1420, 620},  {1548, 752},  {2048, 1024}, {2048, 2048},
+        {2048, 4096}, {2828, 1024},
     };
     const int count = static_cast<int>(sizeof(shapes) / sizeof(shapes[0]));
 
@@ -136,8 +156,8 @@ int main(int argc, char** argv) {
         const uint32_t mips = full_mips(s.w, s.h);
 
         Image src{}, dst{};
-        if (!make_image(s.w, s.h, 1,
-                        VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_SAMPLED_BIT, src) ||
+        if (!make_image(s.w, s.h, 1, VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
+                        src) ||
             !make_image(s.w, s.h, mips,
                         VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT, dst)) {
             std::printf("  %4ux%-4u  SETUP FAILED\n", s.w, s.h);
@@ -151,7 +171,8 @@ int main(int argc, char** argv) {
         vkCreateCommandPool(g_device, &pci, nullptr, &pool);
         VkCommandBufferAllocateInfo cbai{};
         cbai.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
-        cbai.commandPool = pool; cbai.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
+        cbai.commandPool = pool;
+        cbai.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
         cbai.commandBufferCount = 1;
         VkCommandBuffer cmd{};
         vkAllocateCommandBuffers(g_device, &cbai, &cmd);
@@ -160,7 +181,8 @@ int main(int argc, char** argv) {
         bi.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
         vkBeginCommandBuffer(cmd, &bi);
         barrier(cmd, src.handle, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, VK_ACCESS_TRANSFER_READ_BIT);
-        barrier(cmd, dst.handle, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_ACCESS_TRANSFER_WRITE_BIT);
+        barrier(cmd, dst.handle, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+                VK_ACCESS_TRANSFER_WRITE_BIT);
 
         std::vector<VkImageCopy> regions;
         for (uint32_t m = 0; m < mips; ++m) {
@@ -171,8 +193,8 @@ int main(int argc, char** argv) {
             regions.push_back(r);
         }
         vkCmdCopyImage(cmd, src.handle, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, dst.handle,
-                       VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
-                       static_cast<uint32_t>(regions.size()), regions.data());
+                       VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, static_cast<uint32_t>(regions.size()),
+                       regions.data());
         vkEndCommandBuffer(cmd);
 
         VkFenceCreateInfo fci{};
@@ -181,7 +203,8 @@ int main(int argc, char** argv) {
         vkCreateFence(g_device, &fci, nullptr, &fence);
         VkSubmitInfo si{};
         si.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
-        si.commandBufferCount = 1; si.pCommandBuffers = &cmd;
+        si.commandBufferCount = 1;
+        si.pCommandBuffers = &cmd;
         const VkResult sub = vkQueueSubmit(g_queue, 1, &si, fence);
         const VkResult wait = (sub == VK_SUCCESS)
                                   ? vkWaitForFences(g_device, 1, &fence, VK_TRUE, 5000000000ull)
@@ -195,8 +218,10 @@ int main(int argc, char** argv) {
 
         vkDestroyFence(g_device, fence, nullptr);
         vkDestroyCommandPool(g_device, pool, nullptr);
-        vkDestroyImage(g_device, dst.handle, nullptr); vkFreeMemory(g_device, dst.memory, nullptr);
-        vkDestroyImage(g_device, src.handle, nullptr); vkFreeMemory(g_device, src.memory, nullptr);
+        vkDestroyImage(g_device, dst.handle, nullptr);
+        vkFreeMemory(g_device, dst.memory, nullptr);
+        vkDestroyImage(g_device, src.handle, nullptr);
+        vkFreeMemory(g_device, src.memory, nullptr);
     }
     std::printf("  all %d shapes completed\n", count - start);
     return 0;
