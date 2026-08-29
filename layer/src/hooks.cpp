@@ -671,12 +671,10 @@ VKAPI_ATTR void VKAPI_CALL vntx_CmdCopyBufferToImage(const VkCommandBuffer comma
                     int32_t scaled_ox =
                         region.imageOffset.x / static_cast<int32_t>(info.scale_factor);
                     scaled_ox = (scaled_ox / 4) * 4;
-                    const int32_t max_ox =
-                        ((static_cast<int32_t>(dst_mip_w) - 4) / 4) * 4;
+                    const int32_t max_ox = ((static_cast<int32_t>(dst_mip_w) - 4) / 4) * 4;
                     region.imageOffset.x = std::clamp(scaled_ox, 0, max_ox);
 
-                    uint32_t scaled_w =
-                        std::max(1u, region.imageExtent.width / info.scale_factor);
+                    uint32_t scaled_w = std::max(1u, region.imageExtent.width / info.scale_factor);
                     scaled_w = ((scaled_w + 3u) / 4u) * 4u;
                     if (static_cast<uint32_t>(region.imageOffset.x) + scaled_w > dst_mip_w) {
                         scaled_w = dst_mip_w - static_cast<uint32_t>(region.imageOffset.x);
@@ -691,12 +689,10 @@ VKAPI_ATTR void VKAPI_CALL vntx_CmdCopyBufferToImage(const VkCommandBuffer comma
                     int32_t scaled_oy =
                         region.imageOffset.y / static_cast<int32_t>(info.scale_factor);
                     scaled_oy = (scaled_oy / 4) * 4;
-                    const int32_t max_oy =
-                        ((static_cast<int32_t>(dst_mip_h) - 4) / 4) * 4;
+                    const int32_t max_oy = ((static_cast<int32_t>(dst_mip_h) - 4) / 4) * 4;
                     region.imageOffset.y = std::clamp(scaled_oy, 0, max_oy);
 
-                    uint32_t scaled_h =
-                        std::max(1u, region.imageExtent.height / info.scale_factor);
+                    uint32_t scaled_h = std::max(1u, region.imageExtent.height / info.scale_factor);
                     scaled_h = ((scaled_h + 3u) / 4u) * 4u;
                     if (static_cast<uint32_t>(region.imageOffset.y) + scaled_h > dst_mip_h) {
                         scaled_h = dst_mip_h - static_cast<uint32_t>(region.imageOffset.y);
@@ -857,12 +853,10 @@ vntx_CmdCopyBufferToImage2(const VkCommandBuffer commandBuffer,
                     int32_t scaled_ox =
                         region.imageOffset.x / static_cast<int32_t>(info.scale_factor);
                     scaled_ox = (scaled_ox / 4) * 4;
-                    const int32_t max_ox =
-                        ((static_cast<int32_t>(dst_mip_w) - 4) / 4) * 4;
+                    const int32_t max_ox = ((static_cast<int32_t>(dst_mip_w) - 4) / 4) * 4;
                     region.imageOffset.x = std::clamp(scaled_ox, 0, max_ox);
 
-                    uint32_t scaled_w =
-                        std::max(1u, region.imageExtent.width / info.scale_factor);
+                    uint32_t scaled_w = std::max(1u, region.imageExtent.width / info.scale_factor);
                     scaled_w = ((scaled_w + 3u) / 4u) * 4u;
                     if (static_cast<uint32_t>(region.imageOffset.x) + scaled_w > dst_mip_w) {
                         scaled_w = dst_mip_w - static_cast<uint32_t>(region.imageOffset.x);
@@ -877,12 +871,10 @@ vntx_CmdCopyBufferToImage2(const VkCommandBuffer commandBuffer,
                     int32_t scaled_oy =
                         region.imageOffset.y / static_cast<int32_t>(info.scale_factor);
                     scaled_oy = (scaled_oy / 4) * 4;
-                    const int32_t max_oy =
-                        ((static_cast<int32_t>(dst_mip_h) - 4) / 4) * 4;
+                    const int32_t max_oy = ((static_cast<int32_t>(dst_mip_h) - 4) / 4) * 4;
                     region.imageOffset.y = std::clamp(scaled_oy, 0, max_oy);
 
-                    uint32_t scaled_h =
-                        std::max(1u, region.imageExtent.height / info.scale_factor);
+                    uint32_t scaled_h = std::max(1u, region.imageExtent.height / info.scale_factor);
                     scaled_h = ((scaled_h + 3u) / 4u) * 4u;
                     if (static_cast<uint32_t>(region.imageOffset.y) + scaled_h > dst_mip_h) {
                         scaled_h = dst_mip_h - static_cast<uint32_t>(region.imageOffset.y);
@@ -1004,7 +996,8 @@ VKAPI_ATTR void VKAPI_CALL vntx_CmdPipelineBarrier(
                         }
 
                         if (it->second.array_layers > 0) {
-                            if (barrier.subresourceRange.baseArrayLayer >= it->second.array_layers) {
+                            if (barrier.subresourceRange.baseArrayLayer >=
+                                it->second.array_layers) {
                                 barrier.subresourceRange.baseArrayLayer =
                                     it->second.array_layers - 1;
                                 if (barrier.subresourceRange.layerCount !=
@@ -1033,10 +1026,10 @@ VKAPI_ATTR void VKAPI_CALL vntx_CmdPipelineBarrier(
             }
         }
 
-        device_data->next_cmd_pipeline_barrier(
-            commandBuffer, srcStageMask, dstStageMask, dependencyFlags, memoryBarrierCount,
-            pMemoryBarriers, bufferMemoryBarrierCount, pBufferMemoryBarriers,
-            imageMemoryBarrierCount, out_barriers);
+        device_data->next_cmd_pipeline_barrier(commandBuffer, srcStageMask, dstStageMask,
+                                               dependencyFlags, memoryBarrierCount, pMemoryBarriers,
+                                               bufferMemoryBarrierCount, pBufferMemoryBarriers,
+                                               imageMemoryBarrierCount, out_barriers);
     } catch (...) {
         auto* const device_data =
             vntx::LayerContext::get().get_device_data_from_command_buffer(commandBuffer);
@@ -1113,7 +1106,8 @@ VKAPI_ATTR void VKAPI_CALL vntx_CmdPipelineBarrier2(const VkCommandBuffer comman
                         }
 
                         if (it->second.array_layers > 0) {
-                            if (barrier.subresourceRange.baseArrayLayer >= it->second.array_layers) {
+                            if (barrier.subresourceRange.baseArrayLayer >=
+                                it->second.array_layers) {
                                 barrier.subresourceRange.baseArrayLayer =
                                     it->second.array_layers - 1;
                                 if (barrier.subresourceRange.layerCount !=

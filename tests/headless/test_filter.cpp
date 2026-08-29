@@ -276,14 +276,10 @@ TEST(FilterTest, DynamicLatencyBudget25ms) {
 
 TEST(FilterTest, RejectsMultiPlanarYCbCrAndAstcFormats) {
     const std::vector<VkFormat> non_bc_formats = {
-        VK_FORMAT_G8_B8R8_2PLANE_420_UNORM,
-        VK_FORMAT_G8_B8_R8_3PLANE_420_UNORM,
-        VK_FORMAT_G16_B16R16_2PLANE_420_UNORM,
-        VK_FORMAT_ASTC_4x4_UNORM_BLOCK,
-        VK_FORMAT_ASTC_8x8_UNORM_BLOCK,
-        VK_FORMAT_ETC2_R8G8B8_UNORM_BLOCK,
-        VK_FORMAT_ETC2_R8G8B8A8_UNORM_BLOCK,
-        VK_FORMAT_EAC_R11_UNORM_BLOCK,
+        VK_FORMAT_G8_B8R8_2PLANE_420_UNORM,    VK_FORMAT_G8_B8_R8_3PLANE_420_UNORM,
+        VK_FORMAT_G16_B16R16_2PLANE_420_UNORM, VK_FORMAT_ASTC_4x4_UNORM_BLOCK,
+        VK_FORMAT_ASTC_8x8_UNORM_BLOCK,        VK_FORMAT_ETC2_R8G8B8_UNORM_BLOCK,
+        VK_FORMAT_ETC2_R8G8B8A8_UNORM_BLOCK,   VK_FORMAT_EAC_R11_UNORM_BLOCK,
     };
 
     for (const auto format : non_bc_formats) {
@@ -294,4 +290,3 @@ TEST(FilterTest, RejectsMultiPlanarYCbCrAndAstcFormats) {
         EXPECT_FALSE(get_filter_rejection_reason(info).empty());
     }
 }
-

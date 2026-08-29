@@ -33,7 +33,8 @@ struct CandidateTextureInfo {
         1};  ///< Physical dimension compression scale factor (e.g. 2 = 75% VRAM saved)
     VkExtent3D created_extent{0, 0, 0};  ///< Actual physical image extent created on GPU
     bool is_bound{false};                ///< True after vkBindImageMemory[2]
-    bool fallback_triggered{false};      ///< True if runtime validation failed and image reverted to pass-through
+    bool fallback_triggered{
+        false};  ///< True if runtime validation failed and image reverted to pass-through
 };
 
 /// @brief Thread-safe instance-wide and device-wide telemetry counters for VRAM reduction

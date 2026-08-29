@@ -78,8 +78,9 @@ static void mock_vkd3d_get_image_memory_requirements(VkDevice, VkImage,
     pMemoryRequirements->memoryTypeBits = 0x7u;
 }
 
-static void mock_vkd3d_get_image_memory_requirements2(
-    VkDevice, const VkImageMemoryRequirementsInfo2*, VkMemoryRequirements2* pMemoryRequirements) {
+static void mock_vkd3d_get_image_memory_requirements2(VkDevice,
+                                                      const VkImageMemoryRequirementsInfo2*,
+                                                      VkMemoryRequirements2* pMemoryRequirements) {
     pMemoryRequirements->memoryRequirements.size = 5592448u;
     pMemoryRequirements->memoryRequirements.alignment = 65536u;
     pMemoryRequirements->memoryRequirements.memoryTypeBits = 0x7u;
@@ -137,10 +138,12 @@ static void mock_vkd3d_cmd_copy_buffer_to_image2(
     g_vkd3d_copy_calls.push_back(rec);
 }
 
-static void mock_vkd3d_cmd_pipeline_barrier(
-    VkCommandBuffer commandBuffer, VkPipelineStageFlags, VkPipelineStageFlags, VkDependencyFlags,
-    uint32_t, const VkMemoryBarrier*, uint32_t, const VkBufferMemoryBarrier*,
-    uint32_t imageMemoryBarrierCount, const VkImageMemoryBarrier* pImageMemoryBarriers) {
+static void mock_vkd3d_cmd_pipeline_barrier(VkCommandBuffer commandBuffer, VkPipelineStageFlags,
+                                            VkPipelineStageFlags, VkDependencyFlags, uint32_t,
+                                            const VkMemoryBarrier*, uint32_t,
+                                            const VkBufferMemoryBarrier*,
+                                            uint32_t imageMemoryBarrierCount,
+                                            const VkImageMemoryBarrier* pImageMemoryBarriers) {
     std::lock_guard<std::mutex> lock(g_vkd3d_test_mutex);
     MockVkd3dBarrierRecord rec{};
     rec.cmd_buffer = commandBuffer;
@@ -253,7 +256,8 @@ TEST(Vkd3dCompatMemoryTest, PreserveDriverRequirementsWhenDownsizeDisabled) {
     VkMemoryRequirements mem_reqs{};
     vntx_GetImageMemoryRequirements(fixture.device, img, &mem_reqs);
 
-    // When downsize_vram_allocations is false, driver size, alignment, and type bits must be preserved
+    // When downsize_vram_allocations is false, driver size, alignment, and type bits must be
+    // preserved
     EXPECT_EQ(mem_reqs.size, 5592448u);
     EXPECT_EQ(mem_reqs.alignment, 65536u);
     EXPECT_EQ(mem_reqs.memoryTypeBits, 0x7u);
@@ -331,7 +335,8 @@ TEST(Vkd3dCompatMemoryTest, BindImageMemoryOffsetAlignmentValidation) {
     VkMemoryRequirements mem_reqs{};
     vntx_GetImageMemoryRequirements(fixture.device, img, &mem_reqs);
 
-    // Binding with misaligned offset (e.g. 1024 when alignment is 65536) triggers per-image fallback
+    // Binding with misaligned offset (e.g. 1024 when alignment is 65536) triggers per-image
+    // fallback
     const VkDeviceMemory mock_mem = reinterpret_cast<VkDeviceMemory>(0xAAAA);
     EXPECT_EQ(vntx_BindImageMemory(fixture.device, img, mock_mem, 1024), VK_SUCCESS);
 
@@ -409,7 +414,8 @@ TEST(Vkd3dCompatSubresourceTest, PipelineBarrierClampsRemainingMipsWhenBaseMipEx
     VkImage img = VK_NULL_HANDLE;
     ASSERT_EQ(vntx_CreateImage(fixture.device, &info, nullptr, &img), VK_SUCCESS);
 
-    // VKD3D-Proton emits barrier on original tail mip 11 (which is index 11 >= 11 in downscaled image)
+    // VKD3D-Proton emits barrier on original tail mip 11 (which is index 11 >= 11 in downscaled
+    // image)
     VkImageMemoryBarrier barrier{};
     barrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
     barrier.image = img;
@@ -428,7 +434,8 @@ TEST(Vkd3dCompatSubresourceTest, PipelineBarrierClampsRemainingMipsWhenBaseMipEx
         ASSERT_EQ(g_vkd3d_barrier_calls.size(), 1u);
         ASSERT_EQ(g_vkd3d_barrier_calls[0].image_barriers.size(), 1u);
         const auto& adjusted = g_vkd3d_barrier_calls[0].image_barriers[0];
-        // baseMipLevel clamped to max_mips - 1 (10), levelCount preserved as VK_REMAINING_MIP_LEVELS
+        // baseMipLevel clamped to max_mips - 1 (10), levelCount preserved as
+        // VK_REMAINING_MIP_LEVELS
         EXPECT_EQ(adjusted.subresourceRange.baseMipLevel, 10u);
         EXPECT_EQ(adjusted.subresourceRange.levelCount, VK_REMAINING_MIP_LEVELS);
     }
@@ -684,7 +691,8 @@ TEST(Vkd3dCompatSubresourceTest, PipelineBarrier2ClampsRemainingMipsWhenBaseMipE
     VkImage img = VK_NULL_HANDLE;
     ASSERT_EQ(vntx_CreateImage(fixture.device, &info, nullptr, &img), VK_SUCCESS);
 
-    // VKD3D-Proton emits barrier2 on original tail mip 11 (which is index 11 >= 11 in downscaled image)
+    // VKD3D-Proton emits barrier2 on original tail mip 11 (which is index 11 >= 11 in downscaled
+    // image)
     VkImageMemoryBarrier2 barrier{};
     barrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER_2;
     barrier.image = img;
@@ -706,7 +714,8 @@ TEST(Vkd3dCompatSubresourceTest, PipelineBarrier2ClampsRemainingMipsWhenBaseMipE
         ASSERT_EQ(g_vkd3d_barrier_calls.size(), 1u);
         ASSERT_EQ(g_vkd3d_barrier_calls[0].image_barriers2.size(), 1u);
         const auto& adjusted = g_vkd3d_barrier_calls[0].image_barriers2[0];
-        // baseMipLevel clamped to max_mips - 1 (10), levelCount preserved as VK_REMAINING_MIP_LEVELS
+        // baseMipLevel clamped to max_mips - 1 (10), levelCount preserved as
+        // VK_REMAINING_MIP_LEVELS
         EXPECT_EQ(adjusted.subresourceRange.baseMipLevel, 10u);
         EXPECT_EQ(adjusted.subresourceRange.levelCount, VK_REMAINING_MIP_LEVELS);
     }
@@ -836,7 +845,8 @@ TEST(Vkd3dCompatStagingCopyTest, CopyBufferToImageNPOTAndSubFourByFourTailMips) 
     VkImage img = VK_NULL_HANDLE;
     ASSERT_EQ(vntx_CreateImage(fixture.device, &info, nullptr, &img), VK_SUCCESS);
 
-    // Copying tail mips: mip 10 (2x2 in original) and mip 11 (1x1 in original) with bufferRowLength=0
+    // Copying tail mips: mip 10 (2x2 in original) and mip 11 (1x1 in original) with
+    // bufferRowLength=0
     VkBufferImageCopy regions[2]{};
     // Mip 10 (downscaled mip 10 is 1x1)
     regions[0].bufferOffset = 0;
@@ -983,7 +993,8 @@ TEST(Vkd3dCompatResilienceTest, BindImageMemoryDriverFailureTriggersFallback) {
     g_mock_force_bind_image_fail = true;
 
     const VkDeviceMemory mock_mem = reinterpret_cast<VkDeviceMemory>(0xBBBB);
-    EXPECT_EQ(vntx_BindImageMemory(fixture.device, img, mock_mem, 0), VK_ERROR_OUT_OF_DEVICE_MEMORY);
+    EXPECT_EQ(vntx_BindImageMemory(fixture.device, img, mock_mem, 0),
+              VK_ERROR_OUT_OF_DEVICE_MEMORY);
 
     auto* dev_data = LayerContext::get().get_device_data(fixture.device);
     ASSERT_NE(dev_data, nullptr);
@@ -1068,7 +1079,9 @@ TEST(Vkd3dCompatResilienceTest, FallbackTriggeredImagePreservesScaledRegionsAndB
     vntx_GetImageMemoryRequirements(fixture.device, img, &mem_reqs);
 
     // Trigger fallback by calling BindImageMemory with misaligned offset (123 % 65536 != 0)
-    EXPECT_EQ(vntx_BindImageMemory(fixture.device, img, reinterpret_cast<VkDeviceMemory>(0x9999), 123), VK_SUCCESS);
+    EXPECT_EQ(
+        vntx_BindImageMemory(fixture.device, img, reinterpret_cast<VkDeviceMemory>(0x9999), 123),
+        VK_SUCCESS);
 
     auto* dev_data = LayerContext::get().get_device_data(fixture.device);
     ASSERT_NE(dev_data, nullptr);
@@ -1184,7 +1197,8 @@ TEST(Vkd3dCompatSubresourceTest, MultiLayer2DArrayHighSliceCountClamping) {
     region1.imageSubresource.layerCount = 8;
     region1.imageExtent = {2048, 2048, 1};
 
-    // 2. Copy with baseArrayLayer=4 and layerCount=VK_REMAINING_ARRAY_LAYERS -> layerCount clamped to 12
+    // 2. Copy with baseArrayLayer=4 and layerCount=VK_REMAINING_ARRAY_LAYERS -> layerCount clamped
+    // to 12
     VkBufferImageCopy region2{};
     region2.bufferOffset = 1048576;
     region2.imageSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
@@ -1207,7 +1221,8 @@ TEST(Vkd3dCompatSubresourceTest, MultiLayer2DArrayHighSliceCountClamping) {
         EXPECT_EQ(g_vkd3d_copy_calls[0].regions[0].imageSubresource.layerCount, 4u);  // 16 - 12 = 4
 
         EXPECT_EQ(g_vkd3d_copy_calls[0].regions[1].imageSubresource.baseArrayLayer, 4u);
-        EXPECT_EQ(g_vkd3d_copy_calls[0].regions[1].imageSubresource.layerCount, 12u);  // 16 - 4 = 12
+        EXPECT_EQ(g_vkd3d_copy_calls[0].regions[1].imageSubresource.layerCount,
+                  12u);  // 16 - 4 = 12
     }
 
     // 3. Barrier with baseArrayLayer=14 and layerCount=6 (14+6=20 > 16) -> layerCount clamped to 2
@@ -1229,7 +1244,8 @@ TEST(Vkd3dCompatSubresourceTest, MultiLayer2DArrayHighSliceCountClamping) {
         ASSERT_EQ(g_vkd3d_barrier_calls.size(), 1u);
         ASSERT_EQ(g_vkd3d_barrier_calls[0].image_barriers.size(), 1u);
         EXPECT_EQ(g_vkd3d_barrier_calls[0].image_barriers[0].subresourceRange.baseArrayLayer, 14u);
-        EXPECT_EQ(g_vkd3d_barrier_calls[0].image_barriers[0].subresourceRange.layerCount, 2u);  // 16 - 14 = 2
+        EXPECT_EQ(g_vkd3d_barrier_calls[0].image_barriers[0].subresourceRange.layerCount,
+                  2u);  // 16 - 14 = 2
     }
 
     vntx_DestroyImage(fixture.device, img, nullptr);
@@ -1267,7 +1283,8 @@ TEST(Vkd3dCompatStagingCopyTest, CopyBufferToImageLargeRegionCountMemorySafety) 
         regions[i].imageSubresource.mipLevel = 0;
         regions[i].imageSubresource.baseArrayLayer = 0;
         regions[i].imageSubresource.layerCount = 1;
-        regions[i].imageOffset = {static_cast<int32_t>((i % 4) * 512), static_cast<int32_t>((i / 4) * 512), 0};
+        regions[i].imageOffset = {static_cast<int32_t>((i % 4) * 512),
+                                  static_cast<int32_t>((i / 4) * 512), 0};
         regions[i].imageExtent = {512, 512, 1};
     }
 
@@ -1397,7 +1414,7 @@ TEST(Vkd3dCompatSubresourceTest, ZeroLevelCountAndZeroLayerCountNormalization) {
     barrier.image = img;
     barrier.subresourceRange.aspectMask = 0;  // Zero aspect mask
     barrier.subresourceRange.baseMipLevel = 0;
-    barrier.subresourceRange.levelCount = 0;   // Zero level count
+    barrier.subresourceRange.levelCount = 0;  // Zero level count
     barrier.subresourceRange.baseArrayLayer = 0;
     barrier.subresourceRange.layerCount = 0;  // Zero layer count
 
@@ -1455,12 +1472,9 @@ TEST(Vkd3dCompatFilterTest, RejectsMultiPlanarYCbCrAndAstcEtcFormats) {
     set_layer_config(cfg);
 
     const std::vector<VkFormat> non_bc_formats = {
-        VK_FORMAT_G8_B8R8_2PLANE_420_UNORM,
-        VK_FORMAT_G8_B8_R8_3PLANE_420_UNORM,
-        VK_FORMAT_G16_B16R16_2PLANE_420_UNORM,
-        VK_FORMAT_ASTC_4x4_UNORM_BLOCK,
-        VK_FORMAT_ASTC_8x8_UNORM_BLOCK,
-        VK_FORMAT_ETC2_R8G8B8_UNORM_BLOCK,
+        VK_FORMAT_G8_B8R8_2PLANE_420_UNORM,    VK_FORMAT_G8_B8_R8_3PLANE_420_UNORM,
+        VK_FORMAT_G16_B16R16_2PLANE_420_UNORM, VK_FORMAT_ASTC_4x4_UNORM_BLOCK,
+        VK_FORMAT_ASTC_8x8_UNORM_BLOCK,        VK_FORMAT_ETC2_R8G8B8_UNORM_BLOCK,
         VK_FORMAT_ETC2_R8G8B8A8_UNORM_BLOCK,
     };
 
@@ -1613,7 +1627,8 @@ TEST(Vkd3dCompatConcurrencyTest, HighConcurrencyInterceptionAndDestruction32Thre
                 VkImageCreateInfo info{};
                 info.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
                 info.imageType = VK_IMAGE_TYPE_2D;
-                info.format = (t % 2 == 0) ? VK_FORMAT_BC7_UNORM_BLOCK : VK_FORMAT_BC1_RGBA_UNORM_BLOCK;
+                info.format =
+                    (t % 2 == 0) ? VK_FORMAT_BC7_UNORM_BLOCK : VK_FORMAT_BC1_RGBA_UNORM_BLOCK;
                 info.extent = {2048, 2048, 1};
                 info.mipLevels = 12;
                 info.arrayLayers = 1;
@@ -1688,4 +1703,3 @@ TEST(Vkd3dCompatConcurrencyTest, HighConcurrencyInterceptionAndDestruction32Thre
 
     EXPECT_EQ(success_count.load(), NUM_THREADS * ITERS_PER_THREAD);
 }
-
